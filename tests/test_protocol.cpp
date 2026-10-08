@@ -1,0 +1,68 @@
+#include "common/Protocol.hpp"
+
+#include <gtest/gtest.h>
+
+using namespace rtype::protocol;
+
+TEST(Protocol, RoundTripInput)
+{
+    const auto bytes = encode({42, Input{InputFlag::Up | InputFlag::Shoot}});
+    ASSERT_EQ(bytes.size(), HeaderSize + 1);
+
+    const auto packet = decode(bytes);
+    ASSERT_TRUE(packet);
+    EXPECT_EQ(packet->sequence, 42u);
+    ASSERT_TRUE(std::holds_alternative<Input>(packet->message));
+    EXPECT_EQ(std::get<Input>(packet->message).flags, InputFlag::Up | InputFlag::Shoot);
+}
+
+TEST(Protocol, RoundTripSnapshot)
+{
+    Snapshot snap{7, {{1, EntityType::Player, 2, 10.5f, 20.f}, {9, EntityType::Enemy, 0, 1800.f, 300.f}}};
+    const auto packet = decode(encode({1, snap}));
+    ASSERT_TRUE(packet);
+    const auto &out = std::get<Snapshot>(packet->message);
+    EXPECT_EQ(out.tick, 7u);
+    ASSERT_EQ(out.entities.size(), 2u);
+    EXPECT_EQ(out.entities[0].variant, 2);
+    EXPECT_FLOAT_EQ(out.entities[0].x, 10.5f);
+    EXPECT_EQ(out.entities[1].type, EntityType::Enemy);
+}
+
+TEST(Protocol, HeaderIsBigEndian)
+{
+    const auto bytes = encode({0x01020304, Connect{}});
+    ASSERT_EQ(bytes.size(), HeaderSize);
+    EXPECT_EQ(bytes[0], 0x52); // 'R'
+    EXPECT_EQ(bytes[1], 0x54); // 'T'
+    EXPECT_EQ(bytes[4], 0x01);
+    EXPECT_EQ(bytes[7], 0x04);
+}
+
+TEST(Protocol, RejectsMalformedPackets)
+{
+    auto valid = encode({1, Ping{123}});
+
+    EXPECT_FALSE(decode({}));
+    EXPECT_FALSE(decode(std::span(valid).first(HeaderSize - 1)));   // truncated header
+    EXPECT_FALSE(decode(std::span(valid).first(valid.size() - 1))); // truncated payload
+
+    auto badMagic = valid;
+    badMagic[0] = 0;
+    EXPECT_FALSE(decode(badMagic));
+
+    auto unknownType = valid;
+    unknownType[3] = 0x7F;
+    EXPECT_FALSE(decode(unknownType));
+
+    auto trailing = valid;
+    trailing.push_back(0);
+    EXPECT_FALSE(decode(trailing)); // payloadSize no longer matches
+}
+
+TEST(Protocol, RejectsSnapshotWithLyingCount)
+{
+    auto bytes = encode({1, Snapshot{1, {{1, EntityType::Player, 0, 0.f, 0.f}}}});
+    bytes[HeaderSize + 5] = 50; // count says 50 entities, payload only holds 1
+    EXPECT_FALSE(decode(bytes));
+}
