@@ -37,9 +37,16 @@ Scopes: `engine`, `common`, `server`, `client`, `network`, `gameplay`, `ci`, `do
 - Formatting: `clang-format` with the repository `.clang-format` (run it before committing).
 - Classes and structs `PascalCase`, functions and variables `camelCase`, private members `_camelCase`,
   constants `PascalCase`, files named after their main class.
+- Explicit names: `reader`, `message`, `entity`, never `r`, `m`, `e`. Single letters only for loop indices (`i`).
 - One namespace per module: `engine::...`, `rtype::protocol`, `rtype::server`, `rtype::client`.
 - No warnings: the build uses `-Wall -Wextra -Wpedantic -Wshadow -Wconversion`.
 - New logic comes with unit tests in `tests/` when it can be tested without a window or a socket.
+
+## Contracts and TODOs
+
+Headers (`.hpp`) are the contracts between domains: don't change a public signature without telling the team.
+Functions marked `TODO(<domain>)` are not implemented yet and throw `std::logic_error`.
+The tests in `tests/` describe the expected behavior: a feature is done when its tests pass.
 
 ## Documentation
 
