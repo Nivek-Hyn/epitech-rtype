@@ -50,17 +50,18 @@ Input flags: `0x01` up, `0x02` down, `0x04` left, `0x08` right, `0x10` shoot.
 |---|---|---|---|
 | `0x81` | ConnectAccepted | `u8 player_id` | `player_id` in 0–3. |
 | `0x82` | ConnectRejected | `u8 reason` | `1` server full, `2` version mismatch. |
-| `0x83` | Snapshot | see below | State of the entities at a server tick. |
+| `0x83` | Snapshot | see below | Game state, score and entities at a server tick. |
 | `0x84` | EntityDestroyed | `u32 net_id`, `u8 reason` | `1` killed, `2` out of bounds. |
 | `0x85` | PlayerLeft | `u8 player_id`, `u8 reason` | `1` disconnected, `2` timed out. |
-| `0x86` | GameOver | `u32 score` | End of the game. |
-| `0x87` | Pong | `u32 timestamp_ms` | Same value as the Ping. |
+| `0x86` | Pong | `u32 timestamp_ms` | Same value as the Ping. |
 
 #### Snapshot payload
 
 | Size | Field |
 |---|---|
 | u32 | tick |
+| u8 | state: `1` waiting for players, `2` playing, `3` finished |
+| u32 | score |
 | u16 | count (max 84) |
 | count × 14 bytes | entities |
 
@@ -75,6 +76,9 @@ Each entity:
 | f32 | y | |
 
 A tick with more than 84 entities is sent as several Snapshot packets with the same `tick`.
+
+The end of the game is not a separate message: the client sees `state = 3` in the snapshots, with the final score.
+Since a snapshot is sent every tick, this information cannot be lost.
 
 ## 5. Session
 

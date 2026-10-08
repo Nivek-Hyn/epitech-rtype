@@ -18,11 +18,16 @@ TEST(Protocol, RoundTripInput)
 
 TEST(Protocol, RoundTripSnapshot)
 {
-    Snapshot sent{7, {{1, EntityType::Player, 2, 10.5f, 20.f}, {9, EntityType::Enemy, 0, 1800.f, 300.f}}};
+    Snapshot sent{7,
+                  GameState::Playing,
+                  1500,
+                  {{1, EntityType::Player, 2, 10.5f, 20.f}, {9, EntityType::Enemy, 0, 1800.f, 300.f}}};
     const auto packet = decode(encode({1, sent}));
     ASSERT_TRUE(packet);
     const auto &received = std::get<Snapshot>(packet->message);
     EXPECT_EQ(received.tick, 7u);
+    EXPECT_EQ(received.state, GameState::Playing);
+    EXPECT_EQ(received.score, 1500u);
     ASSERT_EQ(received.entities.size(), 2u);
     EXPECT_EQ(received.entities[0].variant, 2);
     EXPECT_FLOAT_EQ(received.entities[0].x, 10.5f);
@@ -62,7 +67,14 @@ TEST(Protocol, RejectsMalformedPackets)
 
 TEST(Protocol, RejectsSnapshotWithLyingCount)
 {
-    auto bytes = encode({1, Snapshot{1, {{1, EntityType::Player, 0, 0.f, 0.f}}}});
-    bytes[HeaderSize + 5] = 50; // count says 50 entities, payload only holds 1
+    auto bytes = encode({1, Snapshot{1, GameState::Playing, 0, {{1, EntityType::Player, 0, 0.f, 0.f}}}});
+    bytes[HeaderSize + 10] = 50; // count says 50 entities, payload only holds 1
+    EXPECT_FALSE(decode(bytes));
+}
+
+TEST(Protocol, RejectsSnapshotWithUnknownState)
+{
+    auto bytes = encode({1, Snapshot{1, GameState::Playing, 0, {}}});
+    bytes[HeaderSize + 4] = 9; // state 9 doesn't exist
     EXPECT_FALSE(decode(bytes));
 }

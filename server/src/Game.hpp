@@ -27,7 +27,7 @@ public:
     // Current state of every networked entity (split it if bigger than MaxEntitiesPerSnapshot).
     [[nodiscard]] protocol::Snapshot snapshot();
 
-    // Events produced since the last call (EntityDestroyed, GameOver...), to broadcast.
+    // Events produced since the last call (EntityDestroyed...), to broadcast.
     [[nodiscard]] std::vector<protocol::Message> takeEvents();
 
     [[nodiscard]] std::uint32_t tick() const { return _tick; }

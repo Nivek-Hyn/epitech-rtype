@@ -13,8 +13,10 @@ The server must have the final authority on the game. UDP may lose, duplicate or
 
 ## Decision
 - Client → server: an `Input` message (bit flags) every client tick. It also acts as a keep-alive.
-- Server → client: a `Snapshot` of every networked entity every server tick (60/s),
-  plus event messages (`EntityDestroyed`, `PlayerLeft`, `GameOver`) for things the client must react to.
+- Server → client: a `Snapshot` every server tick (60/s) with the game state (waiting / playing / finished),
+  the score and every networked entity, plus event messages (`EntityDestroyed`, `PlayerLeft`) for things
+  the client must react to immediately.
+- Anything that must not be lost (like the end of the game) goes in the snapshot rather than in a one-time message.
 - The client creates an entity the first time it sees its `NetworkId` in a snapshot, and removes it on
   `EntityDestroyed` or when it hasn't appeared in any snapshot for `EntityStaleTimeout`.
 
