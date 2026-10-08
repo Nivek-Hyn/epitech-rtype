@@ -3,73 +3,77 @@
 #include "engine/ecs/Entity.hpp"
 #include "engine/ecs/SparseArray.hpp"
 
-#include <algorithm>
 #include <functional>
 #include <memory>
-#include <tuple>
+#include <stdexcept>
 #include <typeindex>
 #include <unordered_map>
-#include <utility>
 #include <vector>
 
 namespace engine::ecs {
 
 // Owns all entities, their components, and the systems that process them.
 //
-//   Registry reg;
-//   Entity ship = reg.spawn();
-//   reg.emplace<Position>(ship, 10.f, 20.f);
-//   reg.each<Position, Velocity>([](Entity e, Position &p, Velocity &v) { ... });
+//   Registry registry;
+//   Entity ship = registry.spawn();
+//   registry.emplace<Position>(ship, 10.f, 20.f);
+//   registry.each<Position, Velocity>([](Entity entity, Position &position, Velocity &velocity) { ... });
 //
-// Note: don't emplace a component of a type you are currently iterating over in each(),
-// it may reallocate the storage. Spawning, killing and removing are fine.
+// See docs/adr/0006-ecs-sparse-arrays.md. Expected behavior is specified by tests/test_registry.cpp.
 class Registry {
 public:
     using System = std::function<void(Registry &, float dt)>;
 
+    // TODO(engine): return a new entity id, reusing the id of a killed entity if there is one.
     Entity spawn();
+    // TODO(engine): remove every component of entity and make its id reusable. Does nothing if not alive.
     void kill(Entity entity);
+    // TODO(engine): true if entity was spawned and not killed.
     [[nodiscard]] bool alive(Entity entity) const;
 
+    // TODO(engine): the SparseArray storing every component of type C (create it on first use).
     template <typename C> SparseArray<C> &components()
     {
-        auto &slot = _arrays[std::type_index(typeid(C))];
-        if (!slot)
-            slot = std::make_unique<SparseArray<C>>();
-        return static_cast<SparseArray<C> &>(*slot);
+        throw std::logic_error("Registry::components not implemented");
     }
 
-    template <typename C, typename... Args> C &emplace(Entity entity, Args &&...args)
+    // TODO(engine): add a component C built from args to entity, return it.
+    template <typename C, typename... Args> C &emplace([[maybe_unused]] Entity entity, [[maybe_unused]] Args &&...args)
     {
-        return components<C>().emplace(entity, std::forward<Args>(args)...);
+        throw std::logic_error("Registry::emplace not implemented");
     }
 
-    template <typename C> void remove(Entity entity) { components<C>().erase(entity); }
-
-    template <typename C> [[nodiscard]] C *get(Entity entity) { return components<C>().get(entity); }
-
-    template <typename C> [[nodiscard]] bool has(Entity entity) { return components<C>().has(entity); }
-
-    // Calls func(entity, C1&, C2&, ...) for every entity that has all the listed components.
-    template <typename... Cs, typename F> void each(F &&func)
+    // TODO(engine): remove the component C of entity.
+    template <typename C> void remove([[maybe_unused]] Entity entity)
     {
-        static_assert(sizeof...(Cs) > 0, "each() needs at least one component type");
-        std::tuple<SparseArray<Cs> &...> arrays(components<Cs>()...);
-        const std::size_t count = std::min({std::get<SparseArray<Cs> &>(arrays).size()...});
-
-        for (std::size_t i = 0; i < count; ++i) {
-            const auto entity = static_cast<Entity>(i);
-            if ((std::get<SparseArray<Cs> &>(arrays).has(entity) && ...))
-                func(entity, *std::get<SparseArray<Cs> &>(arrays).get(entity)...);
-        }
+        throw std::logic_error("Registry::remove not implemented");
     }
 
-    // Systems run in the order they were added.
+    // TODO(engine): pointer to the component C of entity, or nullptr.
+    template <typename C> [[nodiscard]] C *get([[maybe_unused]] Entity entity)
+    {
+        throw std::logic_error("Registry::get not implemented");
+    }
+
+    // TODO(engine): true if entity has a component C.
+    template <typename C> [[nodiscard]] bool has([[maybe_unused]] Entity entity)
+    {
+        throw std::logic_error("Registry::has not implemented");
+    }
+
+    // TODO(engine): call func(entity, C1&, C2&, ...) for every entity that has ALL the listed components.
+    template <typename... Components, typename Function> void each([[maybe_unused]] Function &&func)
+    {
+        throw std::logic_error("Registry::each not implemented");
+    }
+
+    // TODO(engine): systems run in the order they were added, each one receiving dt.
     void addSystem(System system);
     void update(float dt);
 
 private:
-    std::unordered_map<std::type_index, std::unique_ptr<ISparseArray>> _arrays;
+    // Suggested storage, free to change: only the public functions above are the contract.
+    std::unordered_map<std::type_index, std::unique_ptr<ISparseArray>> _componentArrays;
     std::vector<bool> _alive;
     std::vector<Entity> _freeIds;
     std::vector<System> _systems;

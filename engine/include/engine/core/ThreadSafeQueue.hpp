@@ -1,34 +1,18 @@
 #pragma once
 
-#include <deque>
-#include <mutex>
 #include <optional>
-#include <utility>
+#include <stdexcept>
 
 namespace engine::core {
 
 // Queue shared between two threads (e.g. network thread -> game thread). Never blocks the reader.
 template <typename T> class ThreadSafeQueue {
 public:
-    void push(T value)
-    {
-        std::lock_guard lock(_mutex);
-        _queue.push_back(std::move(value));
-    }
+    // TODO(network): add value at the back. Must be safe to call from one thread while another calls tryPop.
+    void push([[maybe_unused]] T value) { throw std::logic_error("ThreadSafeQueue::push not implemented"); }
 
-    [[nodiscard]] std::optional<T> tryPop()
-    {
-        std::lock_guard lock(_mutex);
-        if (_queue.empty())
-            return std::nullopt;
-        T value = std::move(_queue.front());
-        _queue.pop_front();
-        return value;
-    }
-
-private:
-    std::mutex _mutex;
-    std::deque<T> _queue;
+    // TODO(network): remove and return the front value, or nullopt if the queue is empty. Never waits.
+    [[nodiscard]] std::optional<T> tryPop() { throw std::logic_error("ThreadSafeQueue::tryPop not implemented"); }
 };
 
 } // namespace engine::core

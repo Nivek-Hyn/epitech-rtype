@@ -1,34 +1,27 @@
 #include "engine/core/FixedTimestep.hpp"
 
+#include <stdexcept>
+
 namespace engine::core {
 
-FixedTimestep::FixedTimestep(double ticksPerSecond, int maxTicksPerAdvance)
-    : _step(1.0 / ticksPerSecond), _maxTicks(maxTicksPerAdvance), _last(Clock::now())
+FixedTimestep::FixedTimestep([[maybe_unused]] double ticksPerSecond, [[maybe_unused]] int maxTicksPerAdvance)
 {
+    throw std::logic_error("FixedTimestep not implemented");
 }
 
 int FixedTimestep::advance()
 {
-    const auto now = Clock::now();
-    _accumulator += now - _last;
-    _last = now;
+    throw std::logic_error("FixedTimestep::advance not implemented");
+}
 
-    int ticks = 0;
-    while (_accumulator >= _step && ticks < _maxTicks) {
-        _accumulator -= _step;
-        ++ticks;
-    }
-    if (ticks == _maxTicks)
-        _accumulator = std::chrono::duration<double>(0.0);
-    return ticks;
+float FixedTimestep::step() const
+{
+    throw std::logic_error("FixedTimestep::step not implemented");
 }
 
 FixedTimestep::Clock::duration FixedTimestep::untilNextTick() const
 {
-    const auto elapsed = _accumulator + (Clock::now() - _last);
-    if (elapsed >= _step)
-        return Clock::duration::zero();
-    return std::chrono::duration_cast<Clock::duration>(_step - elapsed);
+    throw std::logic_error("FixedTimestep::untilNextTick not implemented");
 }
 
 } // namespace engine::core

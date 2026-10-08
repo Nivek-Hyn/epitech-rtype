@@ -9,29 +9,26 @@ namespace engine::core {
 //
 //   FixedTimestep clock(60.0);
 //   while (running) {
-//       for (int i = clock.advance(); i > 0; --i)
+//       for (int ticks = clock.advance(); ticks > 0; --ticks)
 //           registry.update(clock.step());
+//       std::this_thread::sleep_for(clock.untilNextTick());
 //   }
 class FixedTimestep {
 public:
     using Clock = std::chrono::steady_clock;
 
+    // TODO(engine): ticksPerSecond = 60 means one step every 1/60 s.
     explicit FixedTimestep(double ticksPerSecond, int maxTicksPerAdvance = 5);
 
-    // Number of steps to simulate since the last call (capped, to avoid a "spiral of death" after a freeze).
+    // TODO(engine): number of steps to simulate since the last call, never more than maxTicksPerAdvance
+    // (otherwise after a freeze the game would try to catch up forever).
     int advance();
 
-    // Duration of one step, in seconds.
-    [[nodiscard]] float step() const { return static_cast<float>(_step.count()); }
+    // TODO(engine): duration of one step, in seconds.
+    [[nodiscard]] float step() const;
 
-    // Time left before the next step is due, to sleep instead of busy-waiting.
+    // TODO(engine): time left before the next step is due, so the loop can sleep instead of using 100% CPU.
     [[nodiscard]] Clock::duration untilNextTick() const;
-
-private:
-    std::chrono::duration<double> _step;
-    int _maxTicks;
-    Clock::time_point _last;
-    std::chrono::duration<double> _accumulator{0.0};
 };
 
 } // namespace engine::core

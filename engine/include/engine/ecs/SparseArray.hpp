@@ -4,7 +4,7 @@
 
 #include <cstddef>
 #include <optional>
-#include <utility>
+#include <stdexcept>
 #include <vector>
 
 namespace engine::ecs {
@@ -16,28 +16,37 @@ public:
     virtual void erase(Entity entity) = 0;
 };
 
-// Stores every component of type C, indexed by entity: data[entity] is empty if the entity doesn't have one.
+// Stores every component of type C, indexed by entity: slot [entity] is empty if the entity doesn't have one.
+// See docs/adr/0006-ecs-sparse-arrays.md.
 template <typename C> class SparseArray final : public ISparseArray {
 public:
-    template <typename... Args> C &emplace(Entity entity, Args &&...args)
+    // TODO(engine): store a C built from args at index entity (grow the storage if needed), return it.
+    template <typename... Args> C &emplace([[maybe_unused]] Entity entity, [[maybe_unused]] Args &&...args)
     {
-        if (entity >= _data.size())
-            _data.resize(static_cast<std::size_t>(entity) + 1);
-        return _data[entity].emplace(std::forward<Args>(args)...);
+        throw std::logic_error("SparseArray::emplace not implemented");
     }
 
-    void erase(Entity entity) override
+    // TODO(engine): empty the slot of entity. Must do nothing if entity is out of range.
+    void erase([[maybe_unused]] Entity entity) override
     {
-        if (entity < _data.size())
-            _data[entity].reset();
+        throw std::logic_error("SparseArray::erase not implemented");
     }
 
-    [[nodiscard]] bool has(Entity entity) const { return entity < _data.size() && _data[entity].has_value(); }
+    // TODO(engine): true if entity has a component of this type.
+    [[nodiscard]] bool has([[maybe_unused]] Entity entity) const
+    {
+        throw std::logic_error("SparseArray::has not implemented");
+    }
 
-    [[nodiscard]] C *get(Entity entity) { return has(entity) ? &*_data[entity] : nullptr; }
-    [[nodiscard]] const C *get(Entity entity) const { return has(entity) ? &*_data[entity] : nullptr; }
+    // TODO(engine): pointer to the component of entity, or nullptr if it has none.
+    [[nodiscard]] C *get([[maybe_unused]] Entity entity) { throw std::logic_error("SparseArray::get not implemented"); }
+    [[nodiscard]] const C *get([[maybe_unused]] Entity entity) const
+    {
+        throw std::logic_error("SparseArray::get not implemented");
+    }
 
-    [[nodiscard]] std::size_t size() const { return _data.size(); }
+    // TODO(engine): number of slots (highest entity index stored + 1).
+    [[nodiscard]] std::size_t size() const { throw std::logic_error("SparseArray::size not implemented"); }
 
 private:
     std::vector<std::optional<C>> _data;
