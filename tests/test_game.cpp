@@ -18,10 +18,13 @@ TEST(Game, InputMovesPlayer)
 {
     Game game;
     game.onPlayerJoined(1);
-    const float startX = game.snapshot().entities[0].x;
+    const auto before = game.snapshot();
+    ASSERT_EQ(before.entities.size(), 1u);
     game.onInput(1, protocol::InputFlag::Right);
     game.update(0.1f);
-    EXPECT_GT(game.snapshot().entities[0].x, startX);
+    const auto after = game.snapshot();
+    ASSERT_EQ(after.entities.size(), 1u);
+    EXPECT_GT(after.entities[0].x, before.entities[0].x);
 }
 
 TEST(Game, PlayerLeftProducesDestroyEvent)

@@ -18,15 +18,15 @@ TEST(Protocol, RoundTripInput)
 
 TEST(Protocol, RoundTripSnapshot)
 {
-    Snapshot snap{7, {{1, EntityType::Player, 2, 10.5f, 20.f}, {9, EntityType::Enemy, 0, 1800.f, 300.f}}};
-    const auto packet = decode(encode({1, snap}));
+    Snapshot sent{7, {{1, EntityType::Player, 2, 10.5f, 20.f}, {9, EntityType::Enemy, 0, 1800.f, 300.f}}};
+    const auto packet = decode(encode({1, sent}));
     ASSERT_TRUE(packet);
-    const auto &out = std::get<Snapshot>(packet->message);
-    EXPECT_EQ(out.tick, 7u);
-    ASSERT_EQ(out.entities.size(), 2u);
-    EXPECT_EQ(out.entities[0].variant, 2);
-    EXPECT_FLOAT_EQ(out.entities[0].x, 10.5f);
-    EXPECT_EQ(out.entities[1].type, EntityType::Enemy);
+    const auto &received = std::get<Snapshot>(packet->message);
+    EXPECT_EQ(received.tick, 7u);
+    ASSERT_EQ(received.entities.size(), 2u);
+    EXPECT_EQ(received.entities[0].variant, 2);
+    EXPECT_FLOAT_EQ(received.entities[0].x, 10.5f);
+    EXPECT_EQ(received.entities[1].type, EntityType::Enemy);
 }
 
 TEST(Protocol, HeaderIsBigEndian)
