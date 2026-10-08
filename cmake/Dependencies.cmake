@@ -32,6 +32,8 @@ if(RTYPE_BUILD_CLIENT)
             "SFML_BUILD_NETWORK OFF"
             "SFML_BUILD_EXAMPLES OFF"
             "SFML_BUILD_DOC OFF"
+            # Fetch FreeType, HarfBuzz, Vorbis, FLAC... instead of requiring them on the system (default on Linux)
+            "SFML_USE_SYSTEM_DEPS OFF"
             "BUILD_SHARED_LIBS OFF"
     )
 endif()
