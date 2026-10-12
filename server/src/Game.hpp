@@ -25,12 +25,12 @@ public:
     void update(float dt);
 
     // Current state of every networked entity (split it if bigger than MaxEntitiesPerSnapshot).
-    [[nodiscard]] protocol::Snapshot snapshot();
+    protocol::Snapshot snapshot();
 
     // Events produced since the last call (EntityDestroyed...), to broadcast.
-    [[nodiscard]] std::vector<protocol::Message> takeEvents();
+    std::vector<protocol::Message> takeEvents();
 
-    [[nodiscard]] std::uint32_t tick() const { return _tick; }
+    std::uint32_t tick() const { return _tick; }
 
 private:
     engine::ecs::Entity spawnNetworked(protocol::EntityType type, std::uint8_t variant, float x, float y);

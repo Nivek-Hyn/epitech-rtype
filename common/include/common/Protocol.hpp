@@ -113,9 +113,9 @@ struct Packet {
     Message message;
 };
 
-[[nodiscard]] std::vector<std::uint8_t> encode(const Packet &packet);
+std::vector<std::uint8_t> encode(const Packet &packet);
 
 // Returns nullopt for any invalid datagram (bad magic/version, unknown type, wrong size...). Never throws.
-[[nodiscard]] std::optional<Packet> decode(std::span<const std::uint8_t> datagram);
+std::optional<Packet> decode(std::span<const std::uint8_t> datagram);
 
 } // namespace rtype::protocol

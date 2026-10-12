@@ -25,10 +25,10 @@ public:
     int advance();
 
     // TODO(engine): duration of one step, in seconds.
-    [[nodiscard]] float step() const;
+    float step() const;
 
     // TODO(engine): time left before the next step is due, so the loop can sleep instead of using 100% CPU.
-    [[nodiscard]] Clock::duration untilNextTick() const;
+    Clock::duration untilNextTick() const;
 };
 
 } // namespace engine::core

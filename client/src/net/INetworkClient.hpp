@@ -18,7 +18,7 @@ public:
 
     virtual void connect(const std::string &host, std::uint16_t port) = 0;
     virtual void disconnect() = 0;
-    [[nodiscard]] virtual bool connected() const = 0;
+    virtual bool connected() const = 0;
 
     // Called by the main thread every frame until it returns nullopt. Never blocks.
     virtual std::optional<protocol::Message> poll() = 0;

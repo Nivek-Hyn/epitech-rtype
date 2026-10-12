@@ -4,7 +4,7 @@
 
 namespace engine::core {
 
-FixedTimestep::FixedTimestep([[maybe_unused]] double ticksPerSecond, [[maybe_unused]] int maxTicksPerAdvance)
+FixedTimestep::FixedTimestep(double /* ticksPerSecond */, int /* maxTicksPerAdvance */)
 {
     throw std::logic_error("FixedTimestep not implemented");
 }

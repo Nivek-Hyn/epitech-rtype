@@ -13,15 +13,15 @@ namespace engine::net {
 class ByteWriter {
 public:
     // TODO(network): append value as 1 / 2 / 4 bytes, most significant byte first.
-    void u8([[maybe_unused]] std::uint8_t value) { throw std::logic_error("ByteWriter::u8 not implemented"); }
-    void u16([[maybe_unused]] std::uint16_t value) { throw std::logic_error("ByteWriter::u16 not implemented"); }
-    void u32([[maybe_unused]] std::uint32_t value) { throw std::logic_error("ByteWriter::u32 not implemented"); }
+    void u8(std::uint8_t /* value */) { throw std::logic_error("ByteWriter::u8 not implemented"); }
+    void u16(std::uint16_t /* value */) { throw std::logic_error("ByteWriter::u16 not implemented"); }
+    void u32(std::uint32_t /* value */) { throw std::logic_error("ByteWriter::u32 not implemented"); }
     // TODO(network): write the 32 bits of the float as a u32 (hint: std::bit_cast).
-    void f32([[maybe_unused]] float value) { throw std::logic_error("ByteWriter::f32 not implemented"); }
+    void f32(float /* value */) { throw std::logic_error("ByteWriter::f32 not implemented"); }
 
     // TODO(network): number of bytes written / the bytes themselves.
-    [[nodiscard]] std::size_t size() const { throw std::logic_error("ByteWriter::size not implemented"); }
-    [[nodiscard]] std::vector<std::uint8_t> &data() { throw std::logic_error("ByteWriter::data not implemented"); }
+    std::size_t size() const { throw std::logic_error("ByteWriter::size not implemented"); }
+    std::vector<std::uint8_t> &data() { throw std::logic_error("ByteWriter::data not implemented"); }
 };
 
 // Reads values written by ByteWriter.
@@ -29,7 +29,7 @@ public:
 // end.
 class ByteReader {
 public:
-    explicit ByteReader([[maybe_unused]] std::span<const std::uint8_t> bytes)
+    explicit ByteReader(std::span<const std::uint8_t> /* bytes */)
     {
         throw std::logic_error("ByteReader not implemented");
     }
@@ -41,9 +41,9 @@ public:
     float f32() { throw std::logic_error("ByteReader::f32 not implemented"); }
 
     // TODO(network): false once a read went past the end.
-    [[nodiscard]] bool ok() const { throw std::logic_error("ByteReader::ok not implemented"); }
+    bool ok() const { throw std::logic_error("ByteReader::ok not implemented"); }
     // TODO(network): number of bytes not read yet.
-    [[nodiscard]] std::size_t remaining() const { throw std::logic_error("ByteReader::remaining not implemented"); }
+    std::size_t remaining() const { throw std::logic_error("ByteReader::remaining not implemented"); }
 };
 
 } // namespace engine::net

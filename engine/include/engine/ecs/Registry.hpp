@@ -29,7 +29,7 @@ public:
     // TODO(engine): remove every component of entity and make its id reusable. Does nothing if not alive.
     void kill(Entity entity);
     // TODO(engine): true if entity was spawned and not killed.
-    [[nodiscard]] bool alive(Entity entity) const;
+    bool alive(Entity entity) const;
 
     // TODO(engine): the SparseArray storing every component of type C (create it on first use).
     template <typename C> SparseArray<C> &components()
@@ -38,31 +38,25 @@ public:
     }
 
     // TODO(engine): add a component C built from args to entity, return it.
-    template <typename C, typename... Args> C &emplace([[maybe_unused]] Entity entity, [[maybe_unused]] Args &&...args)
+    template <typename C, typename... Args> C &emplace(Entity /* entity */, Args &&.../* args */)
     {
         throw std::logic_error("Registry::emplace not implemented");
     }
 
     // TODO(engine): remove the component C of entity.
-    template <typename C> void remove([[maybe_unused]] Entity entity)
+    template <typename C> void remove(Entity /* entity */)
     {
         throw std::logic_error("Registry::remove not implemented");
     }
 
     // TODO(engine): pointer to the component C of entity, or nullptr.
-    template <typename C> [[nodiscard]] C *get([[maybe_unused]] Entity entity)
-    {
-        throw std::logic_error("Registry::get not implemented");
-    }
+    template <typename C> C *get(Entity /* entity */) { throw std::logic_error("Registry::get not implemented"); }
 
     // TODO(engine): true if entity has a component C.
-    template <typename C> [[nodiscard]] bool has([[maybe_unused]] Entity entity)
-    {
-        throw std::logic_error("Registry::has not implemented");
-    }
+    template <typename C> bool has(Entity /* entity */) { throw std::logic_error("Registry::has not implemented"); }
 
     // TODO(engine): call func(entity, C1&, C2&, ...) for every entity that has ALL the listed components.
-    template <typename... Components, typename Function> void each([[maybe_unused]] Function &&func)
+    template <typename... Components, typename Function> void each(Function && /* func */)
     {
         throw std::logic_error("Registry::each not implemented");
     }

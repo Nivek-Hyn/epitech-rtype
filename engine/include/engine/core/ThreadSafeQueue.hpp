@@ -9,10 +9,10 @@ namespace engine::core {
 template <typename T> class ThreadSafeQueue {
 public:
     // TODO(network): add value at the back. Must be safe to call from one thread while another calls tryPop.
-    void push([[maybe_unused]] T value) { throw std::logic_error("ThreadSafeQueue::push not implemented"); }
+    void push(T /* value */) { throw std::logic_error("ThreadSafeQueue::push not implemented"); }
 
     // TODO(network): remove and return the front value, or nullopt if the queue is empty. Never waits.
-    [[nodiscard]] std::optional<T> tryPop() { throw std::logic_error("ThreadSafeQueue::tryPop not implemented"); }
+    std::optional<T> tryPop() { throw std::logic_error("ThreadSafeQueue::tryPop not implemented"); }
 };
 
 } // namespace engine::core
