@@ -24,6 +24,44 @@ TEST(Registry, SpawnGivesDistinctIds)
     EXPECT_NE(first, second);
 }
 
+TEST(Registry, SpawnedEntitiesAreAliveAndUnknownIdsAreNot)
+{
+    Registry registry;
+    EXPECT_FALSE(registry.alive(0));
+    const Entity entity = registry.spawn();
+    EXPECT_TRUE(registry.alive(entity));
+    EXPECT_FALSE(registry.alive(100));
+    EXPECT_FALSE(registry.alive(engine::ecs::NullEntity));
+}
+
+TEST(Registry, KillPreservesOtherEntitiesAndReusesOnlyTheFreedId)
+{
+    Registry registry;
+    const Entity first = registry.spawn();
+    const Entity second = registry.spawn();
+    registry.kill(first);
+    EXPECT_FALSE(registry.alive(first));
+    EXPECT_TRUE(registry.alive(second));
+    const Entity replacement = registry.spawn();
+    EXPECT_EQ(replacement, first);
+    EXPECT_TRUE(registry.alive(replacement));
+    const Entity next = registry.spawn();
+    EXPECT_NE(next, first);
+    EXPECT_NE(next, second);
+}
+
+TEST(Registry, KillingDeadOrUnknownEntitiesDoesNotDuplicateFreeIds)
+{
+    Registry registry;
+    const Entity entity = registry.spawn();
+    registry.kill(entity);
+    registry.kill(entity);
+    registry.kill(100);
+    registry.kill(engine::ecs::NullEntity);
+    EXPECT_EQ(registry.spawn(), entity);
+    EXPECT_NE(registry.spawn(), entity);
+}
+
 TEST(Registry, KillRemovesComponentsAndReusesId)
 {
     Registry registry;

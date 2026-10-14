@@ -4,17 +4,36 @@ namespace engine::ecs {
 
 Entity Registry::spawn()
 {
-    throw std::logic_error("Registry::spawn not implemented");
+    if (!_freeIds.empty()) {
+        const Entity entity = _freeIds.back();
+        _freeIds.pop_back();
+        _alive[entity] = true;
+        return entity;
+    }
+
+    if (_alive.size() >= static_cast<std::size_t>(NullEntity))
+        throw std::overflow_error("Registry has no entity ids left");
+
+    const Entity entity = static_cast<Entity>(_alive.size());
+    _alive.push_back(true);
+    return entity;
 }
 
-void Registry::kill(Entity /* entity */)
+void Registry::kill(Entity entity)
 {
-    throw std::logic_error("Registry::kill not implemented");
+    if (!alive(entity))
+        return;
+
+    for (auto &entry : _componentArrays)
+        entry.second->erase(entity);
+
+    _freeIds.push_back(entity);
+    _alive[entity] = false;
 }
 
-bool Registry::alive(Entity /* entity */) const
+bool Registry::alive(Entity entity) const
 {
-    throw std::logic_error("Registry::alive not implemented");
+    return entity < _alive.size() && _alive[entity];
 }
 
 void Registry::addSystem(System /* system */)

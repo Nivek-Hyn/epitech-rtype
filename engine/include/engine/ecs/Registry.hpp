@@ -24,11 +24,11 @@ class Registry {
 public:
     using System = std::function<void(Registry &, float dt)>;
 
-    // TODO(engine): return a new entity id, reusing the id of a killed entity if there is one.
+    // Return a new entity id, reusing a killed entity's id when available. NullEntity is reserved.
     Entity spawn();
-    // TODO(engine): remove every component of entity and make its id reusable. Does nothing if not alive.
+    // Remove every component of entity and make its id reusable. Does nothing if not alive.
     void kill(Entity entity);
-    // TODO(engine): true if entity was spawned and not killed.
+    // True if entity was spawned and not killed.
     bool alive(Entity entity) const;
 
     // TODO(engine): the SparseArray storing every component of type C (create it on first use).
