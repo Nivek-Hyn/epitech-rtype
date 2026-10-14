@@ -174,6 +174,63 @@ TEST(Registry, EachVisitsOnlyEntitiesWithAllComponents)
     EXPECT_EQ(visitedCount, 1);
 }
 
+TEST(Registry, EachModifiesTheStoredComponents)
+{
+    Registry registry;
+    const Entity entity = registry.spawn();
+    registry.emplace<Position>(entity, 3.f, 4.f);
+    registry.emplace<Velocity>(entity, 2.f, 0.f);
+    registry.each<Position, Velocity>([](Entity, Position &position, Velocity &velocity) {
+        position.x += velocity.x;
+        velocity.y = 1.f;
+    });
+    EXPECT_FLOAT_EQ(registry.get<Position>(entity)->x, 5.f);
+    EXPECT_FLOAT_EQ(registry.get<Velocity>(entity)->y, 1.f);
+}
+
+TEST(Registry, EachSkipsDeadEntitiesAndAcceptsASingleComponent)
+{
+    Registry registry;
+    const Entity dead = registry.spawn();
+    const Entity live = registry.spawn();
+    registry.emplace<Position>(dead);
+    registry.emplace<Position>(live);
+    registry.kill(dead);
+    // Direct storage access can populate a dead slot; each must still skip it.
+    registry.components<Position>().emplace(dead);
+    int visitedCount = 0;
+    registry.each<Position>([&](Entity entity, Position &) {
+        EXPECT_EQ(entity, live);
+        ++visitedCount;
+    });
+    EXPECT_EQ(visitedCount, 1);
+}
+
+TEST(Registry, EachHandlesEmptyRegistryAndMissingComponentTypes)
+{
+    Registry registry;
+    int visitedCount = 0;
+    auto visitor = [&](Entity, Position &, Velocity &) { ++visitedCount; };
+    registry.each<Position, Velocity>(visitor);
+    const Entity entity = registry.spawn();
+    registry.emplace<Position>(entity);
+    registry.each<Position, Velocity>(visitor);
+    EXPECT_EQ(visitedCount, 0);
+}
+
+TEST(Registry, EachWithoutComponentsDoesNotVisitNewlyAppendedEntities)
+{
+    Registry registry;
+    const Entity original = registry.spawn();
+    int visitedCount = 0;
+    registry.each<>([&](Entity entity) {
+        EXPECT_EQ(entity, original);
+        ++visitedCount;
+        registry.spawn();
+    });
+    EXPECT_EQ(visitedCount, 1);
+}
+
 TEST(Registry, UpdateRunsSystems)
 {
     Registry registry;

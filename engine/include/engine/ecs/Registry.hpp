@@ -73,10 +73,16 @@ public:
     // True if a live entity has a component C.
     template <typename C> bool has(Entity entity) { return get<C>(entity) != nullptr; }
 
-    // TODO(engine): call func(entity, C1&, C2&, ...) for every entity that has ALL the listed components.
-    template <typename... Components, typename Function> void each(Function && /* func */)
+    // Call func(entity, C1&, C2&, ...) for each live entity with ALL the listed components.
+    // Callbacks must not retain references or invalidate them by growing a component storage.
+    template <typename... Components, typename Function> void each(Function &&func)
     {
-        throw std::logic_error("Registry::each not implemented");
+        const std::size_t entityCount = _alive.size();
+        for (std::size_t i = 0; i < entityCount; i++) {
+            const Entity entity = static_cast<Entity>(i);
+            if (alive(entity) && (has<Components>(entity) && ...))
+                func(entity, *get<Components>(entity)...);
+        }
     }
 
     // TODO(engine): systems run in the order they were added, each one receiving dt.
