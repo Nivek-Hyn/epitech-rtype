@@ -7,7 +7,9 @@
 #include <memory>
 #include <stdexcept>
 #include <typeindex>
+#include <typeinfo>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 namespace engine::ecs {
@@ -31,29 +33,45 @@ public:
     // True if entity was spawned and not killed.
     bool alive(Entity entity) const;
 
-    // TODO(engine): the SparseArray storing every component of type C (create it on first use).
+    // The SparseArray storing every component of type C (create it on first use).
     template <typename C> SparseArray<C> &components()
     {
-        throw std::logic_error("Registry::components not implemented");
+        if (auto *storage = findComponents<C>())
+            return *storage;
+
+        auto storage = std::make_unique<SparseArray<C>>();
+        SparseArray<C> &result = *storage;
+        _componentArrays.emplace(std::type_index(typeid(C)), std::move(storage));
+        return result;
     }
 
-    // TODO(engine): add a component C built from args to entity, return it.
-    template <typename C, typename... Args> C &emplace(Entity /* entity */, Args &&.../* args */)
+    // Add or replace a component on a live entity. Reject dead or unknown ids.
+    template <typename C, typename... Args> C &emplace(Entity entity, Args &&...args)
     {
-        throw std::logic_error("Registry::emplace not implemented");
+        if (!alive(entity))
+            throw std::invalid_argument("Cannot add a component to an entity that is not alive");
+        return components<C>().emplace(entity, std::forward<Args>(args)...);
     }
 
-    // TODO(engine): remove the component C of entity.
-    template <typename C> void remove(Entity /* entity */)
+    // Remove the component C of entity. Missing components are ignored.
+    template <typename C> void remove(Entity entity)
     {
-        throw std::logic_error("Registry::remove not implemented");
+        if (auto *storage = findComponents<C>())
+            storage->erase(entity);
     }
 
-    // TODO(engine): pointer to the component C of entity, or nullptr.
-    template <typename C> C *get(Entity /* entity */) { throw std::logic_error("Registry::get not implemented"); }
+    // Borrow the component C of a live entity, or return nullptr.
+    template <typename C> C *get(Entity entity)
+    {
+        if (!alive(entity))
+            return nullptr;
+        if (auto *storage = findComponents<C>())
+            return storage->get(entity);
+        return nullptr;
+    }
 
-    // TODO(engine): true if entity has a component C.
-    template <typename C> bool has(Entity /* entity */) { throw std::logic_error("Registry::has not implemented"); }
+    // True if a live entity has a component C.
+    template <typename C> bool has(Entity entity) { return get<C>(entity) != nullptr; }
 
     // TODO(engine): call func(entity, C1&, C2&, ...) for every entity that has ALL the listed components.
     template <typename... Components, typename Function> void each(Function && /* func */)
@@ -66,6 +84,15 @@ public:
     void update(float dt);
 
 private:
+    // Look up an existing storage without creating one. Each key C owns a SparseArray<C>.
+    template <typename C> SparseArray<C> *findComponents()
+    {
+        auto storageEntry = _componentArrays.find(std::type_index(typeid(C)));
+        if (storageEntry == _componentArrays.end())
+            return nullptr;
+        return static_cast<SparseArray<C> *>(storageEntry->second.get());
+    }
+
     // Suggested storage, free to change: only the public functions above are the contract.
     std::unordered_map<std::type_index, std::unique_ptr<ISparseArray>> _componentArrays;
     std::vector<bool> _alive;
