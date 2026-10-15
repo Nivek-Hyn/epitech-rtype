@@ -24,7 +24,7 @@ namespace engine::ecs {
 // See docs/adr/0006-ecs-sparse-arrays.md. Expected behavior is specified by tests/test_registry.cpp.
 class Registry {
 public:
-    using System = std::function<void(Registry &, float dt)>;
+    using System = std::function<void(Registry &, float timeStepSeconds)>;
 
     // Return a new entity id, reusing a killed entity's id when available. NullEntity is reserved.
     Entity spawn();
@@ -85,9 +85,10 @@ public:
         }
     }
 
-    // TODO(engine): systems run in the order they were added, each one receiving dt.
+    // Register non-empty systems before update; do not add systems from a running system.
     void addSystem(System system);
-    void update(float dt);
+    // Run systems in registration order, passing this Registry and timeStepSeconds in seconds.
+    void update(float timeStepSeconds);
 
 private:
     // Look up an existing storage without creating one. Each key C owns a SparseArray<C>.

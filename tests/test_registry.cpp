@@ -3,6 +3,7 @@
 #include <gtest/gtest.h>
 
 #include <memory>
+#include <vector>
 
 using engine::ecs::Entity;
 using engine::ecs::Registry;
@@ -237,10 +238,52 @@ TEST(Registry, UpdateRunsSystems)
     const Entity ship = registry.spawn();
     registry.emplace<Position>(ship);
     registry.emplace<Velocity>(ship, 10.f, 0.f);
-    registry.addSystem([](Registry &reg, float dt) {
-        reg.each<Position, Velocity>(
-            [dt](Entity, Position &position, Velocity &velocity) { position.x += velocity.x * dt; });
+    registry.addSystem([](Registry &world, float timeStepSeconds) {
+        world.each<Position, Velocity>([timeStepSeconds](Entity, Position &position, Velocity &velocity) {
+            position.x += velocity.x * timeStepSeconds;
+        });
     });
     registry.update(0.5f);
     EXPECT_FLOAT_EQ(registry.get<Position>(ship)->x, 5.f);
+}
+
+TEST(Registry, SystemsRunInOrderWithTheSameRegistryAndTimestep)
+{
+    Registry registry;
+    std::vector<int> calls;
+    registry.addSystem([&](Registry &world, float timeStepSeconds) {
+        EXPECT_EQ(&world, &registry);
+        EXPECT_FLOAT_EQ(timeStepSeconds, 0.25f);
+        calls.push_back(1);
+    });
+    registry.addSystem([&](Registry &world, float timeStepSeconds) {
+        EXPECT_EQ(&world, &registry);
+        EXPECT_FLOAT_EQ(timeStepSeconds, 0.25f);
+        calls.push_back(2);
+    });
+    registry.update(0.25f);
+    registry.update(0.25f);
+    EXPECT_EQ(calls, (std::vector<int>{1, 2, 1, 2}));
+}
+
+TEST(Registry, SystemStatePersistsAcrossUpdates)
+{
+    Registry registry;
+    int observedCount = 0;
+    registry.addSystem([count = 0, &observedCount](Registry &, float) mutable {
+        count++;
+        observedCount = count;
+    });
+    registry.update(0.f);
+    EXPECT_EQ(observedCount, 1);
+    registry.update(0.f);
+    EXPECT_EQ(observedCount, 2);
+}
+
+TEST(Registry, UpdateWithoutSystemsIsSafeAndEmptySystemsAreRejected)
+{
+    Registry registry;
+    EXPECT_NO_THROW(registry.update(0.5f));
+    EXPECT_THROW(registry.addSystem(Registry::System{}), std::invalid_argument);
+    EXPECT_NO_THROW(registry.update(0.5f));
 }

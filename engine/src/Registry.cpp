@@ -36,14 +36,17 @@ bool Registry::alive(Entity entity) const
     return entity < _alive.size() && _alive[entity];
 }
 
-void Registry::addSystem(System /* system */)
+void Registry::addSystem(System system)
 {
-    throw std::logic_error("Registry::addSystem not implemented");
+    if (!system)
+        throw std::invalid_argument("Cannot register an empty system");
+    _systems.push_back(std::move(system));
 }
 
-void Registry::update(float /* dt */)
+void Registry::update(float timeStepSeconds)
 {
-    throw std::logic_error("Registry::update not implemented");
+    for (auto &system : _systems)
+        system(*this, timeStepSeconds);
 }
 
 } // namespace engine::ecs
