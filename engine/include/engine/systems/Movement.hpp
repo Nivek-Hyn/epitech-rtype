@@ -4,10 +4,14 @@
 
 namespace engine::systems {
 
-// Move every entity having both components: position += velocity * timeStepSeconds.
-// The game chooses the component types; each needs float members x and y, velocity in units per second.
-//
-//   registry.addSystem(engine::systems::movement<Position, Velocity>);
+/// @brief System moving every entity having both components: `position += velocity * timeStepSeconds`.
+///
+/// @code
+/// registry.addSystem(engine::systems::movement<Position, Velocity>);
+/// @endcode
+///
+/// @tparam Position Game component with `float x` and `float y`.
+/// @tparam Velocity Game component with `float x` and `float y`, in units per second.
 template <typename Position, typename Velocity> void movement(ecs::Registry &registry, float timeStepSeconds)
 {
     registry.each<Position, Velocity>([timeStepSeconds](ecs::Entity, Position &position, const Velocity &velocity) {

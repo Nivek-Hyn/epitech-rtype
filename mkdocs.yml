@@ -5,6 +5,8 @@ edit_uri: edit/main/docs/
 docs_dir: docs
 exclude_docs: |
   GameDesign/
+  Doxyfile
+  api-mainpage.md
 
 theme:
   name: material
