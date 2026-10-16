@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <functional>
 #include <memory>
 #include <stdexcept>
@@ -12,11 +13,14 @@
 namespace engine::core {
 
 // Lets systems react to each other without knowing each other.
-// Any struct can be an event; publish calls every handler subscribed to that exact type, in subscription order.
+// Any copyable struct can be an event; handlers subscribed to that exact type run in subscription order.
+// publish delivers an event immediately; enqueue stores it until dispatch, e.g. once all systems have run,
+// so handlers that kill entities never run while a system is still iterating over them.
 //
 //   struct Collision { Entity first; Entity second; };
 //   bus.subscribe<Collision>([](const Collision &collision) { ... });
-//   bus.publish(Collision{missile, enemy});
+//   bus.enqueue(Collision{missile, enemy});
+//   bus.dispatch();
 class EventBus {
 public:
     template <typename Event> using Handler = std::function<void(const Event &)>;
@@ -40,6 +44,23 @@ public:
             handler(event);
     }
 
+    // Keep a copy of event; its handlers run on the next dispatch.
+    template <typename Event> void enqueue(Event event)
+    {
+        _queuedEvents.push_back([queuedEvent = std::move(event)](const EventBus &bus) { bus.publish(queuedEvent); });
+    }
+
+    // Publish queued events in the order they were enqueued, then empty the queue.
+    // Events enqueued by a handler during dispatch are delivered in the same call.
+    void dispatch()
+    {
+        for (std::size_t i = 0; i < _queuedEvents.size(); i++) {
+            const auto delivery = std::move(_queuedEvents[i]);
+            delivery(*this);
+        }
+        _queuedEvents.clear();
+    }
+
 private:
     // Type-erased base so handlers of every event type fit in one map, like ISparseArray in the Registry.
     struct IHandlerList {
@@ -60,6 +81,7 @@ private:
     }
 
     std::unordered_map<std::type_index, std::unique_ptr<IHandlerList>> _handlerLists;
+    std::vector<std::function<void(const EventBus &)>> _queuedEvents;
 };
 
 } // namespace engine::core
