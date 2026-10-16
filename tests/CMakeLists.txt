@@ -1,4 +1,5 @@
 add_executable(rtype_tests
+    test_fixed_timestep.cpp
     test_registry.cpp
     test_protocol.cpp
     test_game.cpp
