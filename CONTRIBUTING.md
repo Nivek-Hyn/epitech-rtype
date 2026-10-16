@@ -51,3 +51,6 @@ The tests in `tests/` describe the expected behavior: a feature is done when its
 ## Documentation
 
 All documentation, code comments, commit messages and pull requests are written in **English**.
+
+Documentation must be accessible: follow the [documentation guidelines](docs/documentation-guidelines.md)
+(heading order, alternative text, text descriptions of diagrams, no information by color only).
