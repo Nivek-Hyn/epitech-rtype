@@ -6,9 +6,10 @@
 2. Create a branch from `main`: `<type>/<issue>-<short-name>`, e.g. `feat/28-udp-socket`, `fix/41-starfield-speed`.
    Types: `feat`, `fix`, `refactor`, `test`, `docs`, `ci`, `chore`.
 3. Open a pull request into `main`, with `Closes #<issue>` in the description.
-4. At least **one review from someone working on another domain** before merging.
-   This keeps everyone aware of the whole architecture.
-5. The CI must be green. Merge with "Squash and merge".
+4. Run `scripts/check.sh` before pushing: formatting, build without warnings and unit tests, like the CI.
+   The CI only runs on demand (Actions tab > CI > Run workflow).
+5. A review from someone working on another domain is welcome but not required.
+   Merge with "Create a merge commit", so the small commits of the branch are kept.
 
 Never push directly to `main`.
 
