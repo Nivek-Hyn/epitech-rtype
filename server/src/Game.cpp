@@ -13,11 +13,10 @@ Game::Game()
 void Game::onPlayerJoined(PlayerId player)
 {
     //we create a new entity in the ECS registry
-    auto entity = _registry.spawn_entity();
-    //we add the components to the entity(position, vitesse, type)
-    _registry.add_component<rtype::components::Position>(entity, {100.0f, 300.0f});
-    _registry.add_component<rtype::components::Velocity>(entity, {0.0f, 0.0f});
-    _registry.add_component<rtype::components::Kind>(entity, {rtype::components::EntityKind::Player});
+    engine::ecs::Entity entity = spawnNetworked(protocol::EntityType::Player, static_cast<std::uint8_t>(player), 100.0f, 300.0f);
+    //_registry.add_component<rtype::components::Position>(entity, {100.0f, 300.0f});
+    //_registry.add_component<rtype::components::Velocity>(entity, {0.0f, 0.0f});
+    //_registry.add_component<rtype::components::Kind>(entity, {rtype::components::EntityKind::Player});
     _players[player] = entity;
 }
 
