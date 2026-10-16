@@ -1,9 +1,7 @@
 name: Documentation
 
+# Run by hand only (Actions tab > Documentation > Run workflow) to publish the site.
 on:
-  push:
-    branches: [main]
-    paths: ['docs/**', 'mkdocs.yml']
   workflow_dispatch:
 
 permissions:
