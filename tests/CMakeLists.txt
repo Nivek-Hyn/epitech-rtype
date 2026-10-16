@@ -1,6 +1,7 @@
 add_executable(rtype_tests
     test_aabb.cpp
     test_fixed_timestep.cpp
+    test_movement.cpp
     test_registry.cpp
     test_protocol.cpp
     test_game.cpp
