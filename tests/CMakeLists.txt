@@ -1,4 +1,5 @@
 add_executable(rtype_tests
+    test_aabb.cpp
     test_fixed_timestep.cpp
     test_registry.cpp
     test_protocol.cpp
