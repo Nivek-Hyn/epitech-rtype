@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <optional>
 #include <stdexcept>
+#include <utility>
 #include <vector>
 
 namespace engine::ecs {
@@ -16,28 +17,45 @@ public:
     virtual void erase(Entity entity) = 0;
 };
 
-// Stores every component of type C, indexed by entity: slot [entity] is empty if the entity doesn't have one.
-// See docs/adr/0006-ecs-sparse-arrays.md.
 template <typename C> class SparseArray final : public ISparseArray {
 public:
-    // TODO(engine): store a C built from args at index entity (grow the storage if needed), return it.
-    template <typename... Args> C &emplace(Entity /* entity */, Args &&.../* args */)
+    template <typename... Args> C &emplace(Entity entity, Args &&...args)
     {
-        throw std::logic_error("SparseArray::emplace not implemented");
+        if (entity >= _data.size())
+            _data.resize(static_cast<std::size_t>(entity) + 1);
+        return _data[entity].emplace(std::forward<Args>(args)...);
     }
 
-    // TODO(engine): empty the slot of entity. Must do nothing if entity is out of range.
-    void erase(Entity /* entity */) override { throw std::logic_error("SparseArray::erase not implemented"); }
+    void erase(Entity entity) override
+    {
+        if (entity < _data.size())
+            _data[entity].reset();
+    }
 
-    // TODO(engine): true if entity has a component of this type.
-    bool has(Entity /* entity */) const { throw std::logic_error("SparseArray::has not implemented"); }
+    bool has(Entity entity) const
+    {
+        if (entity < _data.size())
+            return _data[entity].has_value();
+        else
+            return false;
+    }
 
-    // TODO(engine): pointer to the component of entity, or nullptr if it has none.
-    C *get(Entity /* entity */) { throw std::logic_error("SparseArray::get not implemented"); }
-    const C *get(Entity /* entity */) const { throw std::logic_error("SparseArray::get not implemented"); }
+    C *get(Entity entity)
+    {
+        if (entity >= _data.size() || !_data[entity].has_value())
+            return nullptr;
+        else
+            return &(*_data[entity]);
+    }
+    const C *get(Entity entity) const
+    {
+        if (entity >= _data.size() || !_data[entity].has_value())
+            return nullptr;
+        else
+            return &(*_data[entity]);
+    }
 
-    // TODO(engine): number of slots (highest entity index stored + 1).
-    std::size_t size() const { throw std::logic_error("SparseArray::size not implemented"); }
+    std::size_t size() const { return _data.size(); }
 
 private:
     std::vector<std::optional<C>> _data;
