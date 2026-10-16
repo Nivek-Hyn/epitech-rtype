@@ -7,3 +7,7 @@ r-type_client
 compile_commands.json
 .vscode/
 .idea/
+
+# Documentation site
+site/
+.venv/
