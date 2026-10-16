@@ -41,6 +41,8 @@ Scopes: `engine`, `common`, `server`, `client`, `network`, `gameplay`, `ci`, `do
 - One namespace per module: `engine::...`, `rtype::protocol`, `rtype::server`, `rtype::client`.
 - No warnings: the build uses `-Wall -Wextra -Wpedantic -Wshadow -Wconversion`.
 - New logic comes with unit tests in `tests/` when it can be tested without a window or a socket.
+- Public declarations in headers are documented with Doxygen `///` comments: `@brief`, an empty line, then
+  details, `@param`, `@return`, `@throws`. Generate the API reference with `doxygen docs/Doxyfile`.
 
 ## Contracts and TODOs
 

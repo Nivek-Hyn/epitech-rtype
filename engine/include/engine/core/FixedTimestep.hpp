@@ -4,30 +4,42 @@
 
 namespace engine::core {
 
-// Turns real elapsed time into a number of fixed-size simulation steps,
-// so the game runs at the same speed whatever the CPU speed or frame rate.
-//
-//   FixedTimestep clock(60.0);
-//   while (running) {
-//       for (int ticks = clock.advance(); ticks > 0; ticks--)
-//           registry.update(clock.step());
-//       std::this_thread::sleep_for(clock.untilNextTick());
-//   }
+/// @brief Turns real elapsed time into a number of fixed-size simulation steps,
+/// so the game runs at the same speed whatever the CPU speed or frame rate.
+///
+/// @code
+/// FixedTimestep clock(60.0);
+/// while (running) {
+///     for (int ticks = clock.advance(); ticks > 0; ticks--)
+///         registry.update(clock.step());
+///     std::this_thread::sleep_for(clock.untilNextTick());
+/// }
+/// @endcode
 class FixedTimestep {
 public:
+    /// @brief Monotonic clock: never goes backwards when the system time changes.
     using Clock = std::chrono::steady_clock;
 
-    // ticksPerSecond = 60 means one step every 1/60 s. Reject invalid rates and limits.
+    /// @brief Create a clock producing @p ticksPerSecond steps per second.
+    ///
+    /// @param ticksPerSecond Number of steps per second: 60 means one step every 1/60 s.
+    /// @param maxTicksPerAdvance Maximum number of steps advance() returns at once (catch-up limit).
+    /// @throws std::invalid_argument if a value is not finite and positive, or if the step does not fit the clock.
     explicit FixedTimestep(double ticksPerSecond, int maxTicksPerAdvance = 5);
 
-    // Consume elapsed time and return at most maxTicksPerAdvance steps.
-    // Discard excess whole steps after a stall, keeping only the fractional remainder.
+    /// @brief Consume the time elapsed since the last call.
+    ///
+    /// After a stall, the extra whole steps are dropped and only the fraction of a step is kept.
+    ///
+    /// @return The number of steps to simulate now, at most maxTicksPerAdvance.
     int advance();
 
-    // Duration of one step, in seconds.
+    /// @brief Duration of one step, in seconds.
     float step() const;
 
-    // Time left before the next step is due, accounting for time since advance().
+    /// @brief Time left before the next step is due, counting the time spent since advance().
+    ///
+    /// @return A duration to pass to `std::this_thread::sleep_for`, zero if a step is already due.
     Clock::duration untilNextTick() const;
 
 private:

@@ -10,4 +10,5 @@ compile_commands.json
 
 # Documentation site
 site/
+docs/html/
 .venv/
