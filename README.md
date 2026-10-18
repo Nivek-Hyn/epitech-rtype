@@ -48,7 +48,7 @@ ctest --test-dir build --output-on-failure
 | `server/` | Authoritative game server. |
 | `client/` | Graphical client (SFML). |
 | `tests/` | Unit tests (GoogleTest). |
-| `docs/` | Documentation: [protocol](docs/protocol.md), [architecture decisions](docs/adr/README.md), [technical study](docs/technical-study.md). |
+| `docs/` | Documentation, starting at [docs/index.md](docs/index.md) (also buildable as a website, see that page). |
 
 ## Contributing
 
