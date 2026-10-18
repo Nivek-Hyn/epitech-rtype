@@ -13,11 +13,11 @@ Status labels used below:
 
 | Need | Choice | Main alternatives | Why |
 |---|---|---|---|
-| Language | **C++20** | C++17, Rust, C# | Required by the subject. C++20 brings `std::span` and `std::bit_cast` (used for binary serialization) and is supported by GCC, Clang and MSVC. |
+| Language | **C++20** | C++17, Rust, C# | Required by the subject. C++20 brings `std::span` (the protocol decoder reads a span of bytes), `std::bit_cast` (sending a float as its bits) and aggregate initialization with parentheses (`registry.emplace<Position>(ship, x, y)`), and is supported by GCC, Clang and MSVC. |
 | Build system | **CMake** | Meson, Premake, Makefiles | Required by the subject, cross-platform, understood by every IDE and by the CI. |
 | Dependencies | **CPM** | vcpkg, Conan | One CMake file, nothing to install, identical on every machine and in the CI ([ADR 0001](adr/0001-cpp20-cmake-cpm.md)). Cost: dependencies are built from source the first time. |
 | Unit tests | **GoogleTest** | Catch2, doctest | Widely used, integrated with CTest (`gtest_discover_tests`), good failure messages. Catch2 or doctest would also fit; the choice is mostly familiarity. |
-| Continuous integration | **GitHub Actions** | GitLab CI, Jenkins | The repository is on GitHub. Builds and tests on Linux and Windows, checks formatting. |
+| Continuous integration | **GitHub Actions**, run on demand + `scripts/check.sh` locally | GitLab CI, Jenkins | The repository is on GitHub. The workflow builds and tests on Linux and Windows and checks formatting. Our Actions quota is used up, so it only runs on demand, and `scripts/check.sh` runs the same checks on each developer's machine. |
 
 ## 2. Libraries
 
@@ -46,11 +46,14 @@ Asio is hidden behind our own interfaces (`INetworkServer`, `INetworkClient`): g
 ### Module layering ([ADR 0005](adr/0005-engine-as-library.md))
 
 ```
-engine  ←  common  ←  server
-                   ←  client
+server ──→ common ──→ engine
+   └───────────────────↗
+client ──→ common ──→ engine
+   └───────────────────↗
 ```
 
-Dependencies only go one way. `engine/` uses the standard library only and knows nothing about R-Type,
+Dependencies always go down, never up or sideways: `server` and `client` use both `common` and `engine`, never
+each other. `engine/` uses the standard library only and knows nothing about R-Type,
 so it can be reused by another game. This is why the engine provides *generic* building blocks
 (for example `movement<Position, Velocity>` is a template: the game chooses its own component types).
 
@@ -180,13 +183,14 @@ it chose to connect to.
 |---|---|---|
 | C++ | Memory errors: out-of-bounds access, dangling pointers, use after free | Standard containers (`std::vector`, `std::optional`, `std::span`) instead of raw arrays and `new`; `std::unique_ptr` for ownership; strict warnings (`-Wall -Wextra -Wpedantic -Wshadow -Wconversion`); unit tests. |
 | UDP | No delivery guarantee, no authentication | Full snapshots tolerate losses; validation of every datagram; session token planned. |
-| Third-party libraries (Asio, SFML, GoogleTest) | A vulnerability in a dependency | Exact versions pinned in `cmake/Dependencies.cmake` (`asio-1-38-2`, `3.1.0`, `v1.17.0`): a dependency never changes without a reviewed commit. |
+| Third-party libraries (Asio, SFML, GoogleTest) | A vulnerability in a dependency | Exact versions pinned in `cmake/Dependencies.cmake` (`asio-1-38-2`, `3.1.0`, `v1.17.0`): a dependency never changes without an explicit commit. |
 
 ### Long-term security monitoring
 
 - **Dependencies:** follow the release notes and GitHub security advisories of Asio, SFML and GoogleTest.
-  CPM is not supported by Dependabot, so each version bump is a manual, reviewed pull request.
-- **Continuous integration:** every pull request is built and tested on Linux and Windows, and formatting is checked.
+  CPM is not supported by Dependabot, so each version bump is a manual pull request.
+- **Checks before every push:** `scripts/check.sh` builds with strict warnings, runs the unit tests and checks the
+  formatting; the CI workflow does the same on Linux and Windows when it is run.
 - **Planned:** build the tests with AddressSanitizer and UndefinedBehaviorSanitizer in the CI, and fuzz the packet
   decoder (for example with libFuzzer), since it is the only code reachable by an attacker.
 

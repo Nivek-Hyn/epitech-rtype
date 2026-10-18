@@ -78,7 +78,7 @@ The Registry finds the storage of a type with a `std::unordered_map<std::type_in
 | Rule | Why |
 |---|---|
 | Do not keep a pointer or reference to a component after the current system | Adding a component can grow a vector and move every component of that type. |
-| Do not keep an entity id across ticks without checking `alive` | Killed ids are reused: an old id may now point to a different entity. |
+| Do not keep an entity id across ticks | Killed ids are reused: an old id may now point to a different, alive entity, and `alive` cannot tell (there is no generation counter yet). |
 | Never send an `Entity` over the network | Ids are local to each machine. Send a `NetworkId` component instead. |
 | Do not add a system from inside a running system | `update` is iterating over the list of systems. |
 | Inside `each`, do not kill entities or add components of the visited types | It can invalidate the references passed to the callback. Use `EventBus::enqueue` and react after the systems have run. |

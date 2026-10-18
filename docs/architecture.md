@@ -9,7 +9,8 @@ Each diagram is followed by a text description, so the page can be read without 
 ## 1. Layers
 
 The subject requires visible and decoupled subsystems for rendering, networking and game logic.
-The code is split into four modules, and dependencies only go one way.
+The code is split into four modules. **Dependencies always go down, never up or sideways**: a module may use the
+modules below it, never the ones above or beside it.
 
 ```mermaid
 flowchart BT
@@ -19,12 +20,14 @@ flowchart BT
     client["client/<br/>rendering, input, audio + client network"]
     common --> engine
     server --> common
+    server --> engine
     client --> common
+    client --> engine
 ```
 
 *Text description: `engine` is at the bottom and depends on nothing but the standard library.
-`common` depends on `engine`. `server` and `client` both depend on `common` (and therefore on `engine`),
-but never on each other.*
+`common` depends on `engine` (the protocol uses its serialization). `server` and `client` each depend directly on
+both `common` (the protocol they share) and `engine` (ECS, game loop), but never on each other.*
 
 | Module | Responsibility | Third-party libraries | CMake target |
 |---|---|---|---|
@@ -33,7 +36,7 @@ but never on each other.*
 | `server/` | Authoritative game simulation and server networking | Asio | `rtype_server_lib` (game logic, tested) + `r-type_server` |
 | `client/` | Display, keyboard input, sound and client networking | SFML, Asio | `r-type_client` |
 
-Rules enforced in code review ([CONTRIBUTING](https://github.com/EpitechPGE3-2026/G-ING-500-MAR-5-1-rtype-5/blob/main/CONTRIBUTING.md)):
+Rules every contributor follows ([CONTRIBUTING](https://github.com/EpitechPGE3-2026/G-ING-500-MAR-5-1-rtype-5/blob/main/CONTRIBUTING.md)):
 - `engine/` never includes anything from `common/`, `server/` or `client/`.
 - SFML is only used in `client/`. Asio is only used in network implementation files.
 
@@ -54,6 +57,7 @@ flowchart LR
         Components["Components<br/>Position, Velocity, NetworkId, Kind"]
     end
     subgraph Server["server/"]
+        ServerMain["Main loop<br/>main.cpp"]
         Game["Game logic<br/>Game"]
         ServerNet["Network<br/>INetworkServer"]
     end
@@ -62,18 +66,24 @@ flowchart LR
         ClientNet["Network<br/>INetworkClient"]
     end
     Protocol --> Bytes
+    ServerMain --> Loop
+    ServerMain --> Game
+    ServerMain --> ServerNet
     Game --> ECS
+    Game --> Physics
+    Game --> Events
     Game --> Components
     ServerNet --> Protocol
     ServerNet --> Queue
     ClientNet --> Protocol
+    ClientNet --> Queue
     Render --> ECS
 ```
 
 *Text description: the engine offers six independent building blocks. The protocol uses the engine's
-serialization. The server game logic uses the ECS and the shared components. Both network layers use the
-protocol; the server network layer also uses the thread-safe queue. The client renders entities stored in its
-own ECS.*
+serialization. On the server, the main loop uses the fixed timestep clock, drives the game logic and talks to
+the network layer. The game logic uses the ECS, physics, events and the shared components. Both network layers
+use the protocol and a thread-safe queue. The client renders the entities stored in its own ECS.*
 
 | Subsystem | Main files | Status |
 |---|---|---|
@@ -142,26 +152,60 @@ network events and sends what it produces, so it can be unit tested without a ne
 
 ## 5. Threads
 
+A **thread** is a second flow of execution running another function at the same time, in the same program and
+with the same memory (`std::thread`). Each program has two:
+
+- the **network thread**, created by `network.start(port)`, which does nothing but wait for datagrams;
+- the **game thread** (on the client, the rendering thread), the one running `main`, which must never wait.
+
+Receiving on a socket blocks until a datagram arrives: if the game loop did it, the simulation would freeze
+whenever nobody sends anything. This is why receiving is done by its own thread.
+
 ```mermaid
 flowchart LR
-    subgraph NetworkThread["Network thread (Asio)"]
-        Receive["Receive and decode datagrams"]
-        Transmit["Encode and send datagrams"]
+    subgraph NetworkThread["Network thread"]
+        Receive["receive_from: waits for a datagram<br/>decode, then push an event"]
     end
+    Queue[("ThreadSafeQueue<br/>of events")]
     subgraph GameThread["Game thread"]
-        Simulation["Fixed-step simulation"]
+        Simulation["each step: poll the queue,<br/>update, send the snapshot"]
     end
-    Receive -- "ThreadSafeQueue<br/>(events)" --> Simulation
-    Simulation -- "send / broadcast<br/>(thread-safe)" --> Transmit
+    Clients(["Clients"])
+    Clients -- "datagrams (Input...)" --> Receive
+    Receive -- "push" --> Queue
+    Queue -- "tryPop, never waits" --> Simulation
+    Simulation -- "send / broadcast: encode + send_to" --> Clients
 ```
 
-*Text description: on the server, the network thread receives and decodes datagrams and pushes the resulting
-events into a thread-safe queue. The game thread reads that queue at the start of each step without ever
-waiting. The game thread sends messages through thread-safe `send` and `broadcast` functions.*
+*Text description: clients send datagrams to the server's UDP port. The network thread waits for them, decodes
+each one and pushes the resulting event (player joined, left, input) into a thread-safe queue. At each step, the
+game thread takes every event from the queue without ever waiting, runs the simulation and sends the snapshot to
+the clients with `send` and `broadcast`.*
 
-The client follows the same idea: its network thread fills a queue that the main (rendering) thread reads
-every frame. The game logic therefore never waits for the network, and a slow or silent client cannot block
-the simulation.
+**The queue between the two threads.** Both threads use the same queue. If they modified a `std::queue` at the
+same moment, its internal state would be corrupted (a *data race*). A mutex, a lock that only one thread can hold
+at a time, prevents it. `tryPop` never waits for a message: when the queue is empty it returns `std::nullopt`.
+
+```cpp
+// Network thread, after decoding an Input datagram:
+_events.push(PlayerInput{player, input->flags});
+
+// Game thread, at the start of each step: take every event until the queue is empty.
+while (auto event = network.poll())   // poll() calls tryPop()
+    apply(*event);                    // onPlayerJoined / onPlayerLeft / onInput
+```
+
+**Sending.** `send(player, message)` encodes the message and sends the bytes to the address of that player,
+remembered when it connected. `broadcast(message)` does the same for every connected player. They can be called
+from the game thread because the list of clients they read is protected by a mutex.
+
+**Ports.** The server listens on a fixed UDP port (4242 by default). A client does not choose its port: the
+operating system gives it a free one when it sends its first datagram, and the server learns it from the
+sender address of each datagram it receives.
+
+The client follows the same idea: its network thread fills a queue that the main (rendering) thread empties every
+frame before drawing. The game logic therefore never waits for the network, and a slow or silent client cannot
+block the simulation.
 
 ## 6. Inside the engine: the ECS
 

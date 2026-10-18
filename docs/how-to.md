@@ -135,8 +135,8 @@ An enemy is an entity, not a class: a new enemy type is a new combination of com
    // + server-only components: health, hitbox, movement pattern, shooting...
    ```
 
-   `spawnNetworked` (in `server/src/Game.hpp`) gives the entity a `NetworkId`, a `Kind` and a `Position`, which
-   is what the snapshot sends.
+   `spawnNetworked` (declared in `server/src/Game.hpp`, written by the gameplay team) is meant to give the entity a
+   `NetworkId`, a `Kind` and a `Position`, which is what the snapshot sends.
 
 3. **Give it a behavior.** Reuse existing systems when possible (movement, shooting). For a new movement pattern,
    add a component holding its parameters and a system that updates the `Velocity` from it.

@@ -11,7 +11,7 @@
 5. A review from someone working on another domain is welcome but not required.
    Merge with "Create a merge commit", so the small commits of the branch are kept.
 
-Never push directly to `main`.
+Never push code directly to `main`. Small documentation fixes may be committed directly to `main`.
 
 ## Commits
 
