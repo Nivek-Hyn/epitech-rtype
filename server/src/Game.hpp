@@ -37,6 +37,7 @@ private:
 
     engine::ecs::Registry _registry;
     std::array<engine::ecs::Entity, MaxPlayers> _players;
+    std::array<float, MaxPlayers> _shootCooldowns{};
     std::vector<protocol::Message> _events;
     std::uint32_t _tick = 0;
     std::uint32_t _nextNetId = 1;
