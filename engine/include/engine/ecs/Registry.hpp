@@ -14,26 +14,32 @@
 
 namespace engine::ecs {
 
-// Owns all entities, their components, and the systems that process them.
-//
-//   Registry registry;
-//   Entity ship = registry.spawn();
-//   registry.emplace<Position>(ship, 10.f, 20.f);
-//   registry.each<Position, Velocity>([](Entity entity, Position &position, Velocity &velocity) { ... });
-//
-// See docs/adr/0006-ecs-sparse-arrays.md. Expected behavior is specified by tests/test_registry.cpp.
+/// @brief Owns all entities, their components, and the systems that process them.
+///
+/// @code
+/// Registry registry;
+/// Entity ship = registry.spawn();
+/// registry.emplace<Position>(ship, 10.f, 20.f);
+/// registry.each<Position, Velocity>([](Entity entity, Position &position, Velocity &velocity) { ... });
+/// @endcode
+///
+/// See docs/adr/0006-ecs-sparse-arrays.md. Expected behavior is specified by tests/test_registry.cpp.
 class Registry {
 public:
+    /// @brief A system: a function called by update() with this Registry and the step duration in seconds.
     using System = std::function<void(Registry &, float timeStepSeconds)>;
 
-    // Return a new entity id, reusing a killed entity's id when available. NullEntity is reserved.
+    /// @brief Create an entity.
+    ///
+    /// @return A new id, or the id of the last killed entity when one is available. Never NullEntity.
+    /// @throws std::overflow_error if every id except NullEntity is already used.
     Entity spawn();
-    // Remove every component of entity and make its id reusable. Does nothing if not alive.
+    /// @brief Remove every component of @p entity and make its id reusable. Does nothing if it is not alive.
     void kill(Entity entity);
-    // True if entity was spawned and not killed.
+    /// @brief True if @p entity was spawned and not killed since.
     bool alive(Entity entity) const;
 
-    // The SparseArray storing every component of type C (create it on first use).
+    /// @brief The storage of every component of type @p C, created on first use.
     template <typename C> SparseArray<C> &components()
     {
         if (auto *storage = findComponents<C>())
@@ -45,7 +51,12 @@ public:
         return result;
     }
 
-    // Add or replace a component on a live entity. Reject dead or unknown ids.
+    /// @brief Add or replace the component @p C of a live entity.
+    ///
+    /// @param entity Owner of the component.
+    /// @param args Arguments forwarded to the constructor of @p C.
+    /// @return The new component.
+    /// @throws std::invalid_argument if @p entity is not alive.
     template <typename C, typename... Args> C &emplace(Entity entity, Args &&...args)
     {
         if (!alive(entity))
@@ -53,14 +64,16 @@ public:
         return components<C>().emplace(entity, std::forward<Args>(args)...);
     }
 
-    // Remove the component C of entity. Missing components are ignored.
+    /// @brief Remove the component @p C of @p entity. Does nothing if it has none.
     template <typename C> void remove(Entity entity)
     {
         if (auto *storage = findComponents<C>())
             storage->erase(entity);
     }
 
-    // Borrow the component C of a live entity, or return nullptr.
+    /// @brief Borrow the component @p C of a live entity.
+    ///
+    /// @return A pointer to the component, or `nullptr` if the entity is not alive or has no @p C.
     template <typename C> C *get(Entity entity)
     {
         if (!alive(entity))
@@ -70,11 +83,15 @@ public:
         return nullptr;
     }
 
-    // True if a live entity has a component C.
+    /// @brief True if @p entity is alive and has a component @p C.
     template <typename C> bool has(Entity entity) { return get<C>(entity) != nullptr; }
 
-    // Call func(entity, C1&, C2&, ...) for each live entity with ALL the listed components.
-    // Callbacks must not retain references or invalidate them by growing a component storage.
+    /// @brief Call `func(entity, C1 &, C2 &, ...)` for each live entity having ALL the listed components.
+    ///
+    /// The callback must not keep the references, nor invalidate them by adding components of the visited
+    /// types or killing entities: collect entities first, or use EventBus::enqueue.
+    ///
+    /// @tparam Components Component types an entity must have to be visited.
     template <typename... Components, typename Function> void each(Function &&func)
     {
         const std::size_t entityCount = _alive.size();
@@ -85,9 +102,14 @@ public:
         }
     }
 
-    // Register non-empty systems before update; do not add systems from a running system.
+    /// @brief Register a system, run by update() after the systems added before it.
+    ///
+    /// @throws std::invalid_argument if @p system is empty.
+    /// @warning Do not add a system from inside a running system.
     void addSystem(System system);
-    // Run systems in registration order, passing this Registry and timeStepSeconds in seconds.
+    /// @brief Run every system once, in registration order.
+    ///
+    /// @param timeStepSeconds Duration of the simulated step, passed to each system.
     void update(float timeStepSeconds);
 
 private:

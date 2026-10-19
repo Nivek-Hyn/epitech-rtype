@@ -1,0 +1,68 @@
+site_name: R-Type
+site_description: Networked multiplayer R-Type built on our own C++ game engine
+repo_url: https://github.com/EpitechPGE3-2026/G-ING-500-MAR-5-1-rtype-5
+edit_uri: edit/main/docs/
+docs_dir: docs
+exclude_docs: |
+  GameDesign/
+  Doxyfile
+  api-mainpage.md
+
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle:
+        icon: material/brightness-4
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/brightness-7
+        name: Switch to light mode
+
+markdown_extensions:
+  - tables
+  - admonition
+  - toc:
+      permalink: true
+  - pymdownx.highlight
+  - pymdownx.tasklist
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+
+plugins:
+  - search
+
+nav:
+  - Home: index.md
+  - Architecture:
+      - Overview: architecture.md
+      - Engine: engine.md
+      - Technical study: technical-study.md
+      - Decision records:
+          - Index: adr/README.md
+          - 0001 C++20, CMake, CPM: adr/0001-cpp20-cmake-cpm.md
+          - 0002 SFML 3: adr/0002-sfml3-rendering.md
+          - 0003 Asio: adr/0003-asio-networking.md
+          - 0004 Cross-platform: adr/0004-cross-platform.md
+          - 0005 Engine as a library: adr/0005-engine-as-library.md
+          - 0006 ECS with sparse arrays: adr/0006-ecs-sparse-arrays.md
+          - 0007 Authoritative snapshots: adr/0007-authoritative-snapshots.md
+          - 0008 Binary protocol: adr/0008-binary-protocol.md
+  - Network protocol: protocol.md
+  - Guides:
+      - How-to guides: how-to.md
+  - Accessibility:
+      - Accessibility study: accessibility.md
+      - Documentation guidelines: documentation-guidelines.md

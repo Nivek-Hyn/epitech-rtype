@@ -6,11 +6,12 @@
 2. Create a branch from `main`: `<type>/<issue>-<short-name>`, e.g. `feat/28-udp-socket`, `fix/41-starfield-speed`.
    Types: `feat`, `fix`, `refactor`, `test`, `docs`, `ci`, `chore`.
 3. Open a pull request into `main`, with `Closes #<issue>` in the description.
-4. At least **one review from someone working on another domain** before merging.
-   This keeps everyone aware of the whole architecture.
-5. The CI must be green. Merge with "Squash and merge".
+4. Run `scripts/check.sh` before pushing: formatting, build without warnings and unit tests, like the CI.
+   The CI only runs on demand (Actions tab > CI > Run workflow).
+5. A review from someone working on another domain is welcome but not required.
+   Merge with "Create a merge commit", so the small commits of the branch are kept.
 
-Never push directly to `main`.
+Never push code directly to `main`. Small documentation fixes may be committed directly to `main`.
 
 ## Commits
 
@@ -41,6 +42,8 @@ Scopes: `engine`, `common`, `server`, `client`, `network`, `gameplay`, `ci`, `do
 - One namespace per module: `engine::...`, `rtype::protocol`, `rtype::server`, `rtype::client`.
 - No warnings: the build uses `-Wall -Wextra -Wpedantic -Wshadow -Wconversion`.
 - New logic comes with unit tests in `tests/` when it can be tested without a window or a socket.
+- Public declarations in headers are documented with Doxygen `///` comments: `@brief`, an empty line, then
+  details, `@param`, `@return`, `@throws`. Generate the API reference with `doxygen docs/Doxyfile`.
 
 ## Contracts and TODOs
 
@@ -51,3 +54,6 @@ The tests in `tests/` describe the expected behavior: a feature is done when its
 ## Documentation
 
 All documentation, code comments, commit messages and pull requests are written in **English**.
+
+Documentation must be accessible: follow the [documentation guidelines](docs/documentation-guidelines.md)
+(heading order, alternative text, text descriptions of diagrams, no information by color only).

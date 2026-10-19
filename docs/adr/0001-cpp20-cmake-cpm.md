@@ -14,10 +14,10 @@ on a fresh machine without installing libraries system-wide.
 | Conan | Prebuilt binaries, powerful | Needs Python and profile configuration, more friction |
 
 ## Decision
-- **C++20**: `std::span`, `std::bit_cast`, designated initializers, concepts; supported by GCC, Clang and MSVC.
+- **C++20**: `std::span`, `std::bit_cast`, aggregate initialization with parentheses; supported by GCC, Clang and MSVC.
 - **CMake** as build system generator.
 - **CPM** as package manager. Downloads are shared between build folders through `CPM_SOURCE_CACHE`.
 
 ## Consequences
 - `cmake -S . -B build && cmake --build build` is the only thing a developer needs.
-- The CI must cache `CPM_SOURCE_CACHE` to avoid downloading dependencies on every run.
+- The CI caches `CPM_SOURCE_CACHE` to avoid downloading dependencies on every run.

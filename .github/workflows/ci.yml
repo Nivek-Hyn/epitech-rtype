@@ -1,9 +1,9 @@
 name: CI
 
+# Run by hand only (Actions tab > CI > Run workflow): automatic runs failed on every push while the
+# Actions budget was exhausted and notified the whole team. Run scripts/check.sh locally before pushing.
 on:
-  push:
-    branches: [main]
-  pull_request:
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.ref }}

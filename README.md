@@ -37,18 +37,19 @@ Run the client from the repository root so it finds `assets/`.
 
 ```sh
 ctest --test-dir build --output-on-failure
+scripts/check.sh                 # formatting + build without warnings + tests, as the CI does
 ```
 
 ## Project layout
 
 | Folder | Content |
 |---|---|
-| `engine/` | Generic game engine (ECS, timing, serialization). Knows nothing about R-Type. |
+| `engine/` | Generic game engine (ECS, game loop, events, collisions, serialization). Knows nothing about R-Type. |
 | `common/` | Code shared by server and client: network protocol, components, constants. |
 | `server/` | Authoritative game server. |
 | `client/` | Graphical client (SFML). |
 | `tests/` | Unit tests (GoogleTest). |
-| `docs/` | Documentation: [protocol](docs/protocol.md), [architecture decisions](docs/adr/README.md). |
+| `docs/` | Documentation, starting at [docs/index.md](docs/index.md) (also buildable as a website, see that page). |
 
 ## Contributing
 

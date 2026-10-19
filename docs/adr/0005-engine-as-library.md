@@ -15,11 +15,11 @@ engine  ←  common  ←  server
 
 | Module | Contains | May depend on |
 |---|---|---|
-| `engine/` | ECS, fixed timestep, thread-safe queue, byte serialization | standard library only |
+| `engine/` | ECS, fixed timestep, event bus, collision shapes, movement system, thread-safe queue, byte serialization | standard library only |
 | `common/` | R-Type protocol, shared components, constants | engine |
 | `server/` | Authoritative game logic, server networking | common, engine, Asio |
 | `client/` | Rendering, input, audio, client networking | common, engine, Asio, SFML |
 
 ## Consequences
-- `engine/` must never include anything about R-Type. This is checked in code review.
+- `engine/` must never include anything about R-Type: generic code takes the game's types as template parameters.
 - Extracting the engine into its own repository in part 2 should only require moving the folder.
