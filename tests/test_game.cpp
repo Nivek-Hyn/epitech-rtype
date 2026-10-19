@@ -37,3 +37,16 @@ TEST(Game, PlayerLeftProducesDestroyEvent)
     ASSERT_EQ(events.size(), 1u);
     EXPECT_TRUE(std::holds_alternative<protocol::EntityDestroyed>(events[0]));
 }
+
+TEST(Game, HoldingShootKeepsSnapshotsWithinDatagramLimit)
+{
+    Game game;
+    game.onPlayerJoined(0);
+
+    for (int tick = 0; tick < 600; ++tick) {
+        game.onInput(0, protocol::InputFlag::Shoot);
+        game.update(1.f / 60.f);
+    }
+
+    EXPECT_LE(game.snapshot().entities.size(), 20u);
+}

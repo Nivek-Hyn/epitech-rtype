@@ -1,4 +1,5 @@
 #include "Game.hpp"
+#include "net/AsioNetworkServer.hpp"
 
 #include "common/Constants.hpp"
 #include "engine/core/FixedTimestep.hpp"
@@ -10,6 +11,8 @@
 #include <iostream>
 #include <string>
 #include <thread>
+#include <type_traits>
+#include <variant>
 
 namespace {
 
@@ -38,19 +41,40 @@ int main(int argc, char **argv)
     std::signal(SIGTERM, onSignal);
 
     rtype::server::Game game;
-    // TODO(network): create the Asio implementation of INetworkServer and start(port).
-    std::cout << "r-type_server: listening on UDP port " << port << " (network not implemented yet)\n";
+    rtype::server::AsioNetworkServer network;
+    try {
+        network.start(port);
+    } catch (const std::exception &error) {
+        std::cerr << "Could not start UDP server: " << error.what() << '\n';
+        return EXIT_FAILURE;
+    }
+    std::cout << "r-type_server: listening on UDP port " << port << '\n';
 
     engine::core::FixedTimestep clock(rtype::TickRate);
     while (g_running) {
         for (int i = clock.advance(); i > 0; --i) {
-            // TODO(network): while (auto event = network.poll()) -> game.onPlayerJoined / onPlayerLeft / onInput
+            while (auto event = network.poll()) {
+                std::visit(
+                    [&game](const auto &networkEvent) {
+                        using Event = std::decay_t<decltype(networkEvent)>;
+                        if constexpr (std::is_same_v<Event, rtype::server::PlayerJoined>)
+                            game.onPlayerJoined(networkEvent.id);
+                        else if constexpr (std::is_same_v<Event, rtype::server::PlayerDisconnected>)
+                            game.onPlayerLeft(networkEvent.id);
+                        else if constexpr (std::is_same_v<Event, rtype::server::PlayerInput>)
+                            game.onInput(networkEvent.id, networkEvent.flags);
+                    },
+                    *event);
+            }
             game.update(clock.step());
-            // TODO(network): network.broadcast(game.snapshot()) and every game.takeEvents()
+            network.broadcast(game.snapshot());
+            for (const auto &message : game.takeEvents())
+                network.broadcast(message);
         }
         std::this_thread::sleep_for(clock.untilNextTick());
     }
 
+    network.stop();
     std::cout << "r-type_server: stopped after " << game.tick() << " ticks\n";
     return EXIT_SUCCESS;
 }

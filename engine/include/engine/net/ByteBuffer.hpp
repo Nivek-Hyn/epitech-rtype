@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <bit>
 #include <span>
 #include <stdexcept>
 #include <vector>
@@ -12,16 +13,26 @@ namespace engine::net {
 // Never memcpy whole structs: padding and endianness differ between compilers/OSes (see docs/adr/0008).
 class ByteWriter {
 public:
-    // TODO(network): append value as 1 / 2 / 4 bytes, most significant byte first.
-    void u8(std::uint8_t /* value */) { throw std::logic_error("ByteWriter::u8 not implemented"); }
-    void u16(std::uint16_t /* value */) { throw std::logic_error("ByteWriter::u16 not implemented"); }
-    void u32(std::uint32_t /* value */) { throw std::logic_error("ByteWriter::u32 not implemented"); }
-    // TODO(network): write the 32 bits of the float as a u32 (hint: std::bit_cast).
-    void f32(float /* value */) { throw std::logic_error("ByteWriter::f32 not implemented"); }
+    void u8(std::uint8_t value) { _data.push_back(value); }
+    void u16(std::uint16_t value)
+    {
+        u8(static_cast<std::uint8_t>(value >> 8));
+        u8(static_cast<std::uint8_t>(value));
+    }
+    void u32(std::uint32_t value)
+    {
+        u8(static_cast<std::uint8_t>(value >> 24));
+        u8(static_cast<std::uint8_t>(value >> 16));
+        u8(static_cast<std::uint8_t>(value >> 8));
+        u8(static_cast<std::uint8_t>(value));
+    }
+    void f32(float value) { u32(std::bit_cast<std::uint32_t>(value)); }
 
-    // TODO(network): number of bytes written / the bytes themselves.
-    std::size_t size() const { throw std::logic_error("ByteWriter::size not implemented"); }
-    std::vector<std::uint8_t> &data() { throw std::logic_error("ByteWriter::data not implemented"); }
+    std::size_t size() const { return _data.size(); }
+    std::vector<std::uint8_t> &data() { return _data; }
+
+private:
+    std::vector<std::uint8_t> _data;
 };
 
 // Reads values written by ByteWriter.
@@ -29,21 +40,52 @@ public:
 // end.
 class ByteReader {
 public:
-    explicit ByteReader(std::span<const std::uint8_t> /* bytes */)
+    explicit ByteReader(std::span<const std::uint8_t> bytes) : _bytes(bytes) {}
+
+    std::uint8_t u8()
     {
-        throw std::logic_error("ByteReader not implemented");
+        if (!canRead(1))
+            return 0;
+        return _bytes[_offset++];
+    }
+    std::uint16_t u16()
+    {
+        if (!canRead(2))
+            return 0;
+        const std::uint16_t value = static_cast<std::uint16_t>(_bytes[_offset]) << 8 |
+                                    static_cast<std::uint16_t>(_bytes[_offset + 1]);
+        _offset += 2;
+        return value;
+    }
+    std::uint32_t u32()
+    {
+        if (!canRead(4))
+            return 0;
+        const std::uint32_t value = static_cast<std::uint32_t>(_bytes[_offset]) << 24 |
+                                    static_cast<std::uint32_t>(_bytes[_offset + 1]) << 16 |
+                                    static_cast<std::uint32_t>(_bytes[_offset + 2]) << 8 |
+                                    static_cast<std::uint32_t>(_bytes[_offset + 3]);
+        _offset += 4;
+        return value;
+    }
+    float f32() { return std::bit_cast<float>(u32()); }
+
+    bool ok() const { return !_failed; }
+    std::size_t remaining() const { return _bytes.size() - _offset; }
+
+private:
+    bool canRead(std::size_t count)
+    {
+        if (_failed || count > remaining()) {
+            _failed = true;
+            return false;
+        }
+        return true;
     }
 
-    // TODO(network): read the next 1 / 2 / 4 bytes (big-endian), or return 0 and fail if there aren't enough.
-    std::uint8_t u8() { throw std::logic_error("ByteReader::u8 not implemented"); }
-    std::uint16_t u16() { throw std::logic_error("ByteReader::u16 not implemented"); }
-    std::uint32_t u32() { throw std::logic_error("ByteReader::u32 not implemented"); }
-    float f32() { throw std::logic_error("ByteReader::f32 not implemented"); }
-
-    // TODO(network): false once a read went past the end.
-    bool ok() const { throw std::logic_error("ByteReader::ok not implemented"); }
-    // TODO(network): number of bytes not read yet.
-    std::size_t remaining() const { throw std::logic_error("ByteReader::remaining not implemented"); }
+    std::span<const std::uint8_t> _bytes;
+    std::size_t _offset = 0;
+    bool _failed = false;
 };
 
 } // namespace engine::net

@@ -34,6 +34,21 @@ TEST(Protocol, RoundTripSnapshot)
     EXPECT_EQ(received.entities[1].type, EntityType::Enemy);
 }
 
+TEST(Protocol, RoundTripsEveryMessageType)
+{
+    const std::vector<Message> messages = {
+        Connect{}, Input{InputFlag::Down}, Disconnect{}, Ping{123}, ConnectAccepted{3},
+        ConnectRejected{RejectReason::VersionMismatch}, Snapshot{},
+        EntityDestroyed{9, DestroyReason::OutOfBounds}, PlayerLeft{2, LeaveReason::TimedOut}, Pong{456}};
+
+    for (const Message &message : messages) {
+        const auto decoded = decode(encode({7, message}));
+        ASSERT_TRUE(decoded);
+        EXPECT_EQ(decoded->sequence, 7u);
+        EXPECT_EQ(decoded->message.index(), message.index());
+    }
+}
+
 TEST(Protocol, HeaderIsBigEndian)
 {
     const auto bytes = encode({0x01020304, Connect{}});
@@ -77,4 +92,23 @@ TEST(Protocol, RejectsSnapshotWithUnknownState)
     auto bytes = encode({1, Snapshot{1, GameState::Playing, 0, {}}});
     bytes[HeaderSize + 4] = 9; // state 9 doesn't exist
     EXPECT_FALSE(decode(bytes));
+}
+
+TEST(Protocol, RejectsReservedInputFlagsAndUnknownEnumValues)
+{
+    auto input = encode({1, Input{}});
+    input[HeaderSize] = 0x20;
+    EXPECT_FALSE(decode(input));
+
+    auto accepted = encode({1, ConnectAccepted{0}});
+    accepted[HeaderSize] = 4;
+    EXPECT_FALSE(decode(accepted));
+
+    auto destroyed = encode({1, EntityDestroyed{1, DestroyReason::Killed}});
+    destroyed[HeaderSize + 4] = 0;
+    EXPECT_FALSE(decode(destroyed));
+
+    auto entityType = encode({1, Snapshot{1, GameState::Playing, 0, {{1, EntityType::Player, 0, 0.f, 0.f}}}});
+    entityType[HeaderSize + SnapshotFixedSize + 4] = 0;
+    EXPECT_FALSE(decode(entityType));
 }
