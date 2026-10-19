@@ -1,4 +1,6 @@
 #include "Game.hpp"
+#include "engine/systems/Movement.hpp"
+#include "common/Components.hpp"
 
 namespace rtype::server {
 
@@ -24,7 +26,28 @@ void Game::onPlayerJoined(PlayerId player)
 void Game::onPlayerLeft(PlayerId /* player */) {}
 
 // TODO(gameplay): turn the input flags into the ship's velocity, handle shooting.
-void Game::onInput(PlayerId /* player */, std::uint8_t /* flags */) {}
+void Game::onInput(PlayerId player, std::uint8_t flags)
+{
+    //we get the entity associated with the player
+    engine::ecs::Entity entity = _players[player];
+    if (entity == engine::ecs::NullEntity)
+        return;
+    float speed = 200.0f;
+    float vx = 0.0f;
+    float vy = 0.0f;
+    //we check the input flags and set the velocity accordingly
+    if (flags & protocol::InputFlag::Up)
+        vy -= speed;
+    if (flags & protocol::InputFlag::Down)
+        vy += speed;
+    if (flags & protocol::InputFlag::Left)
+        vx -= speed;
+    if (flags & protocol::InputFlag::Right)
+        vx += speed;
+    //on met a jour (ou ajout) la vitesse du joueur
+    _registry.emplace<rtype::components::Velocity>(entity, vx, vy);
+    //shoot later don't forget !!!!!!
+}
 
 // TODO(gameplay): run the systems (_registry.update) and increase _tick.
 void Game::update(float dt)
