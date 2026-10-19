@@ -8,6 +8,7 @@ Game::Game()
 {
     _players.fill(engine::ecs::NullEntity);
     _registry.addSystem(engine::systems::movement<rtype::components::Position, rtype::components::Velocity>);
+    onPlayerJoined(0);
     // TODO(gameplay): register the systems here (movement, spawn, shooting, collisions, damage...).
 }
 
@@ -20,6 +21,16 @@ void Game::onPlayerJoined(PlayerId player)
     //_registry.add_component<rtype::components::Velocity>(entity, {0.0f, 0.0f});
     //_registry.add_component<rtype::components::Kind>(entity, {rtype::components::EntityKind::Player});
     _players[player] = entity;
+}
+
+engine::ecs::Entity Game::spawnNetworked(protocol::EntityType type, std::uint8_t variant, float x, float y)
+{
+    engine::ecs::Entity entity = _registry.spawn();
+    _registry.emplace<rtype::components::NetworkId>(entity, _nextNetId++);
+    _registry.emplace<rtype::components::Kind>(entity, type, variant);
+    _registry.emplace<rtype::components::Position>(entity, x, y);
+    _registry.emplace<rtype::components::Velocity>(entity, 0.0f, 0.0f);
+    return entity;
 }
 
 // TODO(gameplay): kill the player's ship and add an EntityDestroyed event.
@@ -46,7 +57,16 @@ void Game::onInput(PlayerId player, std::uint8_t flags)
         vx += speed;
     //on met a jour (ou ajout) la vitesse du joueur
     _registry.emplace<rtype::components::Velocity>(entity, vx, vy);
-    //shoot later don't forget !!!!!!
+    
+
+    if (flags & protocol::InputFlag::Shoot) {
+        auto *pos = _registry.get<rtype::components::Position>(entity);
+        if (pos) {
+            engine::ecs::Entity bullet = spawnNetworked(
+                protocol::EntityType::PlayerMissile, 0, pos->x + 30.0f, pos->y);
+            _registry.emplace<rtype::components::Velocity>(bullet, 400.0f, 0.0f);
+        }
+    }
 }
 
 // TODO(gameplay): run the systems (_registry.update) and increase _tick.
@@ -65,7 +85,7 @@ protocol::Snapshot Game::snapshot()
     snap.score = 0;
 
     _registry.each<rtype::components::Position, rtype::components::Kind, rtype::components::NetworkId>(
-        [&snap](engine::ecs::Entity entity, const rtype::components::Position &pos, const rtype::components::Kind &kind, const rtype::components::NetworkId &netId) {
+        [&snap](engine::ecs::Entity /*entity*/, const rtype::components::Position &pos, const rtype::components::Kind &kind, const rtype::components::NetworkId &netId) {
             protocol::EntityState state;
             state.netId = netId.id;
             state.type = kind.type;
@@ -81,6 +101,41 @@ protocol::Snapshot Game::snapshot()
 std::vector<protocol::Message> Game::takeEvents()
 {
     return {};
+}
+
+
+void checkCollisions(engine::ecs::Registry &registry, std::vector<protocol::Message> &events)
+{
+    registry.each<rtype::components::Position, rtype::components::Kind, rtype::components::NetworkId>(
+        [&registry, &events](engine::ecs::Entity missileEntity, const rtype::components::Position &missilePos, const rtype::components::Kind &missileKind, const rtype::components::NetworkId &missileNetId) {
+            if (missileKind.type != protocol::EntityType::PlayerMissile)
+                return;
+            registry.each<rtype::components::Position, rtype::components::Kind, rtype::components::NetworkId>(
+                [&registry, &events, missileEntity, &missilePos, &missileNetId](engine::ecs::Entity enemyEntity, const rtype::components::Position &enemyPos, const rtype::components::Kind &enemyKind, const rtype::components::NetworkId &enemyNetId) {
+                    if (enemyKind.type != protocol::EntityType::Enemy)
+                        return;
+
+                    // Définition simple d'une boîte de collision (AABB) d'une taille de 20x20 pixels par exemple
+                    float boxSize = 20.0f;
+                    bool collision = (missilePos.x < enemyPos.x + boxSize && missilePos.x + boxSize > enemyPos.x && missilePos.y < enemyPos.y + boxSize && missilePos.y + boxSize > enemyPos.y);
+
+                    if (collision) {
+                        // 1. On détruit le missile
+                        registry.kill(missileEntity);
+                        protocol::EntityDestroyed missileDestroyed;
+                        missileDestroyed.netId = missileNetId.id;
+                        missileDestroyed.reason = protocol::DestroyReason::Killed;
+                        events.push_back(missileDestroyed);
+
+                        // 2. On détruit l'ennemi
+                        registry.kill(enemyEntity);
+                        protocol::EntityDestroyed enemyDestroyed;
+                        enemyDestroyed.netId = enemyNetId.id;
+                        enemyDestroyed.reason = protocol::DestroyReason::Killed;
+                        events.push_back(enemyDestroyed);
+                    }
+                });
+        });
 }
 
 } // namespace rtype::server
