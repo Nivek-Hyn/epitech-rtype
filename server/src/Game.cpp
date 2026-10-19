@@ -59,7 +59,22 @@ void Game::update(float dt)
 // TODO(gameplay): one EntityState per entity having NetworkId + Kind + Position.
 protocol::Snapshot Game::snapshot()
 {
-    return {};
+    protocol::Snapshot snap;
+    snap.tick = _tick;
+    snap.state = protocol::GameState::Playing;
+    snap.score = 0;
+
+    _registry.each<rtype::components::Position, rtype::components::Kind, rtype::components::NetworkId>(
+        [&snap](engine::ecs::Entity entity, const rtype::components::Position &pos, const rtype::components::Kind &kind, const rtype::components::NetworkId &netId) {
+            protocol::EntityState state;
+            state.netId = netId.id;
+            state.type = kind.type;
+            state.variant = kind.variant;
+            state.x = pos.x;
+            state.y = pos.y;
+            snap.entities.push_back(state);
+        });
+    return snap;
 }
 
 // TODO(gameplay): return the events produced since the last call and clear them.
