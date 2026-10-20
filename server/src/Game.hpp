@@ -34,6 +34,7 @@ public:
 
 private:
     engine::ecs::Entity spawnNetworked(protocol::EntityType type, std::uint8_t variant, float x, float y);
+    void spawnEnemies(float dt);
 
     engine::ecs::Registry _registry;
     std::array<engine::ecs::Entity, MaxPlayers> _players;
@@ -41,6 +42,8 @@ private:
     std::vector<protocol::Message> _events;
     std::uint32_t _tick = 0;
     std::uint32_t _nextNetId = 1;
+    float _enemySpawnTimer = 0.f;
+    std::uint32_t _enemiesSpawned = 0;
 };
 
 } // namespace rtype::server

@@ -2,13 +2,27 @@
 #include "common/Components.hpp"
 #include "engine/systems/Movement.hpp"
 
+#include <algorithm>
+#include <array>
+
 namespace rtype::server {
+
+namespace {
+
+constexpr float EnemySpawnIntervalSeconds = 2.f;
+constexpr float EnemySpeed = 100.f; // world units per second, towards the left
+// Hitbox sizes match the client sprites (scaled x2): enemy 33x36.
+constexpr float EnemyWidth = 66.f;
+constexpr float EnemyHeight = 72.f;
+// Rows where enemies appear, in turn. The first one is level with a new player's ship (y = 300).
+constexpr std::array<float, 4> EnemyRows = {290.f, 150.f, 600.f, 450.f};
+
+} // namespace
 
 Game::Game()
 {
     _players.fill(engine::ecs::NullEntity);
     _registry.addSystem(engine::systems::movement<rtype::components::Position, rtype::components::Velocity>);
-    // TODO(gameplay): register the systems here (movement, spawn, shooting, collisions, damage...).
 }
 
 // TODO(gameplay): spawn the player's ship (NetworkId, Kind, Position, Velocity...) and remember it in _players.
@@ -82,9 +96,9 @@ void Game::onInput(PlayerId player, std::uint8_t flags)
     }
 }
 
-// TODO(gameplay): run the systems (_registry.update) and increase _tick.
 void Game::update(float dt)
 {
+    spawnEnemies(dt);
     _registry.update(dt);
     for (float &cooldown : _shootCooldowns)
         cooldown = std::max(0.f, cooldown - dt);
@@ -93,8 +107,11 @@ void Game::update(float dt)
     _registry.each<rtype::components::Position, rtype::components::Kind, rtype::components::NetworkId>(
         [&expiredMissiles](engine::ecs::Entity entity, const rtype::components::Position &position,
                            const rtype::components::Kind &kind, const rtype::components::NetworkId &networkId) {
-            if ((kind.type == protocol::EntityType::PlayerMissile || kind.type == protocol::EntityType::EnemyMissile) &&
-                (position.x > WorldWidth || position.x < 0.f || position.y > WorldHeight || position.y < 0.f))
+            const bool missileOut =
+                (kind.type == protocol::EntityType::PlayerMissile || kind.type == protocol::EntityType::EnemyMissile) &&
+                (position.x > WorldWidth || position.x < 0.f || position.y > WorldHeight || position.y < 0.f);
+            const bool enemyOut = kind.type == protocol::EntityType::Enemy && position.x < -EnemyWidth;
+            if (missileOut || enemyOut)
                 expiredMissiles.emplace_back(entity, networkId.id);
         });
     for (const auto &[entity, networkId] : expiredMissiles) {
@@ -131,6 +148,25 @@ std::vector<protocol::Message> Game::takeEvents()
     std::vector<protocol::Message> events;
     events.swap(_events);
     return events;
+}
+
+// Spawns an enemy on the right edge every EnemySpawnIntervalSeconds while at least one player is in the game.
+void Game::spawnEnemies(float dt)
+{
+    const bool anyPlayer = std::any_of(_players.begin(), _players.end(),
+                                       [](engine::ecs::Entity player) { return player != engine::ecs::NullEntity; });
+    if (!anyPlayer) {
+        _enemySpawnTimer = 0.f;
+        return;
+    }
+    _enemySpawnTimer += dt;
+    while (_enemySpawnTimer >= EnemySpawnIntervalSeconds) {
+        _enemySpawnTimer -= EnemySpawnIntervalSeconds;
+        const float y = EnemyRows[_enemiesSpawned % EnemyRows.size()];
+        const engine::ecs::Entity enemy = spawnNetworked(protocol::EntityType::Enemy, 0, WorldWidth - EnemyWidth, y);
+        _registry.emplace<rtype::components::Velocity>(enemy, -EnemySpeed, 0.f);
+        _enemiesSpawned++;
+    }
 }
 
 void checkCollisions(engine::ecs::Registry &registry, std::vector<protocol::Message> &events)

@@ -2,6 +2,8 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
+
 using namespace rtype;
 using namespace rtype::server;
 
@@ -48,5 +50,22 @@ TEST(Game, HoldingShootKeepsSnapshotsWithinDatagramLimit)
         game.update(1.f / 60.f);
     }
 
-    EXPECT_LE(game.snapshot().entities.size(), 20u);
+    EXPECT_LE(game.snapshot().entities.size(), protocol::MaxEntitiesPerSnapshot);
+}
+
+TEST(Game, EnemiesAppearOnlyWhilePlayersAreConnected)
+{
+    Game game;
+    for (int tick = 0; tick < 180; tick++)
+        game.update(1.f / 60.f);
+    EXPECT_TRUE(game.snapshot().entities.empty());
+
+    game.onPlayerJoined(0);
+    for (int tick = 0; tick < 180; tick++)
+        game.update(1.f / 60.f);
+    const auto snap = game.snapshot();
+    const auto enemyCount = std::count_if(snap.entities.begin(), snap.entities.end(), [](const auto &entity) {
+        return entity.type == protocol::EntityType::Enemy;
+    });
+    EXPECT_EQ(enemyCount, 1);
 }
