@@ -1,6 +1,6 @@
 #include "Game.hpp"
-#include "engine/systems/Movement.hpp"
 #include "common/Components.hpp"
+#include "engine/systems/Movement.hpp"
 
 namespace rtype::server {
 
@@ -16,8 +16,9 @@ void Game::onPlayerJoined(PlayerId player)
 {
     if (player >= MaxPlayers || _players[player] != engine::ecs::NullEntity)
         return;
-    //we create a new entity in the ECS registry
-    engine::ecs::Entity entity = spawnNetworked(protocol::EntityType::Player, static_cast<std::uint8_t>(player), 100.0f, 300.0f);
+    // we create a new entity in the ECS registry
+    engine::ecs::Entity entity =
+        spawnNetworked(protocol::EntityType::Player, static_cast<std::uint8_t>(player), 100.0f, 300.0f);
     //_registry.add_component<rtype::components::Position>(entity, {100.0f, 300.0f});
     //_registry.add_component<rtype::components::Velocity>(entity, {0.0f, 0.0f});
     //_registry.add_component<rtype::components::Kind>(entity, {rtype::components::EntityKind::Player});
@@ -52,14 +53,14 @@ void Game::onInput(PlayerId player, std::uint8_t flags)
 {
     if (player >= MaxPlayers)
         return;
-    //we get the entity associated with the player
+    // we get the entity associated with the player
     engine::ecs::Entity entity = _players[player];
     if (entity == engine::ecs::NullEntity)
         return;
     float speed = 200.0f;
     float vx = 0.0f;
     float vy = 0.0f;
-    //we check the input flags and set the velocity accordingly
+    // we check the input flags and set the velocity accordingly
     if (flags & protocol::InputFlag::Up)
         vy -= speed;
     if (flags & protocol::InputFlag::Down)
@@ -68,15 +69,13 @@ void Game::onInput(PlayerId player, std::uint8_t flags)
         vx -= speed;
     if (flags & protocol::InputFlag::Right)
         vx += speed;
-    //on met a jour (ou ajout) la vitesse du joueur
+    // on met a jour (ou ajout) la vitesse du joueur
     _registry.emplace<rtype::components::Velocity>(entity, vx, vy);
-    
 
     if ((flags & protocol::InputFlag::Shoot) && _shootCooldowns[player] <= 0.f) {
         auto *pos = _registry.get<rtype::components::Position>(entity);
         if (pos) {
-            engine::ecs::Entity bullet = spawnNetworked(
-                protocol::EntityType::PlayerMissile, 0, pos->x + 30.0f, pos->y);
+            engine::ecs::Entity bullet = spawnNetworked(protocol::EntityType::PlayerMissile, 0, pos->x + 30.0f, pos->y);
             _registry.emplace<rtype::components::Velocity>(bullet, 400.0f, 0.0f);
             _shootCooldowns[player] = 0.25f;
         }
@@ -114,7 +113,8 @@ protocol::Snapshot Game::snapshot()
     snap.score = 0;
 
     _registry.each<rtype::components::Position, rtype::components::Kind, rtype::components::NetworkId>(
-        [&snap](engine::ecs::Entity /*entity*/, const rtype::components::Position &pos, const rtype::components::Kind &kind, const rtype::components::NetworkId &netId) {
+        [&snap](engine::ecs::Entity /*entity*/, const rtype::components::Position &pos,
+                const rtype::components::Kind &kind, const rtype::components::NetworkId &netId) {
             protocol::EntityState state;
             state.netId = netId.id;
             state.type = kind.type;
@@ -133,21 +133,25 @@ std::vector<protocol::Message> Game::takeEvents()
     return events;
 }
 
-
 void checkCollisions(engine::ecs::Registry &registry, std::vector<protocol::Message> &events)
 {
     registry.each<rtype::components::Position, rtype::components::Kind, rtype::components::NetworkId>(
-        [&registry, &events](engine::ecs::Entity missileEntity, const rtype::components::Position &missilePos, const rtype::components::Kind &missileKind, const rtype::components::NetworkId &missileNetId) {
+        [&registry, &events](engine::ecs::Entity missileEntity, const rtype::components::Position &missilePos,
+                             const rtype::components::Kind &missileKind,
+                             const rtype::components::NetworkId &missileNetId) {
             if (missileKind.type != protocol::EntityType::PlayerMissile)
                 return;
             registry.each<rtype::components::Position, rtype::components::Kind, rtype::components::NetworkId>(
-                [&registry, &events, missileEntity, &missilePos, &missileNetId](engine::ecs::Entity enemyEntity, const rtype::components::Position &enemyPos, const rtype::components::Kind &enemyKind, const rtype::components::NetworkId &enemyNetId) {
+                [&registry, &events, missileEntity, &missilePos, &missileNetId](
+                    engine::ecs::Entity enemyEntity, const rtype::components::Position &enemyPos,
+                    const rtype::components::Kind &enemyKind, const rtype::components::NetworkId &enemyNetId) {
                     if (enemyKind.type != protocol::EntityType::Enemy)
                         return;
 
                     // Définition simple d'une boîte de collision (AABB) d'une taille de 20x20 pixels par exemple
                     float boxSize = 20.0f;
-                    bool collision = (missilePos.x < enemyPos.x + boxSize && missilePos.x + boxSize > enemyPos.x && missilePos.y < enemyPos.y + boxSize && missilePos.y + boxSize > enemyPos.y);
+                    bool collision = (missilePos.x < enemyPos.x + boxSize && missilePos.x + boxSize > enemyPos.x &&
+                                      missilePos.y < enemyPos.y + boxSize && missilePos.y + boxSize > enemyPos.y);
 
                     if (collision) {
                         // 1. On détruit le missile

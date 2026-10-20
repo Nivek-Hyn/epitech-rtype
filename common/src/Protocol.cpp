@@ -6,7 +6,6 @@
 #include <type_traits>
 #include <utility>
 
-
 namespace rtype::protocol {
 
 namespace {
@@ -15,15 +14,24 @@ MessageType typeOf(const Message &message)
 {
     return std::visit(
         []<typename T>(const T &) {
-            if constexpr (std::is_same_v<T, Connect>) return MessageType::Connect;
-            if constexpr (std::is_same_v<T, Input>) return MessageType::Input;
-            if constexpr (std::is_same_v<T, Disconnect>) return MessageType::Disconnect;
-            if constexpr (std::is_same_v<T, Ping>) return MessageType::Ping;
-            if constexpr (std::is_same_v<T, ConnectAccepted>) return MessageType::ConnectAccepted;
-            if constexpr (std::is_same_v<T, ConnectRejected>) return MessageType::ConnectRejected;
-            if constexpr (std::is_same_v<T, Snapshot>) return MessageType::Snapshot;
-            if constexpr (std::is_same_v<T, EntityDestroyed>) return MessageType::EntityDestroyed;
-            if constexpr (std::is_same_v<T, PlayerLeft>) return MessageType::PlayerLeft;
+            if constexpr (std::is_same_v<T, Connect>)
+                return MessageType::Connect;
+            if constexpr (std::is_same_v<T, Input>)
+                return MessageType::Input;
+            if constexpr (std::is_same_v<T, Disconnect>)
+                return MessageType::Disconnect;
+            if constexpr (std::is_same_v<T, Ping>)
+                return MessageType::Ping;
+            if constexpr (std::is_same_v<T, ConnectAccepted>)
+                return MessageType::ConnectAccepted;
+            if constexpr (std::is_same_v<T, ConnectRejected>)
+                return MessageType::ConnectRejected;
+            if constexpr (std::is_same_v<T, Snapshot>)
+                return MessageType::Snapshot;
+            if constexpr (std::is_same_v<T, EntityDestroyed>)
+                return MessageType::EntityDestroyed;
+            if constexpr (std::is_same_v<T, PlayerLeft>)
+                return MessageType::PlayerLeft;
             return MessageType::Pong;
         },
         message);
@@ -108,33 +116,41 @@ std::optional<Packet> decode(std::span<const std::uint8_t> datagram)
         Message message;
         switch (static_cast<MessageType>(rawType)) {
         case MessageType::Connect:
-            if (payloadSize != 0) return std::nullopt;
+            if (payloadSize != 0)
+                return std::nullopt;
             message = Connect{};
             break;
         case MessageType::Input: {
-            if (payloadSize != 1) return std::nullopt;
+            if (payloadSize != 1)
+                return std::nullopt;
             const auto flags = reader.u8();
-            if ((flags & 0xE0) != 0) return std::nullopt;
+            if ((flags & 0xE0) != 0)
+                return std::nullopt;
             message = Input{flags};
             break;
         }
         case MessageType::Disconnect:
-            if (payloadSize != 0) return std::nullopt;
+            if (payloadSize != 0)
+                return std::nullopt;
             message = Disconnect{};
             break;
         case MessageType::Ping:
-            if (payloadSize != 4) return std::nullopt;
+            if (payloadSize != 4)
+                return std::nullopt;
             message = Ping{reader.u32()};
             break;
         case MessageType::ConnectAccepted: {
-            if (payloadSize != 1) return std::nullopt;
+            if (payloadSize != 1)
+                return std::nullopt;
             const auto playerId = reader.u8();
-            if (playerId >= 4) return std::nullopt;
+            if (playerId >= 4)
+                return std::nullopt;
             message = ConnectAccepted{playerId};
             break;
         }
         case MessageType::ConnectRejected: {
-            if (payloadSize != 1) return std::nullopt;
+            if (payloadSize != 1)
+                return std::nullopt;
             const auto reason = reader.u8();
             if (reason < static_cast<std::uint8_t>(RejectReason::ServerFull) ||
                 reason > static_cast<std::uint8_t>(RejectReason::VersionMismatch))
@@ -143,7 +159,8 @@ std::optional<Packet> decode(std::span<const std::uint8_t> datagram)
             break;
         }
         case MessageType::Snapshot: {
-            if (payloadSize < SnapshotFixedSize) return std::nullopt;
+            if (payloadSize < SnapshotFixedSize)
+                return std::nullopt;
             Snapshot snapshot;
             snapshot.tick = reader.u32();
             const auto state = reader.u8();
@@ -160,7 +177,8 @@ std::optional<Packet> decode(std::span<const std::uint8_t> datagram)
                 EntityState entity;
                 entity.netId = reader.u32();
                 const auto type = reader.u8();
-                if (!validEntityType(type)) return std::nullopt;
+                if (!validEntityType(type))
+                    return std::nullopt;
                 entity.type = static_cast<EntityType>(type);
                 entity.variant = reader.u8();
                 entity.x = reader.f32();
@@ -171,7 +189,8 @@ std::optional<Packet> decode(std::span<const std::uint8_t> datagram)
             break;
         }
         case MessageType::EntityDestroyed: {
-            if (payloadSize != 5) return std::nullopt;
+            if (payloadSize != 5)
+                return std::nullopt;
             const auto netId = reader.u32();
             const auto reason = reader.u8();
             if (reason < static_cast<std::uint8_t>(DestroyReason::Killed) ||
@@ -181,7 +200,8 @@ std::optional<Packet> decode(std::span<const std::uint8_t> datagram)
             break;
         }
         case MessageType::PlayerLeft: {
-            if (payloadSize != 2) return std::nullopt;
+            if (payloadSize != 2)
+                return std::nullopt;
             const auto playerId = reader.u8();
             const auto reason = reader.u8();
             if (playerId >= 4 || reason < static_cast<std::uint8_t>(LeaveReason::Disconnected) ||
@@ -191,7 +211,8 @@ std::optional<Packet> decode(std::span<const std::uint8_t> datagram)
             break;
         }
         case MessageType::Pong:
-            if (payloadSize != 4) return std::nullopt;
+            if (payloadSize != 4)
+                return std::nullopt;
             message = Pong{reader.u32()};
             break;
         default:
