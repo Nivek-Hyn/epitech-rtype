@@ -1,9 +1,12 @@
 #include "Game.hpp"
 #include "common/Components.hpp"
+#include "engine/physics/Aabb.hpp"
 #include "engine/systems/Movement.hpp"
 
 #include <algorithm>
 #include <array>
+#include <utility>
+#include <vector>
 
 namespace rtype::server {
 
@@ -11,9 +14,12 @@ namespace {
 
 constexpr float EnemySpawnIntervalSeconds = 2.f;
 constexpr float EnemySpeed = 100.f; // world units per second, towards the left
-// Hitbox sizes match the client sprites (scaled x2): enemy 33x36.
+// Hitbox sizes match the client sprites (scaled x2): enemy 33x36, missile 18x12.
 constexpr float EnemyWidth = 66.f;
 constexpr float EnemyHeight = 72.f;
+constexpr float MissileWidth = 36.f;
+constexpr float MissileHeight = 24.f;
+constexpr std::uint32_t PointsPerEnemy = 100;
 // Rows where enemies appear, in turn. The first one is level with a new player's ship (y = 300).
 constexpr std::array<float, 4> EnemyRows = {290.f, 150.f, 600.f, 450.f};
 
@@ -100,6 +106,8 @@ void Game::update(float dt)
 {
     spawnEnemies(dt);
     _registry.update(dt);
+    // After movement, so collisions are tested on the positions sent in this tick's snapshot.
+    handleCollisions();
     for (float &cooldown : _shootCooldowns)
         cooldown = std::max(0.f, cooldown - dt);
 
@@ -127,7 +135,7 @@ protocol::Snapshot Game::snapshot()
     protocol::Snapshot snap;
     snap.tick = _tick;
     snap.state = protocol::GameState::Playing;
-    snap.score = 0;
+    snap.score = _score;
 
     _registry.each<rtype::components::Position, rtype::components::Kind, rtype::components::NetworkId>(
         [&snap](engine::ecs::Entity /*entity*/, const rtype::components::Position &pos,
@@ -169,43 +177,42 @@ void Game::spawnEnemies(float dt)
     }
 }
 
-void checkCollisions(engine::ecs::Registry &registry, std::vector<protocol::Message> &events)
+// A player missile touching an enemy destroys both and adds PointsPerEnemy to the score.
+// Entities are only collected inside each and killed afterwards: killing them during each would invalidate
+// the component references the loop is still using.
+void Game::handleCollisions()
 {
-    registry.each<rtype::components::Position, rtype::components::Kind, rtype::components::NetworkId>(
-        [&registry, &events](engine::ecs::Entity missileEntity, const rtype::components::Position &missilePos,
-                             const rtype::components::Kind &missileKind,
-                             const rtype::components::NetworkId &missileNetId) {
-            if (missileKind.type != protocol::EntityType::PlayerMissile)
-                return;
-            registry.each<rtype::components::Position, rtype::components::Kind, rtype::components::NetworkId>(
-                [&registry, &events, missileEntity, &missilePos, &missileNetId](
-                    engine::ecs::Entity enemyEntity, const rtype::components::Position &enemyPos,
-                    const rtype::components::Kind &enemyKind, const rtype::components::NetworkId &enemyNetId) {
-                    if (enemyKind.type != protocol::EntityType::Enemy)
-                        return;
+    using rtype::components::Kind;
+    using rtype::components::Position;
 
-                    // Définition simple d'une boîte de collision (AABB) d'une taille de 20x20 pixels par exemple
-                    float boxSize = 20.0f;
-                    bool collision = (missilePos.x < enemyPos.x + boxSize && missilePos.x + boxSize > enemyPos.x &&
-                                      missilePos.y < enemyPos.y + boxSize && missilePos.y + boxSize > enemyPos.y);
+    std::vector<std::pair<engine::ecs::Entity, engine::physics::Aabb>> enemies;
+    _registry.each<Position, Kind>([&enemies](engine::ecs::Entity entity, const Position &position, const Kind &kind) {
+        if (kind.type == protocol::EntityType::Enemy)
+            enemies.push_back({entity, {position.x, position.y, EnemyWidth, EnemyHeight}});
+    });
 
-                    if (collision) {
-                        // 1. On détruit le missile
-                        registry.kill(missileEntity);
-                        protocol::EntityDestroyed missileDestroyed;
-                        missileDestroyed.netId = missileNetId.id;
-                        missileDestroyed.reason = protocol::DestroyReason::Killed;
-                        events.push_back(missileDestroyed);
+    std::vector<bool> enemyHit(enemies.size(), false);
+    std::vector<engine::ecs::Entity> destroyed;
+    _registry.each<Position, Kind>([&](engine::ecs::Entity missile, const Position &position, const Kind &kind) {
+        if (kind.type != protocol::EntityType::PlayerMissile)
+            return;
+        const engine::physics::Aabb missileBox{position.x, position.y, MissileWidth, MissileHeight};
+        for (std::size_t i = 0; i < enemies.size(); i++) {
+            if (!enemyHit[i] && engine::physics::overlaps(missileBox, enemies[i].second)) {
+                enemyHit[i] = true;
+                destroyed.push_back(missile);
+                destroyed.push_back(enemies[i].first);
+                _score += PointsPerEnemy;
+                return; // one missile destroys at most one enemy
+            }
+        }
+    });
 
-                        // 2. On détruit l'ennemi
-                        registry.kill(enemyEntity);
-                        protocol::EntityDestroyed enemyDestroyed;
-                        enemyDestroyed.netId = enemyNetId.id;
-                        enemyDestroyed.reason = protocol::DestroyReason::Killed;
-                        events.push_back(enemyDestroyed);
-                    }
-                });
-        });
+    for (const engine::ecs::Entity entity : destroyed) {
+        if (const auto *networkId = _registry.get<rtype::components::NetworkId>(entity))
+            _events.push_back(protocol::EntityDestroyed{networkId->id, protocol::DestroyReason::Killed});
+        _registry.kill(entity);
+    }
 }
 
 } // namespace rtype::server

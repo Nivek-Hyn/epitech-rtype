@@ -69,3 +69,21 @@ TEST(Game, EnemiesAppearOnlyWhilePlayersAreConnected)
     });
     EXPECT_EQ(enemyCount, 1);
 }
+
+TEST(Game, PlayerMissileDestroysEnemyAndScores)
+{
+    Game game;
+    game.onPlayerJoined(0); // ship at y = 300, level with the first enemy
+    game.onInput(0, protocol::InputFlag::Shoot);
+    game.onInput(0, 0);
+    for (int tick = 0; tick < 300; tick++)
+        game.update(1.f / 60.f);
+
+    EXPECT_EQ(game.snapshot().score, 100u);
+    const auto events = game.takeEvents();
+    const auto killed = std::count_if(events.begin(), events.end(), [](const protocol::Message &message) {
+        const auto *destroyed = std::get_if<protocol::EntityDestroyed>(&message);
+        return destroyed && destroyed->reason == protocol::DestroyReason::Killed;
+    });
+    EXPECT_EQ(killed, 2); // the missile and the enemy
+}
