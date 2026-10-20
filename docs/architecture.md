@@ -77,13 +77,13 @@ flowchart LR
     ServerNet --> Queue
     ClientNet --> Protocol
     ClientNet --> Queue
-    Render --> ECS
 ```
 
 *Text description: the engine offers six independent building blocks. The protocol uses the engine's
 serialization. On the server, the main loop uses the fixed timestep clock, drives the game logic and talks to
-the network layer. The game logic uses the ECS, physics, events and the shared components. Both network layers
-use the protocol and a thread-safe queue. The client renders the entities stored in its own ECS.*
+the network layer. The current game logic uses the ECS, movement system and shared components; collision and
+event-bus integration are not yet part of the server loop. Both network layers use the protocol and a thread-safe
+queue. The client renders entities directly from the latest snapshot rather than keeping a local ECS.*
 
 | Subsystem | Main files | Status |
 |---|---|---|
@@ -91,16 +91,14 @@ use the protocol and a thread-safe queue. The client renders the entities stored
 | Game loop | `engine/include/engine/core/FixedTimestep.hpp`, `engine/src/FixedTimestep.cpp` | Implemented |
 | Physics | `engine/include/engine/physics/Aabb.hpp`, `engine/include/engine/systems/Movement.hpp` | Implemented |
 | Events | `engine/include/engine/core/EventBus.hpp` | Implemented |
-| Serialization | `engine/include/engine/net/ByteBuffer.hpp` | Designed |
-| Threading | `engine/include/engine/core/ThreadSafeQueue.hpp` | Designed |
-| Protocol | `common/include/common/Protocol.hpp`, `common/src/Protocol.cpp`, [protocol.md](protocol.md) | Designed |
+| Serialization | `engine/include/engine/net/ByteBuffer.hpp` | Implemented; bounded big-endian reader and writer |
+| Threading | `engine/include/engine/core/ThreadSafeQueue.hpp` | Implemented; mutex-protected FIFO queue |
+| Protocol | `common/include/common/Protocol.hpp`, `common/src/Protocol.cpp`, [protocol.md](protocol.md) | Implemented; validates datagrams and message payloads |
 | Shared components | `common/include/common/Components.hpp`, `common/include/common/Constants.hpp` | Implemented |
-| Game logic | `server/src/Game.hpp`, `server/src/Game.cpp` | Designed |
-| Server network | `server/src/net/INetworkServer.hpp` | Designed |
-| Client network | `client/src/net/INetworkClient.hpp` | Designed |
-| Rendering | `client/src/main.cpp` | Window only |
-
-"Designed" means the header (the contract) and the unit tests exist; the implementation is in progress.
+| Game logic | `server/src/Game.hpp`, `server/src/Game.cpp` | Basic player movement, shooting and snapshots; enemy gameplay is not implemented |
+| Server network | `server/src/net/INetworkServer.hpp`, `server/src/net/AsioNetworkServer.cpp` | Implemented; UDP handshake, inputs, snapshots, ping/pong and timeout handling |
+| Client network | `client/src/net/INetworkClient.hpp`, `client/src/net/AsioNetworkClient.cpp` | Implemented; UDP connection retry, input sending and server timeout detection |
+| Rendering | `client/src/main.cpp` | Basic snapshot rendering with colored rectangles; no sprites, starfield or audio yet |
 
 ## 3. Client–server model
 
@@ -109,24 +107,31 @@ the whole state of the game, 60 times per second.
 
 ```mermaid
 sequenceDiagram
-    participant Client
-    participant Server
-    Client->>Server: Connect (repeated until answered)
-    Server-->>Client: ConnectAccepted (player id 0-3)
-    loop every tick (60 per second)
-        Client->>Server: Input (keys held)
-        Server-->>Client: Snapshot (game state, score, entities)
+    participant ClientMain as Client main/render thread
+    participant ClientNet as Client Asio thread
+    participant ServerNet as Server Asio thread
+    participant ServerMain as Server game thread
+    ClientMain->>ClientNet: Connect / Input / Disconnect
+    ClientNet->>ServerNet: UDP datagrams
+    ServerNet-->>ClientNet: ConnectAccepted (player id 0-3)
+    ServerNet->>ServerMain: PlayerJoined / PlayerInput / PlayerDisconnected
+    loop every server tick (60 per second)
+        ServerMain->>ServerNet: Snapshot and game events
+        ServerNet-->>ClientNet: UDP datagrams
+        ClientNet-->>ClientMain: decoded messages via queue
+        ClientMain->>ClientMain: update displayed entities
     end
-    Server-->>Client: EntityDestroyed / PlayerLeft (when they happen)
-    Client->>Server: Disconnect
 ```
 
-*Text description: the client sends `Connect` until the server answers `ConnectAccepted` with a player id.
-Then, every tick, the client sends its `Input` and the server sends a `Snapshot`. The server also sends
-`EntityDestroyed` and `PlayerLeft` when they happen. The client sends `Disconnect` when it leaves.*
+*Text description: the client network thread retries `Connect` every 500 ms until the server accepts or rejects it.
+The server assigns one of four player ids. The client sends its held input flags while connected. The server
+converts received datagrams into game-thread events and broadcasts a snapshot after each simulation tick. The
+client's rendering thread drains decoded messages and displays the latest snapshot. A disconnect or timeout
+removes the player's entity; the server broadcasts an `EntityDestroyed` message.*
 
-Why it works over UDP: a lost `Snapshot` is replaced by the next one 16.7 ms later, so the client never stays
-out of sync. The end of the game is part of the snapshot (`state = finished`), so it cannot be lost.
+Snapshots are periodically resent, so a lost snapshot is replaced by a later one. Individual UDP events are not
+reliably retransmitted; the current prototype has no acknowledgements, sequence-window handling or
+interpolation. The server rejects a fifth player and removes clients that have sent no datagram for five seconds.
 Full specification: [protocol.md](protocol.md).
 
 ## 4. Server: one tick
@@ -147,24 +152,26 @@ flowchart TD
 the network events, applies them to the game, runs every system once, then sends the snapshot and events.
 When no step is left, it sleeps until the next one is due.*
 
-This loop is in `server/src/main.cpp`. The game logic (`Game`) never touches sockets: `main` gives it the
-network events and sends what it produces, so it can be unit tested without a network.
+This loop is in `server/src/main.cpp`. `AsioNetworkServer` owns the UDP socket and its I/O thread. The main
+thread drains the event queue, calls the corresponding `Game` methods, advances the simulation and asks the
+network layer to broadcast snapshots and destruction events. `Game` never touches sockets, so its behavior can
+be unit tested without a network.
 
 ## 5. Threads
 
 A **thread** is a second flow of execution running another function at the same time, in the same program and
 with the same memory (`std::thread`). Each program has two:
 
-- the **network thread**, created by `network.start(port)`, which does nothing but wait for datagrams;
+- the **network thread**, which runs Asio's asynchronous receive, timer and send handlers;
 - the **game thread** (on the client, the rendering thread), the one running `main`, which must never wait.
 
-Receiving on a socket blocks until a datagram arrives: if the game loop did it, the simulation would freeze
-whenever nobody sends anything. This is why receiving is done by its own thread.
+Asio receives datagrams asynchronously on its own I/O thread. The game and rendering loops therefore do not
+wait for network packets.
 
 ```mermaid
 flowchart LR
     subgraph NetworkThread["Network thread"]
-        Receive["receive_from: waits for a datagram<br/>decode, then push an event"]
+        Receive["async_receive_from: decode datagram,<br/>then push event"]
     end
     Queue[("ThreadSafeQueue<br/>of events")]
     subgraph GameThread["Game thread"]
@@ -177,14 +184,14 @@ flowchart LR
     Simulation -- "send / broadcast: encode + send_to" --> Clients
 ```
 
-*Text description: clients send datagrams to the server's UDP port. The network thread waits for them, decodes
-each one and pushes the resulting event (player joined, left, input) into a thread-safe queue. At each step, the
-game thread takes every event from the queue without ever waiting, runs the simulation and sends the snapshot to
-the clients with `send` and `broadcast`.*
+*Text description: clients send datagrams to the server's UDP port. Asio's I/O thread decodes each valid packet
+and pushes the resulting event (player joined, left, input) into a thread-safe queue. At each step, the game
+thread drains the queue without waiting, runs the simulation and posts snapshots and game events to the network
+thread for delivery.*
 
-**The queue between the two threads.** Both threads use the same queue. If they modified a `std::queue` at the
-same moment, its internal state would be corrupted (a *data race*). A mutex, a lock that only one thread can hold
-at a time, prevents it. `tryPop` never waits for a message: when the queue is empty it returns `std::nullopt`.
+**The queue between the two threads.** Both threads use the same queue. A mutex protects its internal FIFO
+storage from concurrent access. `tryPop` never waits for a message: when the queue is empty it returns
+`std::nullopt`.
 
 ```cpp
 // Network thread, after decoding an Input datagram:
@@ -195,17 +202,18 @@ while (auto event = network.poll())   // poll() calls tryPop()
     apply(*event);                    // onPlayerJoined / onPlayerLeft / onInput
 ```
 
-**Sending.** `send(player, message)` encodes the message and sends the bytes to the address of that player,
-remembered when it connected. `broadcast(message)` does the same for every connected player. They can be called
-from the game thread because the list of clients they read is protected by a mutex.
+**Sending.** `send(player, message)` and `broadcast(message)` post work to the Asio I/O thread. That thread
+encodes each message and sends it to the endpoint remembered during the handshake. Client endpoint state is
+owned by that I/O thread, so it does not need a separate mutex.
 
-**Ports.** The server listens on a fixed UDP port (4242 by default). A client does not choose its port: the
+**Ports.** The server listens on UDP port 4242 by default; the port can be changed on the command line. A client does not choose its local port: the
 operating system gives it a free one when it sends its first datagram, and the server learns it from the
 sender address of each datagram it receives.
 
 The client follows the same idea: its network thread fills a queue that the main (rendering) thread empties every
-frame before drawing. The game logic therefore never waits for the network, and a slow or silent client cannot
-block the simulation.
+frame before drawing. The client sends held input flags while connected; the server remains authoritative for
+player positions. The current client draws the snapshot entities directly as simple shapes rather than storing
+them in a local ECS.
 
 ## 6. Inside the engine: the ECS
 

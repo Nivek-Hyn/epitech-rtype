@@ -9,7 +9,10 @@ namespace rtype::server {
 
 AsioNetworkServer::AsioNetworkServer() : _socket(_io), _timeoutTimer(_io) {}
 
-AsioNetworkServer::~AsioNetworkServer() { stop(); }
+AsioNetworkServer::~AsioNetworkServer()
+{
+    stop();
+}
 
 void AsioNetworkServer::start(std::uint16_t port)
 {
@@ -36,7 +39,10 @@ void AsioNetworkServer::stop()
     _socket.close(error);
 }
 
-std::optional<NetworkEvent> AsioNetworkServer::poll() { return _events.tryPop(); }
+std::optional<NetworkEvent> AsioNetworkServer::poll()
+{
+    return _events.tryPop();
+}
 
 void AsioNetworkServer::send(PlayerId player, const protocol::Message &message)
 {
@@ -117,10 +123,9 @@ void AsioNetworkServer::scheduleTimeoutCheck()
 
 void AsioNetworkServer::sendTo(const Udp::endpoint &endpoint, protocol::Message message)
 {
-    auto bytes = std::make_shared<std::vector<std::uint8_t>>(
-        protocol::encode({ _nextSequence.fetch_add(1), std::move(message) }));
-    _socket.async_send_to(asio::buffer(*bytes), endpoint,
-                          [bytes](const asio::error_code &, std::size_t) {});
+    auto bytes =
+        std::make_shared<std::vector<std::uint8_t>>(protocol::encode({_nextSequence.fetch_add(1), std::move(message)}));
+    _socket.async_send_to(asio::buffer(*bytes), endpoint, [bytes](const asio::error_code &, std::size_t) {});
 }
 
 void AsioNetworkServer::sendToPlayer(PlayerId player, protocol::Message message)

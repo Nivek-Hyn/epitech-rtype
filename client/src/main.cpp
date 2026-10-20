@@ -61,22 +61,18 @@ int main(int argc, char **argv)
         }
 
         std::uint8_t inputFlags = 0;
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Z) ||
-            sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Up))
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Z) || sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Up))
             inputFlags |= rtype::protocol::InputFlag::Up;
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::S) ||
-            sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Down))
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::S) || sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Down))
             inputFlags |= rtype::protocol::InputFlag::Down;
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Q) ||
-            sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Left))
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Q) || sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Left))
             inputFlags |= rtype::protocol::InputFlag::Left;
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::D) ||
-            sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Right))
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::D) || sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Right))
             inputFlags |= rtype::protocol::InputFlag::Right;
         if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Space))
             inputFlags |= rtype::protocol::InputFlag::Shoot;
 
-        if (network.connected()) 
+        if (network.connected())
             network.send(rtype::protocol::Input{inputFlags});
 
         while (auto message = network.poll()) {
@@ -97,16 +93,14 @@ int main(int argc, char **argv)
                     sprite.setScale({2.f, 2.f});
                     sprite.setPosition({entity.x, entity.y});
                     window.draw(sprite);
-                }
-                else if (entity.type == rtype::protocol::EntityType::PlayerMissile ||
-                    entity.type == rtype::protocol::EntityType::EnemyMissile) {
+                } else if (entity.type == rtype::protocol::EntityType::PlayerMissile ||
+                           entity.type == rtype::protocol::EntityType::EnemyMissile) {
                     sf::Sprite sprite(resources.getTexture("bullet"));
                     sprite.setTextureRect(sf::IntRect({248, 102}, {18, 12}));
                     sprite.setScale({2.f, 2.f});
                     sprite.setPosition({entity.x, entity.y});
                     window.draw(sprite);
-                }
-                else if (entity.type == rtype::protocol::EntityType::Enemy) {
+                } else if (entity.type == rtype::protocol::EntityType::Enemy) {
                     sf::Sprite sprite(resources.getTexture("enemy"));
                     sprite.setTextureRect(sf::IntRect({0, 0}, {33, 36}));
                     sprite.setScale({2.f, 2.f});
