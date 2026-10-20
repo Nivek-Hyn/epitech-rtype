@@ -28,6 +28,7 @@ A receiver **silently drops** a datagram if any of these is true:
 - `payload_size` differs from the actual number of bytes after the header;
 - `type` is unknown, or the payload size is wrong for this type;
 - an enumerated field has an unknown value.
+- an `Input` packet sets any reserved flag bit (`0xE0`).
 
 A malformed datagram must never crash the receiver or close the session.
 
