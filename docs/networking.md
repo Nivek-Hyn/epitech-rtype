@@ -165,8 +165,10 @@ ctest --test-dir build --output-on-failure
 
 Protocol round trips and malformed-packet cases are tested in [`test_protocol.cpp`](../tests/test_protocol.cpp).
 Game/player lifecycle and movement are tested in [`test_game.cpp`](../tests/test_game.cpp), and queue behavior is
-tested in [`test_thread_safe_queue.cpp`](../tests/test_thread_safe_queue.cpp). A local two-client session is
-also useful for manually checking that each client sees the same server-owned player positions.
+tested in [`test_thread_safe_queue.cpp`](../tests/test_thread_safe_queue.cpp). The UDP integration test in
+[`test_network_integration.cpp`](../tests/test_network_integration.cpp) checks the four-player limit and fifth
+client rejection. A local two-client session is also useful for manually checking that each client sees the same
+server-owned player positions.
 
 ## 8. Current limitations
 
@@ -342,8 +344,10 @@ ctest --test-dir build --output-on-failure
 Les échanges aller-retour du protocole et les paquets malformés sont testés dans
 [`test_protocol.cpp`](../tests/test_protocol.cpp). Le cycle de vie des joueurs et le déplacement sont testés
 dans [`test_game.cpp`](../tests/test_game.cpp), et la file dans
-[`test_thread_safe_queue.cpp`](../tests/test_thread_safe_queue.cpp). Une session locale avec deux clients permet
-aussi de vérifier que chacun voit les positions des joueurs calculées par le serveur.
+[`test_thread_safe_queue.cpp`](../tests/test_thread_safe_queue.cpp). Le test UDP d’intégration dans
+[`test_network_integration.cpp`](../tests/test_network_integration.cpp) vérifie la limite de quatre joueurs et le
+refus du cinquième. Une session locale avec deux clients permet aussi de vérifier que chacun voit les positions
+des joueurs calculées par le serveur.
 
 ## 8. Limites actuelles
 

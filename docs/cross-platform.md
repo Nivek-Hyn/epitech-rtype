@@ -23,7 +23,8 @@ been checked across the two operating systems.
 
 The GitHub Actions workflow contains an Ubuntu/Windows build-and-test matrix. It is intentionally triggered
 manually to control CI usage. Start it from the repository's **Actions** tab using the **CI** workflow. Confirm
-that configure, build, and CTest pass on both runners.
+that configure, build, and CTest pass on both runners. The test suite includes a real UDP integration test that
+checks four accepted clients and rejection of a fifth.
 
 ## Windows Build
 
