@@ -71,8 +71,12 @@ int main(int argc, char **argv)
         while (auto message = network.poll()) {
             if (const auto *snapshot = std::get_if<rtype::protocol::Snapshot>(&*message))
                 entities = snapshot->entities;
-            else if (const auto *rejected = std::get_if<rtype::protocol::ConnectRejected>(&*message))
-                std::cerr << "Server rejected connection (reason " << static_cast<int>(rejected->reason) << ").\n";
+            else if (const auto *rejected = std::get_if<rtype::protocol::ConnectRejected>(&*message)) {
+                const char *reason = rejected->reason == rtype::protocol::RejectReason::ServerFull
+                                         ? "server is full"
+                                         : "protocol version mismatch";
+                std::cerr << "Connection rejected: " << reason << ".\n";
+            }
         }
 
         window.clear(sf::Color::Black);
