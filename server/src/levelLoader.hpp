@@ -1,3 +1,4 @@
+#pragma once
 #include <string>
 #include <vector>
 
@@ -21,3 +22,5 @@ struct LevelConfig {
     std::string level_name;
     std::vector<WaveConfig> waves;
 };
+
+LevelConfig loadLevelFromJson(const std::string& filepath);

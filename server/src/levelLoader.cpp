@@ -1,4 +1,5 @@
 #include <fstream>
+#include "levelLoader.hpp"
 #include <nlohmann/json.hpp> //bibliotheque pour lire le json
 
 LevelConfig loadLevelFromJson(const std::string& filepath) {

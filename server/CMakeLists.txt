@@ -2,6 +2,7 @@
 add_library(rtype_server_lib STATIC
     src/Game.cpp
     src/net/AsioNetworkServer.cpp
+    src/levelLoader.cpp
 )
 target_include_directories(rtype_server_lib PUBLIC src)
 target_link_libraries(rtype_server_lib PUBLIC rtype_common rtype_engine asio)
