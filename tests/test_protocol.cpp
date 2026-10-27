@@ -36,10 +36,16 @@ TEST(Protocol, RoundTripSnapshot)
 
 TEST(Protocol, RoundTripsEveryMessageType)
 {
-    const std::vector<Message> messages = {
-        Connect{}, Input{InputFlag::Down}, Disconnect{}, Ping{123}, ConnectAccepted{3},
-        ConnectRejected{RejectReason::VersionMismatch}, Snapshot{},
-        EntityDestroyed{9, DestroyReason::OutOfBounds}, PlayerLeft{2, LeaveReason::TimedOut}, Pong{456}};
+    const std::vector<Message> messages = {Connect{},
+                                           Input{InputFlag::Down},
+                                           Disconnect{},
+                                           Ping{123},
+                                           ConnectAccepted{3},
+                                           ConnectRejected{RejectReason::VersionMismatch},
+                                           Snapshot{},
+                                           EntityDestroyed{9, DestroyReason::OutOfBounds},
+                                           PlayerLeft{2, LeaveReason::TimedOut},
+                                           Pong{456}};
 
     for (const Message &message : messages) {
         const auto decoded = decode(encode({7, message}));

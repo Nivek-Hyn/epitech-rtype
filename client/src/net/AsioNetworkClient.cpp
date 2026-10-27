@@ -10,7 +10,10 @@ namespace rtype::client {
 
 AsioNetworkClient::AsioNetworkClient() : _socket(_io), _connectTimer(_io), _timeoutTimer(_io) {}
 
-AsioNetworkClient::~AsioNetworkClient() { disconnect(); }
+AsioNetworkClient::~AsioNetworkClient()
+{
+    disconnect();
+}
 
 void AsioNetworkClient::connect(const std::string &host, std::uint16_t port)
 {
@@ -58,9 +61,15 @@ void AsioNetworkClient::disconnect()
     _socket.close(error);
 }
 
-bool AsioNetworkClient::connected() const { return _connected; }
+bool AsioNetworkClient::connected() const
+{
+    return _connected;
+}
 
-std::optional<protocol::Message> AsioNetworkClient::poll() { return _messages.tryPop(); }
+std::optional<protocol::Message> AsioNetworkClient::poll()
+{
+    return _messages.tryPop();
+}
 
 void AsioNetworkClient::send(const protocol::Message &message)
 {
@@ -74,24 +83,24 @@ void AsioNetworkClient::send(const protocol::Message &message)
 
 void AsioNetworkClient::receive()
 {
-    _socket.async_receive_from(asio::buffer(_receiveBuffer), _sender,
-                               [this](const asio::error_code &error, std::size_t size) {
-                                   if (!error && _sender == _server) {
-                                       if (const auto packet = protocol::decode(std::span(_receiveBuffer).first(size))) {
-                                           _lastReceive = Clock::now();
-                                           if (std::holds_alternative<protocol::ConnectAccepted>(packet->message)) {
-                                               _connected = true;
-                                               _connectionRejected = false;
-                                           } else if (std::holds_alternative<protocol::ConnectRejected>(packet->message)) {
-                                               _connected = false;
-                                               _connectionRejected = true;
-                                           }
-                                           _messages.push(packet->message);
-                                       }
-                                   }
-                                   if (_running)
-                                       receive();
-                               });
+    _socket.async_receive_from(
+        asio::buffer(_receiveBuffer), _sender, [this](const asio::error_code &error, std::size_t size) {
+            if (!error && _sender == _server) {
+                if (const auto packet = protocol::decode(std::span(_receiveBuffer).first(size))) {
+                    _lastReceive = Clock::now();
+                    if (std::holds_alternative<protocol::ConnectAccepted>(packet->message)) {
+                        _connected = true;
+                        _connectionRejected = false;
+                    } else if (std::holds_alternative<protocol::ConnectRejected>(packet->message)) {
+                        _connected = false;
+                        _connectionRejected = true;
+                    }
+                    _messages.push(packet->message);
+                }
+            }
+            if (_running)
+                receive();
+        });
 }
 
 void AsioNetworkClient::scheduleConnectRetry()
@@ -120,10 +129,9 @@ void AsioNetworkClient::scheduleTimeoutCheck()
 
 void AsioNetworkClient::sendDatagram(protocol::Message message)
 {
-    auto bytes = std::make_shared<std::vector<std::uint8_t>>(
-        protocol::encode({_nextSequence.fetch_add(1), std::move(message)}));
-    _socket.async_send_to(asio::buffer(*bytes), _server,
-                          [bytes](const asio::error_code &, std::size_t) {});
+    auto bytes =
+        std::make_shared<std::vector<std::uint8_t>>(protocol::encode({_nextSequence.fetch_add(1), std::move(message)}));
+    _socket.async_send_to(asio::buffer(*bytes), _server, [bytes](const asio::error_code &, std::size_t) {});
 }
 
 } // namespace rtype::client

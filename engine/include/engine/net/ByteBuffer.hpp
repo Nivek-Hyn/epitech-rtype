@@ -1,8 +1,8 @@
 #pragma once
 
+#include <bit>
 #include <cstddef>
 #include <cstdint>
-#include <bit>
 #include <span>
 #include <stdexcept>
 #include <vector>
@@ -52,8 +52,8 @@ public:
     {
         if (!canRead(2))
             return 0;
-        const std::uint16_t value = static_cast<std::uint16_t>(_bytes[_offset]) << 8 |
-                                    static_cast<std::uint16_t>(_bytes[_offset + 1]);
+        const std::uint16_t value =
+            static_cast<std::uint16_t>(_bytes[_offset]) << 8 | static_cast<std::uint16_t>(_bytes[_offset + 1]);
         _offset += 2;
         return value;
     }
@@ -61,10 +61,9 @@ public:
     {
         if (!canRead(4))
             return 0;
-        const std::uint32_t value = static_cast<std::uint32_t>(_bytes[_offset]) << 24 |
-                                    static_cast<std::uint32_t>(_bytes[_offset + 1]) << 16 |
-                                    static_cast<std::uint32_t>(_bytes[_offset + 2]) << 8 |
-                                    static_cast<std::uint32_t>(_bytes[_offset + 3]);
+        const std::uint32_t value =
+            static_cast<std::uint32_t>(_bytes[_offset]) << 24 | static_cast<std::uint32_t>(_bytes[_offset + 1]) << 16 |
+            static_cast<std::uint32_t>(_bytes[_offset + 2]) << 8 | static_cast<std::uint32_t>(_bytes[_offset + 3]);
         _offset += 4;
         return value;
     }
