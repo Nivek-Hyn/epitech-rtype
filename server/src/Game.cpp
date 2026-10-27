@@ -2,6 +2,8 @@
 #include "common/Components.hpp"
 #include "engine/physics/Aabb.hpp"
 #include "engine/systems/Movement.hpp"
+#include "levelLoader.hpp"
+
 
 #include <algorithm>
 #include <array>
@@ -29,6 +31,9 @@ Game::Game()
 {
     _players.fill(engine::ecs::NullEntity);
     _registry.addSystem(engine::systems::movement<rtype::components::Position, rtype::components::Velocity>);
+
+    _currentLevel = loadLevelFromJson("assets/levels/level1.json");
+    _levelTimer = 0.f;
 }
 
 // TODO(gameplay): spawn the player's ship (NetworkId, Kind, Position, Velocity...) and remember it in _players.
@@ -158,22 +163,25 @@ std::vector<protocol::Message> Game::takeEvents()
     return events;
 }
 
-// Spawns an enemy on the right edge every EnemySpawnIntervalSeconds while at least one player is in the game.
 void Game::spawnEnemies(float dt)
 {
-    const bool anyPlayer = std::any_of(_players.begin(), _players.end(),
-                                       [](engine::ecs::Entity player) { return player != engine::ecs::NullEntity; });
-    if (!anyPlayer) {
-        _enemySpawnTimer = 0.f;
-        return;
-    }
-    _enemySpawnTimer += dt;
-    while (_enemySpawnTimer >= EnemySpawnIntervalSeconds) {
-        _enemySpawnTimer -= EnemySpawnIntervalSeconds;
-        const float y = EnemyRows[_enemiesSpawned % EnemyRows.size()];
-        const engine::ecs::Entity enemy = spawnNetworked(protocol::EntityType::Enemy, 0, WorldWidth - EnemyWidth, y);
-        _registry.emplace<rtype::components::Velocity>(enemy, -EnemySpeed, 0.f);
-        _enemiesSpawned++;
+    _levelTimer += dt;
+
+    // On parcourt les vagues du fichier JSON chargé pour le niveau actuel
+    for (auto& wave : _currentLevel.waves) {
+        // Si la vague n'a pas encore spawn et que le timer correspond au délai du JSON
+        if (!wave.isSpawned && _levelTimer >= wave.delay_before_start) {
+            for (const auto& enemyConfig : wave.enemies) {
+                // On utilise directement les données du JSON !
+                float y = enemyConfig.spawn_y;
+                float speed = enemyConfig.speed;
+                
+                // Création de l'ennemi selon son type (patrol, sine_wave...)
+                engine::ecs::Entity enemy = spawnNetworked(protocol::EntityType::Enemy, 0, WorldWidth, y);
+                _registry.emplace<rtype::components::Velocity>(enemy, -speed, 0.f);
+            }
+            wave.isSpawned = true; // La vague est lancée, on ne la relance plus
+        }
     }
 }
 
