@@ -2,6 +2,8 @@
 #include "levelLoader.hpp"
 #include <nlohmann/json.hpp> //bibliotheque pour lire le json
 
+namespace rtype::server {
+
 LevelConfig loadLevelFromJson(const std::string& filepath) {
     std::ifstream file(filepath);
     nlohmann::json j;
@@ -29,3 +31,4 @@ LevelConfig loadLevelFromJson(const std::string& filepath) {
     }
     return level;
 }
+} // namespace rtype::server

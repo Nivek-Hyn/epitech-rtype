@@ -112,6 +112,17 @@ void Game::update(float dt)
     spawnEnemies(dt);
     _registry.update(dt);
     // After movement, so collisions are tested on the positions sent in this tick's snapshot.
+    constexpr float PlayerWidth = 33.f;
+    constexpr float PlayerHeight = 36.f;
+
+    _registry.each<rtype::components::Position, rtype::components::Kind>([](engine::ecs::Entity /*entity*/, 
+        rtype::components::Position &pos, const rtype::components::Kind &kind) {
+        if (kind.type == protocol::EntityType::Player) {
+            pos.x = std::clamp(pos.x, 0.f, WorldWidth - PlayerWidth);
+            pos.y = std::clamp(pos.y, 0.f, WorldHeight - PlayerHeight);
+        }
+    });
+
     handleCollisions();
     for (float &cooldown : _shootCooldowns)
         cooldown = std::max(0.f, cooldown - dt);
@@ -201,6 +212,7 @@ void Game::handleCollisions()
 
     std::vector<bool> enemyHit(enemies.size(), false);
     std::vector<engine::ecs::Entity> destroyed;
+
     _registry.each<Position, Kind>([&](engine::ecs::Entity missile, const Position &position, const Kind &kind) {
         if (kind.type != protocol::EntityType::PlayerMissile)
             return;
@@ -215,6 +227,25 @@ void Game::handleCollisions()
             }
         }
     });
+    
+    constexpr float PlayerWidth = 33.f;
+    constexpr float PlayerHeight = 36.f;
+
+    _registry.each<Position, Kind>([&](engine::ecs::Entity playerEntity, const Position &position, const Kind &kind) {
+        if (kind.type != protocol::EntityType::Player)
+            return;
+
+        const engine::physics::Aabb playerBox{position.x, position.y, PlayerWidth, PlayerHeight};
+
+        for (std::size_t i = 0; i < enemies.size(); i++) {
+            if (!enemyHit[i] && engine::physics::overlaps(playerBox, enemies[i].second)) {
+                enemyHit[i] = true;
+                destroyed.push_back(playerEntity);   // Tue le joueur
+                destroyed.push_back(enemies[i].first); // Tue l'ennemi (optionnel)
+            }
+        }
+    });
+
 
     for (const engine::ecs::Entity entity : destroyed) {
         if (const auto *networkId = _registry.get<rtype::components::NetworkId>(entity))

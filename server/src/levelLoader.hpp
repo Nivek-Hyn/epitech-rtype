@@ -2,6 +2,8 @@
 #include <string>
 #include <vector>
 
+namespace rtype::server {
+
 struct EnemySpawnConfig {
     std::string type;
     float spawn_y;
@@ -24,3 +26,5 @@ struct LevelConfig {
 };
 
 LevelConfig loadLevelFromJson(const std::string& filepath);
+
+}
