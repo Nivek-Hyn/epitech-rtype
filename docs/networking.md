@@ -36,9 +36,9 @@ and sends the resulting state back to every connected client.
 For example, trace what happens when a player holds the Right arrow:
 
 1. **Read the key.** In [`client/src/main.cpp`](../client/src/main.cpp), the SFML loop checks
-  `sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Right)` and adds `InputFlag::Right` to `inputFlags`. When
-  connected, it calls `network.send(Input{inputFlags})`. Keyboard state is currently read globally, without a
-  window-focus check.
+  `sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Right)` (or `D`) and adds `InputFlag::Right` to `inputFlags`.
+  When connected, it calls `network.send(Input{inputFlags})`. Keyboard state is currently read globally, without
+  a window-focus check.
 2. **Queue the send.** [`AsioNetworkClient::send()`](../client/src/net/AsioNetworkClient.cpp) posts the work to
   Asio's I/O thread. `sendDatagram()` assigns a sequence number, calls `protocol::encode()`, and sends the
   resulting bytes to the server with `async_send_to()`.
@@ -76,6 +76,7 @@ renders the same server-produced snapshot. The client never tells the server, "m
 | Asio server implementation | [`AsioNetworkServer.cpp`](../server/src/net/AsioNetworkServer.cpp) |
 | Client network contract | [`INetworkClient.hpp`](../client/src/net/INetworkClient.hpp) |
 | Asio client implementation | [`AsioNetworkClient.cpp`](../client/src/net/AsioNetworkClient.cpp) |
+| Texture loading and caching | [`ResourceManager.cpp`](../client/src/ResourceManager.cpp) |
 | Server/network/game integration | [`server/src/main.cpp`](../server/src/main.cpp) |
 | Client input and snapshot rendering | [`client/src/main.cpp`](../client/src/main.cpp) |
 
@@ -105,14 +106,16 @@ The server simulation runs at 60 ticks per second using `FixedTimestep`:
 
 1. The server main thread drains `AsioNetworkServer::poll()` until the queue is empty.
 2. `PlayerJoined`, `PlayerDisconnected`, and `PlayerInput` events are applied to `Game`.
-3. `Game::update()` advances registered ECS systems. Currently this includes movement, shooting cooldowns,
-   and removal of missiles that leave the world.
+3. `Game::update()` spawns an enemy every two seconds while a player is connected, advances movement, checks
+  player-missile/enemy AABB collisions, updates shooting cooldowns, and removes missiles or enemies that leave
+  the world. Destroying an enemy adds 100 points to the score.
 4. The server creates a snapshot of networked entities and posts it for broadcast to connected clients.
 5. Destruction events are broadcast after the snapshot.
 
-The client samples the arrow keys and Space, sends the corresponding input flags while connected, and drains its
-message queue each frame. On a `Snapshot`, it replaces its displayed entity list with the entities in that
-snapshot. Player ids select different colors; other entity types currently use a simple yellow rectangle.
+The client samples the arrow keys or ZQSD and Space, sends the corresponding input flags while connected, and
+drains its message queue each frame. On a `Snapshot`, it replaces its displayed entity list with the entities
+in that snapshot. `ResourceManager` loads player, enemy and missile sprite sheets from `assets/`; the player id
+selects a sprite row. A starfield and audio are not implemented yet.
 
 ## 5. Threads and queues
 
@@ -154,8 +157,8 @@ Start the server in one terminal and one or more clients in separate terminals:
 ./r-type_client 127.0.0.1 4242
 ```
 
-The server accepts up to four clients. Use the arrow keys to move and Space to shoot. The current client uses
-basic colored rectangles; enemies, a starfield, sprites, and audio are not part of the networking implementation.
+The server accepts up to four clients. Use the arrow keys or ZQSD to move and Space to shoot. The client loads
+player, enemy and missile sprites through `ResourceManager`; a starfield and audio are not implemented yet.
 
 Run the automated tests with:
 
@@ -209,7 +212,7 @@ vitesse, fait avancer la simulation et renvoie le résultat aux clients connect�
 Voici le trajet d’un joueur qui maintient la flèche droite :
 
 1. **Lecture de la touche.** Dans [`client/src/main.cpp`](../client/src/main.cpp), la boucle SFML vérifie
-  `sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Right)` et ajoute `InputFlag::Right` à `inputFlags`. Si le
+  `sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Right)` (ou `D`) et ajoute `InputFlag::Right` à `inputFlags`. Si le
   client est connecté, il appelle `network.send(Input{inputFlags})`. Actuellement, l’état du clavier est lu
   globalement, sans vérifier quelle fenêtre a le focus.
 2. **Mise en file de l’envoi.** [`AsioNetworkClient::send()`](../client/src/net/AsioNetworkClient.cpp) poste le
@@ -250,6 +253,7 @@ maintenant à x = 200 ».
 | Implémentation serveur avec Asio | [`AsioNetworkServer.cpp`](../server/src/net/AsioNetworkServer.cpp) |
 | Contrat réseau client | [`INetworkClient.hpp`](../client/src/net/INetworkClient.hpp) |
 | Implémentation client avec Asio | [`AsioNetworkClient.cpp`](../client/src/net/AsioNetworkClient.cpp) |
+| Chargement et cache des textures | [`ResourceManager.cpp`](../client/src/ResourceManager.cpp) |
 | Intégration réseau et jeu côté serveur | [`server/src/main.cpp`](../server/src/main.cpp) |
 | Entrées client et affichage des snapshots | [`client/src/main.cpp`](../client/src/main.cpp) |
 
@@ -280,15 +284,16 @@ La simulation serveur tourne à 60 ticks par seconde avec `FixedTimestep` :
 
 1. Le thread principal vide `AsioNetworkServer::poll()` jusqu’à ce que la file soit vide.
 2. Les événements `PlayerJoined`, `PlayerDisconnected` et `PlayerInput` sont appliqués à `Game`.
-3. `Game::update()` fait avancer les systèmes ECS enregistrés. Actuellement, ils gèrent le déplacement, la
-  cadence de tir et la suppression des missiles sortis du monde.
+3. `Game::update()` fait apparaître un ennemi toutes les deux secondes lorsqu’un joueur est connecté, met à jour
+  les déplacements, teste les collisions AABB entre missiles joueurs et ennemis, gère la cadence de tir et
+  supprime les missiles ou ennemis sortis du monde. Détruire un ennemi ajoute 100 points au score.
 4. Le serveur construit un snapshot des entités réseau et demande sa diffusion aux clients connectés.
 5. Les événements de destruction sont diffusés après le snapshot.
 
-Le client lit les flèches et Espace, envoie les flags correspondants quand il est connecté, puis vide sa file de
-messages à chaque image. Lorsqu’il reçoit un `Snapshot`, il remplace la liste des entités affichées. La variante
-du joueur détermine sa couleur ; les autres types d’entités sont actuellement dessinés comme de simples
-rectangles jaunes.
+Le client lit les flèches ou ZQSD et Espace, envoie les flags correspondants quand il est connecté, puis vide sa
+file de messages à chaque image. Lorsqu’il reçoit un `Snapshot`, il remplace la liste des entités affichées.
+`ResourceManager` charge les sprites des joueurs, ennemis et missiles depuis `assets/` ; l’identifiant du joueur
+choisit une ligne de sprite. Le starfield et l’audio ne sont pas encore implémentés.
 
 ## 5. Threads et files
 
@@ -331,9 +336,9 @@ Lancer le serveur dans un terminal puis un ou plusieurs clients dans des termina
 ./r-type_client 127.0.0.1 4242
 ```
 
-Le serveur accepte quatre clients au maximum. Les flèches déplacent le joueur et Espace tire. Le client affiche
-actuellement des rectangles colorés ; les ennemis, le starfield, les sprites et le son ne font pas partie de
-l’implémentation réseau.
+Le serveur accepte quatre clients au maximum. Les flèches ou ZQSD déplacent le joueur et Espace tire. Le client
+charge les sprites des joueurs, ennemis et missiles avec `ResourceManager`. Le starfield et l’audio ne sont pas
+encore implémentés.
 
 Lancer les tests automatisés avec :
 

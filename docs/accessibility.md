@@ -64,7 +64,7 @@ alone decides how it looks, so color palettes and contrast modes change only the
 
 | Solution | Why | Inspiration | Status |
 |---|---|---|---|
-| Few controls: 4 directions and 1 fire key | Less to remember; the whole game can be learnt in seconds | Classic arcade games | Implemented (protocol) |
+| Few actions: 4 directions and 1 fire action; arrows or ZQSD move, Space fires | Less to remember; the whole game can be learnt in seconds | Classic arcade games | Implemented (client and protocol) |
 | Controls shown on the waiting screen | Players do not have to remember them or read a manual | Game Accessibility Guidelines (basic) | Planned (part 1, #45) |
 | Clear game states: waiting, playing, finished, each with its own screen | The player always knows what is happening and what to do next | — | Planned (part 1, #45, #47) |
 | Simple connection screen with default values (address and port prefilled) | Fewer steps and fewer chances of error | — | Planned (part 1, #45) |

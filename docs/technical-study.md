@@ -5,9 +5,9 @@ compared to the main alternatives. Each important decision also has a short reco
 this study gathers them, adds the numbers behind them, and covers storage and security.
 
 Status labels used below:
-- **Implemented**: in `main`, covered by unit tests.
-- **Designed**: the interface and expected behavior exist (headers, tests, specification), the implementation is in progress.
-- **Planned**: not started, candidate for part 2.
+- **Implemented**: present in the current branch; tests are noted where available.
+- **Partial**: a basic implementation exists, with known gaps listed.
+- **Planned**: not implemented yet; a candidate for part 2.
 
 ## 1. Language and tooling
 
@@ -108,9 +108,9 @@ keeping the fraction. Without this limit a slow server could accumulate an endle
 | Type erasure (`ISparseArray`, `IHandlerList`) | `Registry`, `EventBus` | — | Lets one container hold storages of different types; `kill` can clear every component of an entity. |
 | Filtered iteration | `Registry::each<A, B>` | O(number of ids × number of component types) | Simple and fast enough for a few hundred entities; no index to keep in sync. |
 | AABB overlap test | `engine::physics::overlaps` | O(1) per pair | Four comparisons; sprites in a shoot'em up are well approximated by rectangles. |
-| Pairwise collision checks | gameplay collision system (designed) | O(n²) | With 200 entities: about 20,000 tests per tick, 1.2 million per second, a negligible cost. A uniform grid or quadtree is **planned** only if entity counts grow. |
+| Player missile/enemy AABB checks | `server/src/Game.cpp` | O(M × E) | The prototype compares each player missile against the current enemy list. A uniform grid or quadtree is **planned** only if entity counts grow. |
 | Accumulator with catch-up limit | `FixedTimestep::advance` | O(steps) | See section 3. |
-| Thread-safe queue | network thread → game thread (designed) | O(1) | A mutex-protected queue is simple and correct; lock-free queues are faster but much harder to get right. |
+| Thread-safe queue | `engine/core/ThreadSafeQueue.hpp` | O(1) | A mutex-protected FIFO passes messages between network and main threads; lock-free queues are faster but much harder to get right. |
 
 ### Known limits
 
@@ -126,7 +126,7 @@ keeping the fraction. Without this limit a slow server could accumulate an endle
 |---|---|---|
 | **UDP** | TCP | Required by the subject for in-game traffic. A lost packet is not retransmitted, so an old position never delays a new one. |
 | **Authoritative server**, clients send inputs only ([ADR 0007](adr/0007-authoritative-snapshots.md)) | Peer-to-peer, client authority | The server decides everything: a modified client cannot move faster or teleport, it can only send key presses. |
-| **Full snapshots every tick** | Delta snapshots, events only | Self-healing: a lost snapshot is replaced by the next one 16.7 ms later. No reliability layer needed. |
+| **Full snapshots every tick** | Delta snapshots, events only | A lost snapshot is replaced by the next one about 16.7 ms later. One-off events are not acknowledged or retransmitted in the current prototype. |
 | **Binary protocol** ([ADR 0008](adr/0008-binary-protocol.md), [specification](protocol.md)) | JSON, text | Compact and fast to parse. One entity takes 14 bytes in binary, about 50 to 60 bytes in JSON. |
 
 Bandwidth estimate, worst case (a full snapshot packet: 10-byte header + 11 bytes + 84 entities × 14 bytes = 1,197 bytes):
@@ -169,10 +169,10 @@ it chose to connect to.
 
 | Threat | Mitigation | Status |
 |---|---|---|
-| Malformed or malicious packet (crash, buffer overflow) | Strict validation: size between 10 and 1,200 bytes, magic, version, exact payload size, known type and enum values. Decoding returns `std::optional` and never throws; invalid packets are dropped silently. Unit tests cover truncated packets and lying counts. | Designed (tests written) |
-| Reading past the end of a buffer | `ByteReader` returns 0 and marks itself as failed instead of reading out of bounds. Fields are read one by one, never with `memcpy` of structs. | Designed |
+| Malformed or malicious packet (crash, buffer overflow) | Strict validation: size between 10 and 1,200 bytes, magic, version, exact payload size, known type and enum values. Decoding returns `std::optional`; invalid packets are dropped. Unit tests cover truncated packets and lying counts. | Implemented and tested |
+| Reading past the end of a buffer | `ByteReader` returns 0 and marks itself as failed instead of reading out of bounds. Fields are read one by one, never with `memcpy` of structs. | Implemented |
 | Cheating with a modified client | Authoritative server: clients only send input flags. Positions, damage and score are computed on the server. | Implemented in the architecture |
-| Too many clients / resource exhaustion | At most 4 players; a client silent for 5 seconds is removed. | Designed |
+| Too many clients / resource exhaustion | At most 4 players; a client silent for 5 seconds is removed. Integration tests cover the four-player limit and fifth-client rejection. | Implemented; timeout behavior is not integration-tested yet |
 | Flooding the server with packets | Invalid packets are dropped before any game logic. Rate limiting per address is **planned**. | Partial |
 | Spoofed source address (sending inputs as another player) | Not covered: UDP has no authentication. A random session token returned in `ConnectAccepted` and required in every packet is **planned**. | Planned |
 | Eavesdropping | Not covered: traffic is not encrypted. The game exchanges no personal data, so the risk is low. | Accepted |

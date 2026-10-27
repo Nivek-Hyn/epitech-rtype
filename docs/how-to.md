@@ -121,13 +121,16 @@ Use the event bus when a system must trigger something it should not know about 
 ## Add an enemy type
 
 An enemy is an entity, not a class: a new enemy type is a new combination of components and a new value of
-`Kind::variant`. This guide lists the steps; the gameplay and rendering systems they rely on are being written.
+`Kind::variant`. The current prototype already spawns a basic enemy on a timer, moves it left, and lets player
+missiles destroy it. The game loop and renderer are in place; extending enemy behavior still requires server and
+client changes.
 
 1. **Pick a variant number.** `Kind{EntityType::Enemy, variant}` identifies the enemy type for the client.
    Keep the list of variants in one place (a comment or an enum in `common/`), so the server and the client
    agree on it.
 
-2. **Spawn it on the server** with the components every networked entity needs, plus its own behavior:
+2. **Spawn it on the server** with the components every networked entity needs, plus its own behavior. The
+   current implementation is in `Game::spawnEnemies()` and `Game::spawnNetworked()`:
 
    ```cpp
    engine::ecs::Entity enemy = spawnNetworked(protocol::EntityType::Enemy, variant, x, y);
@@ -135,14 +138,15 @@ An enemy is an entity, not a class: a new enemy type is a new combination of com
    // + server-only components: health, hitbox, movement pattern, shooting...
    ```
 
-   `spawnNetworked` (declared in `server/src/Game.hpp`, written by the gameplay team) is meant to give the entity a
-   `NetworkId`, a `Kind` and a `Position`, which is what the snapshot sends.
+   `spawnNetworked` gives the entity a `NetworkId`, `Kind`, `Position` and `Velocity`, which are used by the
+   snapshot and movement system. The current spawn timer, enemy rows and speed are constants in `Game.cpp`.
 
 3. **Give it a behavior.** Reuse existing systems when possible (movement, shooting). For a new movement pattern,
    add a component holding its parameters and a system that updates the `Velocity` from it.
 
-4. **Display it on the client.** Map the new variant to a sprite in the client's rendering code. The protocol
-   does not change: the snapshot already carries `type` and `variant`.
+4. **Display it on the client.** Add or load a texture through `client/src/ResourceManager.cpp`, then map the
+   entity type/variant to a sprite in `client/src/main.cpp`. The protocol does not change if the existing
+   `EntityType::Enemy` and `variant` fields are sufficient; a new entity category requires a protocol update.
 
 5. **Test the server side** like any system: spawn the enemy, run a few ticks, check its position or state.
 

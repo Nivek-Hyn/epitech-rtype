@@ -11,8 +11,8 @@ For step-by-step guides, see the [how-to guides](how-to.md).
 | Event bus | `engine/core/EventBus.hpp` | `engine::core` | Implemented |
 | Collision shapes | `engine/physics/Aabb.hpp` | `engine::physics` | Implemented |
 | Movement system | `engine/systems/Movement.hpp` | `engine::systems` | Implemented |
-| Byte serialization | `engine/net/ByteBuffer.hpp` | `engine::net` | Designed (network team) |
-| Thread-safe queue | `engine/core/ThreadSafeQueue.hpp` | `engine::core` | Designed (network team) |
+| Byte serialization | `engine/net/ByteBuffer.hpp` | `engine::net` | Implemented; bounded big-endian reads and writes |
+| Thread-safe queue | `engine/core/ThreadSafeQueue.hpp` | `engine::core` | Implemented; mutex-protected FIFO |
 
 All headers are under `engine/include/`. Link with the `rtype_engine` CMake target.
 The expected behavior of every part is specified by the unit tests in `tests/test_*.cpp`.
@@ -159,9 +159,9 @@ registry.addSystem(engine::systems::movement<rtype::components::Position, rtype:
 
 Velocity is in world units per second, so movement speed does not depend on the tick rate.
 
-## 5. Networking utilities (designed)
+## 5. Networking utilities
 
-These two parts are specified by their headers and implemented by the network team.
+These header-only utilities are generic engine building blocks used by the networking code.
 
 - `ByteWriter` / `ByteReader` write and read integers and floats in big-endian, field by field. Reading past the
   end never overflows: the reader returns 0 and `ok()` becomes false.
@@ -180,6 +180,7 @@ ctest --test-dir build --output-on-failure -R '^(Registry|FixedTimestep|EventBus
 | `tests/test_event_bus.cpp` | Immediate and queued delivery, order, chained events |
 | `tests/test_aabb.cpp` | Overlap, separation, touching edges |
 | `tests/test_movement.cpp` | Movement scaled by the time step, use as a system |
+| `tests/test_thread_safe_queue.cpp` | FIFO order and empty queue behavior |
 
 ## 7. Known limits and next steps
 
