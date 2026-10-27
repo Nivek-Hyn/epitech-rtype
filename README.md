@@ -8,7 +8,9 @@ Up to 4 players connect to an authoritative server and fight waves of Bydos toge
 - A C++20 compiler: GCC 12+, Clang 16+ or MSVC 2022
 - CMake 3.24+
 - Git (dependencies are downloaded automatically by [CPM](https://github.com/cpm-cmake/CPM.cmake))
-- **Linux only**, system packages needed by SFML:
+- Linux is required. Windows is a project target, but has not yet been validated for this branch. See the
+  [cross-platform guide](docs/cross-platform.md).
+- On Linux, install the system packages needed by SFML:
   - Fedora: `sudo dnf install libX11-devel libXrandr-devel libXcursor-devel libXi-devel mesa-libGL-devel systemd-devel`
   - Ubuntu/Debian: `sudo apt install libx11-dev libxrandr-dev libxcursor-dev libxi-dev libgl1-mesa-dev libudev-dev`
 
@@ -23,6 +25,8 @@ cmake --build build -j
 The binaries `r-type_server` and `r-type_client` are created at the repository root.
 
 Options: `-DRTYPE_BUILD_CLIENT=OFF` (server only), `-DRTYPE_BUILD_TESTS=OFF`.
+
+For Windows build commands and current support status, see the [cross-platform guide](docs/cross-platform.md).
 
 ## Run
 
