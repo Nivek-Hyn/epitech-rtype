@@ -94,5 +94,30 @@ configuration-specific directory. Build Release separately and use a separate in
 when a Release consumer is needed.
 Version checks accept compatible patch updates within the same minor version while the engine is at 0.x.
 
+## Check the installed package
+
+From the repository root, run the same command on Linux or Windows:
+
+```sh
+cmake -P engine/cmake/CheckPackage.cmake
+```
+
+This builds and installs all engine modules, then builds and runs the separate movement example
+against that installation. It checks package consumption and propagation of module dependencies.
+It does not build the game or download dependencies. Results stay in
+`build/engine-package-check-portable`, including an install path containing a space.
+The compiler and build tool must already be available in the terminal; with Visual Studio,
+use a Developer PowerShell or Developer Command Prompt.
+
+Optional settings go before `-P`, for example:
+
+```sh
+cmake -DENGINE_CHECK_CONFIGURATION=Release -DENGINE_CHECK_ROOT=build/engine-package-check-release -P engine/cmake/CheckPackage.cmake
+```
+
+Use `-DENGINE_CHECK_GENERATOR=Ninja` to choose a generator. Use a different check directory when
+switching compilers or generators. The command must be run on each target operating system;
+a successful Linux run does not validate Windows binaries.
+
 The full game still uses the repository's root CMake project. See the
 [engine guide](../docs/engine.md) for the API and its current limitations.
