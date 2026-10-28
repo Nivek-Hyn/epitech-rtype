@@ -35,7 +35,9 @@ Scopes: `engine`, `common`, `server`, `client`, `network`, `gameplay`, `ci`, `do
 
 ## Code style
 
-- Formatting: `clang-format` with the repository `.clang-format` (run it before committing).
+- Formatting: `clang-format` 23.1.3 with the repository `.clang-format` (run it before committing).
+- Static analysis: `clang-tidy` 23.1.3 with `.clang-tidy`; see the
+  [selected checks and local commands](docs/static-analysis.md). Run it separately from `scripts/check.sh` for now.
 - Classes and structs `PascalCase`, functions and variables `camelCase`, private members `_camelCase`,
   constants `PascalCase`, files named after their main class.
 - Explicit names: `reader`, `message`, `entity`, never `r`, `m`, `e`. Single letters only for loop indices (`i`).
