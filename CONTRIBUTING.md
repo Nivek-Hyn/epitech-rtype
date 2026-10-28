@@ -6,7 +6,7 @@
 2. Create a branch from `main`: `<type>/<issue>-<short-name>`, e.g. `feat/28-udp-socket`, `fix/41-starfield-speed`.
    Types: `feat`, `fix`, `refactor`, `test`, `docs`, `ci`, `chore`.
 3. Open a pull request into `main`, with `Closes #<issue>` in the description.
-4. Run `scripts/check.sh` before pushing: formatting, build without warnings and unit tests, like the CI.
+4. Run `scripts/check.sh` before pushing: formatting, build without warnings, static analysis and unit tests.
    The CI only runs on demand (Actions tab > CI > Run workflow).
 5. A review from someone working on another domain is welcome but not required.
    Merge with "Create a merge commit", so the small commits of the branch are kept.
@@ -37,7 +37,8 @@ Scopes: `engine`, `common`, `server`, `client`, `network`, `gameplay`, `ci`, `do
 
 - Formatting: `clang-format` 23.1.3 with the repository `.clang-format` (run it before committing).
 - Static analysis: `clang-tidy` 23.1.3 with `.clang-tidy`; see the
-  [selected checks and local commands](docs/static-analysis.md). Run it separately from `scripts/check.sh` for now.
+  [selected checks, tool setup and Linux/Windows commands](docs/static-analysis.md).
+  `scripts/check.sh` includes it; missing tools fail the check rather than silently skipping analysis.
 - Classes and structs `PascalCase`, functions and variables `camelCase`, private members `_camelCase`,
   constants `PascalCase`, files named after their main class.
 - Explicit names: `reader`, `message`, `entity`, never `r`, `m`, `e`. Single letters only for loop indices (`i`).

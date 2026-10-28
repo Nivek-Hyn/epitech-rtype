@@ -2,6 +2,7 @@
 
 Use clang-format **23.1.3** for formatting and clang-tidy **23.1.3** for static analysis.
 These are development tools, not dependencies of the game or the engine.
+The local analysis runner also requires Python 3.9 or newer.
 Install them in your active Python environment (a virtual environment is recommended):
 
 ```sh
@@ -43,15 +44,36 @@ clang-tidy --verify-config
 clang-tidy -p build engine/src/Registry.cpp tests/test_registry.cpp
 ```
 
-To analyze all project source files on Linux, the pinned package also provides the LLVM runner:
+To analyze every project source listed in the database, including tests:
 
 ```sh
-run-clang-tidy.py -p build -j 4 '[/\\](engine|common|server|client|tests)[/\\]'
+python scripts/lint.py --build-dir build
 ```
 
-The source filter excludes downloaded dependencies from the files passed to the analyzer. It is separate
-from the configuration's header filter. Do not use `-fix` in routine verification: inspect diagnostics and
-make deliberate changes instead.
+The runner selects sources under the repository's `engine/`, `common/`, `server/`, `client/` and `tests/`
+directories, removes duplicate entries, and runs up to four analyses concurrently. Downloaded dependencies
+are excluded from the files passed to the analyzer, separately from the configuration's header filter.
+Missing tools, an absent or empty compilation database, invalid configuration and analysis failures all
+produce a nonzero exit status. No fixes are applied automatically.
+
+On Linux, run the complete local gate with:
+
+```sh
+scripts/check.sh
+scripts/check.sh '^(Registry|FixedTimestep)\.'
+```
+
+Both commands check formatting, configure and build with tests enabled, analyze every compiled project
+source, and run tests. The optional expression filters only CTest, not static analysis. A failed format or
+analysis check still allows tests to run when the build succeeded; the final command status remains a failure.
+CTest finding no matching tests is also an error. Fix build failures before analysis or tests can run.
+
+`PYTHON` selects the Python interpreter for `check.sh` (default `python3`). `CLANG_TIDY` selects an analyzer
+executable for both scripts, or use `--clang-tidy` with `lint.py`. For example:
+
+```sh
+CLANG_TIDY=/path/to/clang-tidy scripts/check.sh
+```
 
 On Windows, Visual Studio generators do not produce the compilation database used by this command.
 From a Developer PowerShell with Ninja installed, configure a separate directory:
@@ -60,8 +82,19 @@ From a Developer PowerShell with Ninja installed, configure a separate directory
 cmake -S . -B build/lint -G Ninja -DCMAKE_BUILD_TYPE=Debug
 cmake --build build/lint --parallel 4
 clang-tidy --verify-config
-clang-tidy -p build/lint engine/src/Registry.cpp tests/test_registry.cpp
+python scripts/lint.py --build-dir build/lint
+ctest --test-dir build/lint -C Debug --output-on-failure --no-tests=error
 ```
+
+Run the formatting check separately in PowerShell:
+
+```powershell
+$projectSources = Get-ChildItem engine,common,server,client,tests -Recurse -File -Include *.cpp,*.hpp
+clang-format --dry-run --Werror $projectSources.FullName
+```
+
+Inspect each command's exit status; these PowerShell commands are separate manual checks, not a wrapper.
+`scripts/check.sh` requires Bash and is not a native PowerShell command.
 
 Use the database belonging to the current branch and compiler. If the analyzer cannot find a header or
 parse the compiler flags, fix that setup error before treating the run as valid. Windows execution must
@@ -73,6 +106,6 @@ Static analysis supplements strict compiler warnings, tests and review. A clean 
 the absence of bugs, thread races or malformed-packet vulnerabilities. This configuration does not
 change compiler warning flags or start any GitHub Actions workflow.
 
-For now, run clang-tidy separately from `scripts/check.sh`; integrating it into that script belongs to
-issue #12. LLVM documents the command options and compilation database in the
+GitHub Actions remains manual-only; its existing build/test and format jobs do not run this new local
+analysis step. LLVM documents the command options and compilation database in the
 [clang-tidy manual](https://clang.llvm.org/extra/clang-tidy/).
