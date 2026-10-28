@@ -1,0 +1,27 @@
+R-Type @PROJECT_VERSION@ - @CMAKE_SYSTEM_NAME@ @CMAKE_SYSTEM_PROCESSOR@
+
+Open a terminal in this directory before starting the programs.
+The client looks for assets/ relative to the current working directory.
+Keep the assets directory next to the executables when moving this installation.
+
+Linux:
+  ./r-type_server [port]
+  ./r-type_client [host] [port]
+
+Windows PowerShell:
+  .\r-type_server.exe [port]
+  .\r-type_client.exe [host] [port]
+
+Arguments in brackets are optional. Default host: 127.0.0.1. Default UDP port: 4242.
+Start the server first, then clients in other terminals.
+The client connects to a remote server when its host address is supplied.
+Use arrow keys or ZQSD to move, and Space to shoot. Close the window to quit.
+Stop the server with Ctrl+C. Allow the selected UDP port through the server's firewall.
+
+This installation was configured with RTYPE_BUILD_CLIENT=@RTYPE_BUILD_CLIENT@.
+When OFF, only the server is installed; no graphical assets are required.
+
+This is a local runtime installation, not yet a self-contained release archive.
+Required operating-system libraries and compiler runtimes must be available.
+Linux client requirements include X11, OpenGL and udev runtime libraries.
+Run on a compatible OS, architecture and runtime environment; do not copy Linux binaries to Windows.

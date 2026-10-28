@@ -33,6 +33,30 @@ Options: `-DRTYPE_BUILD_CLIENT=OFF` (server only), `-DRTYPE_BUILD_TESTS=OFF`.
 
 Run the client from the repository root so it finds `assets/`.
 
+## Install locally
+
+After building, install the game's runtime files into a fresh local directory:
+
+```sh
+cmake --install build --config Debug --component GameRuntime --prefix "$PWD/build/installed-game"
+cd build/installed-game
+./r-type_server
+# In another terminal, open the same directory:
+./r-type_client 127.0.0.1
+```
+
+The installation contains the executables, `assets/` when the client is enabled, and `RUNNING.txt` with
+launch instructions. It does not need the source tree or build directory at runtime. The working directory
+must be the installation directory because the current client uses relative resource paths.
+`GameRuntime` selects only game runtime files, excluding dependency development files.
+With `RTYPE_BUILD_CLIENT=OFF`, only the server and launch instructions are installed.
+Use a fresh destination when changing the selected programs; installation does not remove old files.
+
+In Windows PowerShell, use an absolute prefix such as `--prefix "$PWD/build/installed-game"`, keep
+`--config Debug` consistent with the build, and launch `.\r-type_server.exe` / `.\r-type_client.exe`.
+This first installation step does not bundle operating-system libraries or compiler runtime DLLs;
+it is not yet a self-contained Linux/Windows distribution. Windows runtime execution remains to be verified.
+
 ## Tests
 
 ```sh
