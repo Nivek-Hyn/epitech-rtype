@@ -1,7 +1,23 @@
 @PACKAGE_INIT@
 
 include(CMakeFindDependencyMacro)
-find_dependency(Threads)
+
+set(RTypeEngine_Engine_FOUND TRUE)
+set(RTypeEngine_ECS_FOUND @RTYPE_ENGINE_BUILD_ECS@)
+set(RTypeEngine_Core_FOUND @RTYPE_ENGINE_BUILD_CORE@)
+set(RTypeEngine_Physics_FOUND @RTYPE_ENGINE_BUILD_PHYSICS@)
+set(RTypeEngine_Net_FOUND @RTYPE_ENGINE_BUILD_NET@)
+set(RTypeEngine_Systems_FOUND @RTYPE_ENGINE_BUILD_SYSTEMS@)
+
+if(RTypeEngine_Core_FOUND)
+    find_dependency(Threads)
+endif()
 
 include(${CMAKE_CURRENT_LIST_DIR}/RTypeEngineTargets.cmake)
+
+foreach(component IN LISTS RTypeEngine_FIND_COMPONENTS)
+    if(NOT RTypeEngine_${component}_FOUND)
+        set(RTypeEngine_NOT_FOUND_MESSAGE "Component '${component}' is not available in this installation.")
+    endif()
+endforeach()
 check_required_components(RTypeEngine)

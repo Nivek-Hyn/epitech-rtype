@@ -17,8 +17,38 @@ cmake --build build/engine-standalone --config Debug -j 4
 ```
 
 The `engine/` directory can also be copied into another project without the other repository directories.
-Its CMake target is `rtype_engine`, also available as `RTypeEngine::Engine`; linking this target provides
-the public headers, the C++20 requirement and the platform's standard thread support.
+Its umbrella CMake target is `rtype_engine`, also available as `RTypeEngine::Engine`. It links the enabled
+modules, providing their public headers and the C++20 requirement. Core also provides the platform's
+standard thread support.
+
+## Select modules
+
+All modules are enabled by default, preserving the full game's configuration.
+
+| Option | Target | Contents | Dependency |
+|---|---|---|---|
+| `RTYPE_ENGINE_BUILD_ECS` | `RTypeEngine::ECS` | Entities, components and Registry | Standard library |
+| `RTYPE_ENGINE_BUILD_CORE` | `RTypeEngine::Core` | FixedTimestep, EventBus, ThreadSafeQueue | Standard thread support |
+| `RTYPE_ENGINE_BUILD_PHYSICS` | `RTypeEngine::Physics` | AABB and overlap detection | Standard library |
+| `RTYPE_ENGINE_BUILD_NET` | `RTypeEngine::Net` | ByteWriter and ByteReader, without sockets or Asio | Standard library |
+| `RTYPE_ENGINE_BUILD_SYSTEMS` | `RTypeEngine::Systems` | Generic movement system | ECS |
+
+ECS and Core each produce a static library. Physics, Net and Systems are header-only targets, so they do
+not produce library files. Engine is an interface target grouping the enabled modules; it no longer
+produces a separate `librtype_engine.a` or `rtype_engine.lib`.
+
+For a physics-only installation:
+
+```sh
+cmake -S engine -B build/engine-physics -DRTYPE_ENGINE_BUILD_ECS=OFF -DRTYPE_ENGINE_BUILD_CORE=OFF -DRTYPE_ENGINE_BUILD_NET=OFF -DRTYPE_ENGINE_BUILD_SYSTEMS=OFF
+cmake --build build/engine-physics --config Debug
+cmake --install build/engine-physics --config Debug --prefix "$PWD/build/engine-physics-install"
+```
+
+Systems cannot be enabled when ECS is disabled; configuration reports an explicit error.
+Only enabled modules' headers and targets are installed. Use a fresh installation directory when changing
+the module selection: CMake install does not remove files left by an older installation. In a source build,
+the shared include directory still exposes all source headers; these options are not an access restriction.
 
 ## Install and use from another project
 
@@ -28,12 +58,23 @@ After building the engine, install it into a local directory; administrator priv
 cmake --install build/engine-standalone --config Debug --prefix "$PWD/build/engine-install"
 ```
 
-The installation contains the static library, public headers and CMake package files. A consumer only needs:
+The installation contains the enabled modules' libraries and public headers, plus CMake package files.
+A consumer using every installed module only needs:
 
 ```cmake
 find_package(RTypeEngine 0.1 CONFIG REQUIRED)
 target_link_libraries(my_game PRIVATE RTypeEngine::Engine)
 ```
+
+Consumers can also require and link specific components:
+
+```cmake
+find_package(RTypeEngine 0.1 CONFIG REQUIRED COMPONENTS Physics)
+target_link_libraries(my_game PRIVATE RTypeEngine::Physics)
+```
+
+Component names are case-sensitive. Requesting a missing required component fails during configuration.
+The basic example needs ECS and Systems; a physics-only package cannot build it.
 
 Pass the installation directory through `CMAKE_PREFIX_PATH` when configuring the consumer.
 No engine source or build directory is needed by the consumer. The installation can be moved to another
