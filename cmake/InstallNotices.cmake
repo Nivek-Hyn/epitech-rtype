@@ -1,0 +1,31 @@
+# Copy upstream notice files from the dependencies already fetched by the build.
+# Keep them outside the source tree and exclude test-only dependencies.
+function(rtype_install_notice dependency sourceFile)
+    if(NOT EXISTS "${sourceFile}")
+        message(FATAL_ERROR "Missing ${dependency} notice: ${sourceFile}")
+    endif()
+    install(FILES "${sourceFile}" DESTINATION "notices/${dependency}" COMPONENT GameRuntime)
+endfunction()
+
+rtype_install_notice(Asio "${asio_SOURCE_DIR}/COPYING")
+rtype_install_notice(Asio "${asio_SOURCE_DIR}/LICENSE_1_0.txt")
+
+if(RTYPE_BUILD_CLIENT)
+    rtype_install_notice(SFML "${SFML_SOURCE_DIR}/license.md")
+    include(FetchContent)
+    foreach(dependency IN ITEMS freetype harfbuzz SheenBidi ogg vorbis FLAC)
+        FetchContent_GetProperties(${dependency} SOURCE_DIR noticeSource)
+        if(dependency STREQUAL "freetype")
+            rtype_install_notice(${dependency} "${noticeSource}/LICENSE.TXT")
+            rtype_install_notice(${dependency} "${noticeSource}/docs/FTL.TXT")
+        elseif(dependency STREQUAL "SheenBidi")
+            rtype_install_notice(${dependency} "${noticeSource}/LICENSE")
+        elseif(dependency STREQUAL "FLAC")
+            rtype_install_notice(${dependency} "${noticeSource}/COPYING.Xiph")
+        else()
+            rtype_install_notice(${dependency} "${noticeSource}/COPYING")
+        endif()
+    endforeach()
+endif()
+
+install(FILES "${PROJECT_SOURCE_DIR}/THIRD_PARTY_NOTICES.txt" DESTINATION . COMPONENT GameRuntime)

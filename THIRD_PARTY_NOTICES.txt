@@ -1,0 +1,32 @@
+Third-party components
+======================
+
+The runtime uses Asio for UDP transport. Client-enabled builds also link SFML,
+which uses FreeType, HarfBuzz, SheenBidi, Ogg, Vorbis and FLAC in this build.
+Copies of their main upstream notice files are installed under notices/.
+GoogleTest is used only by tests and is not part of the runtime installation.
+
+Asio: https://think-async.com/Asio/
+SFML: https://www.sfml-dev.org/
+FreeType: https://freetype.org/
+HarfBuzz: https://harfbuzz.github.io/
+SheenBidi: https://github.com/Tehreer/SheenBidi
+Ogg, Vorbis and FLAC: https://xiph.org/
+
+Portions of this software are copyright (c) 2026 The FreeType Project
+(www.freetype.org). All rights reserved.
+
+These main notices are not an exhaustive inventory of embedded third-party
+code in SFML, including its image decoders and platform loaders. Preserve and
+review the corresponding upstream header notices when preparing a public release.
+
+Assets and project code
+=======================
+
+The assets/r-typesheet*.gif files are R-Type sprite sheets used by this student
+project. Their original download sources, credits and redistribution permissions
+have not been recorded in this repository. The team must supply that information;
+this document does not assign a license or establish permission for those assets.
+
+The repository currently declares no project-wide source-code license.
+The upstream notices do not assign a license to the project's own code or assets.

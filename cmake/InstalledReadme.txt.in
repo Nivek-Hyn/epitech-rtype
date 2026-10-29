@@ -19,9 +19,10 @@ Use arrow keys or ZQSD to move, and Space to shoot. Close the window to quit.
 Stop the server with Ctrl+C. Allow the selected UDP port through the server's firewall.
 
 This installation was configured with RTYPE_BUILD_CLIENT=@RTYPE_BUILD_CLIENT@.
-When OFF, only the server is installed; no graphical assets are required.
+When OFF, the client and graphical assets are excluded.
 
-This is a local runtime installation, not yet a self-contained release archive.
-Required operating-system libraries and compiler runtimes must be available.
+See THIRD_PARTY_NOTICES.txt and notices/ for dependency notices and outstanding asset credits.
+Required operating-system libraries and compatible C/C++ runtimes must be available.
+MSVC Release packages include compiler runtime files found by CMake; Debug packages are for development.
 Linux client requirements include X11, OpenGL and udev runtime libraries.
 Run on a compatible OS, architecture and runtime environment; do not copy Linux binaries to Windows.
