@@ -3,6 +3,44 @@
 Short recipes for the most common changes. They assume you know the concepts from the
 [engine documentation](engine.md): entities, components, systems and the event bus.
 
+## Run the component and system example
+
+`engine/examples/basic/` is a complete consumer project. It defines its own components and adds a system
+without changing the engine. It requires a C++20 compiler, CMake 3.24+ and a build tool, with no SFML,
+Asio, game assets or GoogleTest. From the repository root:
+
+```sh
+cmake -S engine -B build/engine-tutorial -DCMAKE_BUILD_TYPE=Debug
+cmake --build build/engine-tutorial --config Debug --parallel 4
+cmake --install build/engine-tutorial --config Debug --prefix "$PWD/build/engine-tutorial-install"
+cmake -S engine/examples/basic -B build/engine-tutorial-consumer -DCMAKE_BUILD_TYPE=Debug -DCMAKE_PREFIX_PATH="$PWD/build/engine-tutorial-install"
+cmake --build build/engine-tutorial-consumer --config Debug --parallel 4
+ctest --test-dir build/engine-tutorial-consumer -C Debug --output-on-failure --verbose
+```
+
+These commands also work in PowerShell; use a Developer PowerShell for MSVC and keep `--config Debug`
+and `-C Debug` for Visual Studio generators. Use matching engine/consumer compilers and configurations.
+The test prints `Custom component and system: movement, lifetime and deferred destruction passed`.
+Alternatively, `cmake -P engine/cmake/CheckPackage.cmake` builds, installs and tests the example in one command.
+
+Read `engine/examples/basic/main.cpp` in this order:
+
+1. `Lifetime` holds the remaining lifetime in seconds. The struct belongs to the consumer; the Registry
+   needs no new registration or code change to store it.
+2. `lifetimeSystem` receives the Registry and the duration of one simulated step. Its `each<Lifetime>`
+   callback visits only live entities with that component and subtracts the step duration.
+3. Expired ids are collected in a vector. The following loop kills those entities after `each` has finished,
+   so none of its component references is accessed after destruction.
+4. `main` registers movement first, then lifetime. Each `update(0.5f)` runs both systems in that order.
+   The temporary entity starts with one second of lifetime; the other entity has no Lifetime component.
+5. After the first update, both entities have moved and the temporary entity has half a second left.
+   After the second, the temporary entity and all its components are removed; the permanent one survives.
+   Fresh pointers are obtained after the systems run.
+
+The two updates represent simulated time; this console example does not sleep for a real second.
+To experiment, change the initial lifetime to `1.5f` and adjust the checks to expect half a second remaining
+after the two updates. Keep the engine unchanged: the new behavior belongs to the consumer.
+
 ## Add a component
 
 A component is a plain struct holding data, with default values.

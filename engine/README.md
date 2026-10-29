@@ -89,6 +89,11 @@ cmake --build build/engine-example --config Debug -j 4
 ctest --test-dir build/engine-example -C Debug --output-on-failure
 ```
 
+The example defines Position, Velocity and Lifetime components in its own source file. It combines the
+engine's generic movement with a consumer-defined lifetime system. Two half-second updates demonstrate
+movement, expiration, removal of all expired entity components, and preservation of an entity without
+Lifetime. See the [extension walkthrough](../docs/how-to.md#run-the-component-and-system-example).
+
 For Visual Studio generators, keep `--config Debug` and `-C Debug`: the executable is placed in a
 configuration-specific directory. Build Release separately and use a separate installation directory
 when a Release consumer is needed.

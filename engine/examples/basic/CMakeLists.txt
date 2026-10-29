@@ -9,4 +9,4 @@ target_link_libraries(engine_example PRIVATE RTypeEngine::Systems)
 set_target_properties(engine_example PROPERTIES CXX_EXTENSIONS OFF)
 
 enable_testing()
-add_test(NAME EngineExample.Movement COMMAND engine_example)
+add_test(NAME EngineExample.ComponentsAndSystems COMMAND engine_example)
