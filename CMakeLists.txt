@@ -34,3 +34,4 @@ if(RTYPE_BUILD_TESTS)
 endif()
 
 include(cmake/InstallGame.cmake)
+include(cmake/PackageGame.cmake)

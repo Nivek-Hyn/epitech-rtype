@@ -57,6 +57,29 @@ In Windows PowerShell, use an absolute prefix such as `--prefix "$PWD/build/inst
 This first installation step does not bundle operating-system libraries or compiler runtime DLLs;
 it is not yet a self-contained Linux/Windows distribution. Windows runtime execution remains to be verified.
 
+## Create a runtime archive
+
+Build the configuration to package, then run CPack from the repository root:
+
+```sh
+cmake --build build --config Debug --parallel 4
+cpack --config build/CPackConfig.cmake -C Debug -B build/packages
+```
+
+The default format is `.tar.gz` on Linux and `.zip` on Windows. Add `-G ZIP` or `-G TGZ` to select either
+format explicitly. CPack packages the selected binaries; it does not compile them. For Release, configure
+with `-DCMAKE_BUILD_TYPE=Release` when using a single-configuration generator, build Release, and pass
+`-C Release`. Keep separate build directories for Debug and Release.
+
+Archives contain one top-level directory with the same runtime layout as the installation above.
+Their names include the version, system, processor, enabled programs (`client-server` or `server-only`),
+and build configuration. A `.sha256` checksum accompanies each archive. Only `GameRuntime` is packaged:
+dependency headers, static libraries, tests and the source tree are excluded.
+
+Extract the archive, open a terminal inside its top-level directory, and follow `RUNNING.txt`.
+The runtime-library and platform limitations above still apply. This archive-generation step does not
+complete the remaining dependency-license/asset-attribution inventory or validate a clean Windows machine.
+
 ## Tests
 
 ```sh
