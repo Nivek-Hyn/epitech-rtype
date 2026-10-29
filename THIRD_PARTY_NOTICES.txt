@@ -23,10 +23,11 @@ review the corresponding upstream header notices when preparing a public release
 Assets and project code
 =======================
 
-The assets/r-typesheet*.gif files are R-Type sprite sheets used by this student
-project. Their original download sources, credits and redistribution permissions
-have not been recorded in this repository. The team must supply that information;
-this document does not assign a license or establish permission for those assets.
+The assets/r-typesheet*.gif files were supplied by Epitech for this student
+R-Type project, as confirmed by the team. Original creator credits and any terms
+covering public redistribution have not been recorded in this repository.
+This document records the educational source; it does not assign an asset license
+or establish permission for public redistribution.
 
 The repository currently declares no project-wide source-code license.
 The upstream notices do not assign a license to the project's own code or assets.
