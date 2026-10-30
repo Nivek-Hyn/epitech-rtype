@@ -6,11 +6,15 @@ merged into `main`, or that every delivery criterion has passed.
 
 ## Tested revisions
 
-| Area | Revision | Scope |
-|---|---|---|
-| Standalone engine and extension guide | `f0e254ff370fadb6f1d74d3bd2228ad010b22a54` | Includes the standalone package, module options and custom-system example. |
-| Local quality checks | `7e5feda1174d09d5b4067088b0becc5d45d09084` | Includes the Asio include-path fix and exclusive protocol message-type selection. |
-| Game installation and archives | `c3c3f281adf99ce0bf27b42aad86ba70939b0207` | Includes both fixes, resources, main dependency notices and detected MSVC runtime files. |
+| Area | Current revision | Original tested revision | Scope |
+|---|---|---|---|
+| Standalone engine and extension guide | `b210202ac370b99fc12888dd90ccd6ed76c3cf06` | `f0e254ff370fadb6f1d74d3bd2228ad010b22a54` | Includes the standalone package, module options and custom-system example. |
+| Local quality checks | `4fec5e86cd4f5ec063c30f532cdfbc53adbc93e4` | `7e5feda1174d09d5b4067088b0becc5d45d09084` | Includes the Asio include-path fix and exclusive protocol message-type selection. |
+| Game installation and archives | `060dec9056408f516bd4c2501528f9b28a9e76c1` | `c3c3f281adf99ce0bf27b42aad86ba70939b0207` | Includes both fixes, resources, main dependency notices and detected MSVC runtime files. |
+
+Commit messages were simplified after the tests. The current revisions have the same file contents as
+the original tested revisions; authors, dates and branch structure were preserved. Both identifiers are
+listed so the Windows reports can still be matched to the current branches.
 
 Windows environment: Windows 10 Home 22H2 x64, MSVC 19.44.35229.0 from Visual Studio Build Tools 2022,
 Windows SDK 10.0.26100.0, CMake/CTest 3.31.6, Ninja 1.12.1, Python 3.14.3 and clang-format/clang-tidy 23.1.3.
