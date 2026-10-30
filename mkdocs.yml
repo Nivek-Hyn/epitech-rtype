@@ -49,6 +49,7 @@ nav:
   - Architecture:
       - Overview: architecture.md
       - Engine: engine.md
+      - Shared data: shared-data.md
       - Technical study: technical-study.md
       - Decision records:
           - Index: adr/README.md

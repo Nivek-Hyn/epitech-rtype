@@ -17,6 +17,7 @@ and how to extend it. Build and run instructions are in the
 | Know why we chose each technology | [Technical and comparative study](technical-study.md) and the [decision records](adr/README.md) |
 | Write a new client or change the protocol | [Network protocol](protocol.md) |
 | Add a component, a system or an enemy | [How-to guides](how-to.md) |
+| Understand component fields and network ownership | [Shared data](shared-data.md) |
 | Check what has actually been tested on Linux and Windows | [Validation record](validation.md) |
 | Look up a class or a function | [API reference](html/index.html), generated from source comments with Doxygen (see below) |
 | Know what we do for players with disabilities | [Accessibility study](accessibility.md) |

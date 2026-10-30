@@ -2,6 +2,7 @@
 
 Short recipes for the most common changes. They assume you know the concepts from the
 [engine documentation](engine.md): entities, components, systems and the event bus.
+Before changing data shared across domains, read the [shared data reference](shared-data.md).
 
 ## Run the component and system example
 
@@ -158,8 +159,9 @@ Use the event bus when a system must trigger something it should not know about 
 
 ## Add an enemy type
 
-An enemy is an entity, not a class: a new enemy type is a new combination of components and a new value of
-`Kind::variant`. This guide lists the steps; the gameplay and rendering systems they rely on are being written.
+An enemy is an entity, not a class. Game.cpp currently spawns enemies and checks player-missile collisions;
+the client displays an enemy sprite. A new subtype combines component values, a behavior and a rendering choice.
+Changing `Kind::variant` alone does not add a behavior or a new sprite mapping.
 
 1. **Pick a variant number.** `Kind{EntityType::Enemy, variant}` identifies the enemy type for the client.
    Keep the list of variants in one place (a comment or an enum in `common/`), so the server and the client
@@ -168,21 +170,36 @@ An enemy is an entity, not a class: a new enemy type is a new combination of com
 2. **Spawn it on the server** with the components every networked entity needs, plus its own behavior:
 
    ```cpp
-   engine::ecs::Entity enemy = spawnNetworked(protocol::EntityType::Enemy, variant, x, y);
+   const std::uint8_t variant = 1;
+   engine::ecs::Entity enemy =
+       spawnNetworked(protocol::EntityType::Enemy, variant, rtype::WorldWidth - EnemyWidth, 300.f);
    _registry.emplace<rtype::components::Velocity>(enemy, -200.f, 0.f);
    // + server-only components: health, hitbox, movement pattern, shooting...
    ```
 
-   `spawnNetworked` (declared in `server/src/Game.hpp`, written by the gameplay team) is meant to give the entity a
-   `NetworkId`, a `Kind` and a `Position`, which is what the snapshot sends.
+   This snippet belongs inside a Game method: `spawnNetworked` is private, not a free function callable by
+   arbitrary code. It already gives the entity NetworkId, Kind, Position and a zero Velocity; the example
+   replaces Velocity. The snapshot sends NetworkId, Kind and Position, not every component automatically.
 
 3. **Give it a behavior.** Reuse existing systems when possible (movement, shooting). For a new movement pattern,
-   add a component holding its parameters and a system that updates the `Velocity` from it.
+   add a server-only component holding its parameters and a system that updates Velocity. Run that behavior
+   before movement if the current tick must use the new velocity. Keep resource/render code outside the server.
 
-4. **Display it on the client.** Map the new variant to a sprite in the client's rendering code. The protocol
-   does not change: the snapshot already carries `type` and `variant`.
+4. **Display it on the client.** The current enemy branch uses one texture rectangle regardless of variant.
+   Add an explicit variant-to-sprite mapping and test its fallback. Reusing type/variant needs no new wire
+   field; adding health or other state requires the shared-contract review described above.
 
 5. **Test the server side** like any system: spawn the enemy, run a few ticks, check its position or state.
+
+### Level data and the gameplay branch
+
+The checked revision uses fixed spawn intervals, rows and speed in Game.cpp; it does not load JSON levels.
+The level-loader work belongs to the gameplay branch (#111). Once it is integrated, its author should add
+an actual level/wave example here, list accepted fields and invalid-data behavior, and have another member
+follow the recipe. Do not treat an example JSON file that no code loads as a verified content pipeline.
+
+Use configuration for values an existing behavior already consumes (timing, count, speed or positions).
+A new behavior still needs C++ unless a scripting mechanism capable of expressing it is actually implemented.
 
 ## Change the network protocol
 
