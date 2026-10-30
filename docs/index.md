@@ -19,6 +19,7 @@ and how to extend it. Build and run instructions are in the
 | Add a component, a system or an enemy | [How-to guides](how-to.md) |
 | Understand component fields and network ownership | [Shared data](shared-data.md) |
 | Check what has actually been tested on Linux and Windows | [Validation record](validation.md) |
+| Prepare delivery checks and the defense | [Delivery and defense guide](delivery.md) |
 | Look up a class or a function | [API reference](html/index.html), generated from source comments with Doxygen (see below) |
 | Know what we do for players with disabilities | [Accessibility study](accessibility.md) |
 | Contribute | [Contributing guide on GitHub](https://github.com/EpitechPGE3-2026/G-ING-500-MAR-5-1-rtype-5/blob/main/CONTRIBUTING.md) and the [documentation guidelines](documentation-guidelines.md) |
