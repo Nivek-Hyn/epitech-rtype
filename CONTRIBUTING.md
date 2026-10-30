@@ -60,3 +60,7 @@ All documentation, code comments, commit messages and pull requests are written 
 
 Documentation must be accessible: follow the [documentation guidelines](docs/documentation-guidelines.md)
 (heading order, alternative text, text descriptions of diagrams, no information by color only).
+
+Build the API and site with `python scripts/build_docs.py` from an environment containing the tools listed
+in [docs/index.md](docs/index.md). Check the generated navigation and API links before submitting docs changes.
+Writing a page or passing a test does not close a delivery issue while its required manual checks are pending.

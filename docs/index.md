@@ -28,25 +28,36 @@ and how to extend it. Build and run instructions are in the
 - **As a website**, with navigation, search, dark mode and the API reference: generate it locally with the commands
   below. It is not deployed automatically, because publishing it would need GitHub Actions minutes.
 
+Install Doxygen and Graphviz (`doxygen` and `dot` on PATH), and use Python 3.9+ with the pinned packages
+in `docs/requirements.txt`. They are documentation tools, not game runtime dependencies.
+
+On Linux, from the repository root:
+
 ```sh
 python3 -m venv .venv
-.venv/bin/pip install -r docs/requirements.txt
-doxygen docs/Doxyfile       # API reference in docs/html (needs Doxygen and Graphviz)
-.venv/bin/mkdocs serve      # then open http://127.0.0.1:8000
+.venv/bin/python -m pip install -r docs/requirements.txt
+.venv/bin/python scripts/build_docs.py
+.venv/bin/python -m http.server 8000 --bind 127.0.0.1 --directory build/documentation-site
 ```
 
-Generate the API before starting MkDocs. The site copies the generated `docs/html/` directory, including
-class pages, diagrams, styles and search scripts, under `html/`. Its navigation links to the API home page.
-Generated HTML stays ignored by Git; contributors regenerate it from the current source comments.
+In Windows PowerShell, use the virtual environment's Python directly; activation is not required:
 
-To build the complete site without running a web server:
-
-```sh
-doxygen docs/Doxyfile
-.venv/bin/mkdocs build --strict --site-dir build/documentation-site
-python3 -m http.server 8000 --bind 127.0.0.1 --directory build/documentation-site
+```powershell
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r docs/requirements.txt
+.\.venv\Scripts\python.exe scripts/build_docs.py
+.\.venv\Scripts\python.exe -m http.server 8000 --bind 127.0.0.1 --directory build/documentation-site
 ```
 
-Open `http://127.0.0.1:8000`. Serve the directory rather than opening HTML with `file://`: the generated
-navigation uses directory URLs such as `html/`, which the local web server resolves to `html/index.html`.
-Check both the developer guides and the API reference when changing public interfaces.
+The build script can be called from another working directory using its absolute path. It checks for
+tools, builds Doxygen first and then runs MkDocs in strict mode. Missing tools or a failed stage return
+a nonzero status. Doxygen warnings are errors; the script does not install tools or publish anything.
+Native Windows execution of this documentation script is not part of the existing game validation.
+
+Open `http://127.0.0.1:8000`. Serve the directory rather than opening HTML with `file://`: navigation
+uses directory URLs such as `html/`, resolved by the server to `html/index.html`. Stop the local server
+with Ctrl+C when finished.
+
+The site includes `docs/html/` with API class pages, diagrams, styles and scripts. Generated HTML is ignored
+by Git. After changing public interfaces/comments, rerun the build and check both guides and API pages.
+For live Markdown editing, generate the API first, then run the environment's `python -m mkdocs serve`.
