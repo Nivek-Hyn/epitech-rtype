@@ -61,6 +61,7 @@ nav:
           - 0007 Authoritative snapshots: adr/0007-authoritative-snapshots.md
           - 0008 Binary protocol: adr/0008-binary-protocol.md
   - Network protocol: protocol.md
+  - API reference: html/index.html
   - Guides:
       - How-to guides: how-to.md
       - Validation record: validation.md
