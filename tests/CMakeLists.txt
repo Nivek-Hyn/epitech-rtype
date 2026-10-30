@@ -1,5 +1,6 @@
 add_executable(rtype_tests
     test_aabb.cpp
+    test_components.cpp
     test_event_bus.cpp
     test_fixed_timestep.cpp
     test_movement.cpp

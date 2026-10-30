@@ -40,6 +40,36 @@ TEST(Game, PlayerLeftProducesDestroyEvent)
     EXPECT_TRUE(std::holds_alternative<protocol::EntityDestroyed>(events[0]));
 }
 
+TEST(Game, RejoiningPlayerGetsANewNetworkIdentityAndFreshMovement)
+{
+    Game game;
+    game.onPlayerJoined(2);
+    const auto initial = game.snapshot();
+    ASSERT_EQ(initial.entities.size(), 1u);
+    const auto previousNetworkId = initial.entities[0].netId;
+
+    game.onInput(2, protocol::InputFlag::Right);
+    game.update(0.25f);
+    game.onPlayerLeft(2);
+    const auto events = game.takeEvents();
+    ASSERT_EQ(events.size(), 1u);
+    const auto *destroyed = std::get_if<protocol::EntityDestroyed>(&events[0]);
+    ASSERT_NE(destroyed, nullptr);
+    EXPECT_EQ(destroyed->netId, previousNetworkId);
+
+    // Reusing a player slot must not resurrect its old network object or velocity.
+    game.onPlayerJoined(2);
+    game.update(0.25f);
+    const auto rejoined = game.snapshot();
+    ASSERT_EQ(rejoined.entities.size(), 1u);
+    const auto &ship = rejoined.entities[0];
+    EXPECT_NE(ship.netId, previousNetworkId);
+    EXPECT_EQ(ship.type, protocol::EntityType::Player);
+    EXPECT_EQ(ship.variant, 2);
+    EXPECT_FLOAT_EQ(ship.x, initial.entities[0].x);
+    EXPECT_FLOAT_EQ(ship.y, initial.entities[0].y);
+}
+
 TEST(Game, HoldingShootKeepsSnapshotsWithinDatagramLimit)
 {
     Game game;
