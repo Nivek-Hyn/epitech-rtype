@@ -17,7 +17,7 @@ Status labels used below:
 | Build system | **CMake** | Meson, Premake, Makefiles | Required by the subject, cross-platform, understood by every IDE and by the CI. |
 | Dependencies | **CPM** | vcpkg, Conan | One CMake file, nothing to install, identical on every machine and in the CI ([ADR 0001](adr/0001-cpp20-cmake-cpm.md)). Cost: dependencies are built from source the first time. |
 | Unit tests | **GoogleTest** | Catch2, doctest | Widely used, integrated with CTest (`gtest_discover_tests`), good failure messages. Catch2 or doctest would also fit; the choice is mostly familiarity. |
-| Continuous integration | **GitHub Actions**, run on demand + `scripts/check.sh` locally | GitLab CI, Jenkins | The repository is on GitHub. The workflow builds and tests on Linux and Windows and checks formatting. Our Actions quota is used up, so it only runs on demand, and `scripts/check.sh` runs the same checks on each developer's machine. |
+| Continuous integration | **GitHub Actions**, run on demand + `scripts/check.sh` locally | GitLab CI, Jenkins | The repository is on GitHub. The manual workflow builds and tests on Linux and Windows and checks formatting. Local checks additionally run clang-tidy; they do not use Actions credits. |
 
 ## 2. Libraries
 
@@ -189,8 +189,8 @@ it chose to connect to.
 
 - **Dependencies:** follow the release notes and GitHub security advisories of Asio, SFML and GoogleTest.
   CPM is not supported by Dependabot, so each version bump is a manual pull request.
-- **Checks before every push:** `scripts/check.sh` builds with strict warnings, runs the unit tests and checks the
-  formatting; the CI workflow does the same on Linux and Windows when it is run.
+- **Checks before every push:** `scripts/check.sh` checks formatting, builds with strict warnings, runs clang-tidy
+  and the unit tests. The manual CI workflow covers build, tests and formatting; static analysis is a local check.
 - **Planned:** build the tests with AddressSanitizer and UndefinedBehaviorSanitizer in the CI, and fuzz the packet
   decoder (for example with libFuzzer), since it is the only code reachable by an attacker.
 

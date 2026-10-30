@@ -37,8 +37,10 @@ Run the client from the repository root so it finds `assets/`.
 
 ```sh
 ctest --test-dir build --output-on-failure
-scripts/check.sh                 # formatting + build without warnings + tests, as the CI does
+scripts/check.sh                 # formatting + build without warnings + static analysis + tests (Bash)
 ```
+
+See [local quality checks](docs/static-analysis.md) for tool setup and Windows commands.
 
 ## Project layout
 
