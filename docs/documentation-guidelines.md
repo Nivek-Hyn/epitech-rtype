@@ -36,8 +36,11 @@ They follow the [Web Content Accessibility Guidelines (WCAG) 2.2](https://www.w3
 | Rule | Why |
 |---|---|
 | Never give information by color alone (in diagrams, use labels or shapes as well) | Color-blind readers cannot tell some colors apart. |
-| Keep the default theme colors of the documentation site, which meet the WCAG contrast ratio (4.5:1 for text) | Low-vision readers need enough contrast between text and background. |
+| Check text contrast in both themes: normally at least 4.5:1, or 3:1 for large text | Low-vision readers need enough contrast; choosing a theme does not prove that every page meets the target. |
 | The documentation site must offer a dark mode and stay readable at 200% zoom | Some readers are sensitive to bright screens; others enlarge the page. |
+
+Contrast targets and exceptions are described by [W3C's explanation of WCAG 2.2 contrast requirements](https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html).
+The generated site includes light/dark navigation, but no full screen-reader or contrast audit is claimed.
 
 ## Checklist before opening a pull request that changes documentation
 

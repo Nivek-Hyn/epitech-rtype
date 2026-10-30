@@ -195,6 +195,14 @@ everything in memory removes a whole class of corruption and security problems.
 **For high scores:** SQLite remains a candidate if durable score storage is added. No database is required
 by the current implementation, and this comparison does not add high scores to the delivery scope.
 
+### Accessibility settings and ownership
+
+The [accessibility study](accessibility.md) maps current behavior and tracked features to physical/motor,
+visual/audio and cognitive barriers. The action-based input protocol lets the client own key mapping;
+it does not implement remapping, toggle auto-fire or a settings file automatically. Those client changes
+remain tracked work. A shared game-speed/difficulty setting would additionally need server/gameplay agreement.
+Platform/cross-play tests are not an accessibility audit; no compliance certification is claimed.
+
 ## 7. Security
 
 ### Threat model
