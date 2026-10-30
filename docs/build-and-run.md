@@ -30,6 +30,8 @@ export CPM_SOURCE_CACHE="$HOME/.cache/CPM"
 ```
 
 In PowerShell the equivalent is `$env:CPM_SOURCE_CACHE="$HOME/.cache/CPM"`. This cache is optional.
+`cmake/Dependencies.cmake` calls `find_package` for Asio, SFML (client) and GoogleTest (tests).
+Each has its own `FindXXX.cmake` module backed by CPM, with the project's declared version and options.
 Do not copy CMake build directories, virtual environments or compiler caches between Linux and Windows.
 
 ## Linux
@@ -87,7 +89,7 @@ cmake --install build --config Debug --component GameRuntime --prefix "$PWD/buil
 ```
 
 For the Windows build above, use `build/windows` and `--config Release` instead.
-The prefix must be an absolute destination; `$PWD/build/installed-game` also works in PowerShell.
+Use an absolute prefix; `$PWD/build/installed-game` also works in PowerShell.
 Use a fresh destination when switching selected programs: installation does not remove old files.
 
 The directory contains executable files, resources, launch instructions and dependency notices. With the

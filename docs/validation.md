@@ -66,6 +66,9 @@ The earlier black screen was not reproduced after restarting the coordinated sce
 - Degraded-network measurements and the complete final campaign acceptance remain separate tasks.
 
 The remaining Windows-specific checks were deferred on 30 October so other project issues can proceed.
+The later separation into `FindAsio.cmake`, `FindSFML.cmake` and `FindGTest.cmake` retains the same
+dependency versions/options but has not yet been checked natively on Windows. The documentation build
+helper likewise has only been exercised on Linux; earlier Windows results do not validate these later changes.
 They remain open and must not be counted as successful checks.
 
 ## Reproduce and update
