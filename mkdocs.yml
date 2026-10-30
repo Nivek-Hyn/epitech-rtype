@@ -63,6 +63,7 @@ nav:
   - Network protocol: protocol.md
   - Guides:
       - How-to guides: how-to.md
+      - Validation record: validation.md
   - Accessibility:
       - Accessibility study: accessibility.md
       - Documentation guidelines: documentation-guidelines.md

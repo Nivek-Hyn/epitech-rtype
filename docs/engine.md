@@ -16,7 +16,8 @@ For step-by-step guides, see the [how-to guides](how-to.md).
 
 All headers are under `engine/include/`. The repository uses the `rtype_engine` umbrella CMake target.
 An external project can use the installed `RTypeEngine::Engine` target or select individual modules.
-See the [standalone build and installation instructions](../engine/README.md).
+See the [standalone build and installation walkthrough](how-to.md#run-the-component-and-system-example).
+Additional module-selection recipes are in `engine/README.md` in the source repository.
 The expected behavior of every part is specified by the unit tests in `tests/test_*.cpp`.
 
 ## Build boundaries and module selection
@@ -45,7 +46,7 @@ find_package(RTypeEngine 0.1 CONFIG REQUIRED COMPONENTS Physics)
 target_link_libraries(my_game PRIVATE RTypeEngine::Physics)
 ```
 
-The [basic consumer](../engine/examples/basic/main.cpp) defines its own Position and Velocity types,
+The basic consumer in `engine/examples/basic/main.cpp` defines its own Position and Velocity types,
 registers the generic movement system and checks the result. Its separate CMake project uses the
 installed package rather than the engine's source tree. Run the complete check from the repository root:
 

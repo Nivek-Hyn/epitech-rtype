@@ -36,5 +36,6 @@ engine  ←  common  ←  server
 ## Verification
 
 `cmake -P engine/cmake/CheckPackage.cmake` builds the engine, installs it and runs a separate consumer using
-the exported package. See [engine/README.md](../../engine/README.md) for module options and manual commands.
+the exported package. See the [extension walkthrough](../how-to.md#run-the-component-and-system-example)
+for manual commands, and `engine/README.md` in the source repository for module options.
 The consumer proves package integration and generic movement; a second playable game is a separate delivery.
