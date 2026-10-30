@@ -11,6 +11,7 @@ and how to extend it. Build and run instructions are in the
 
 | You want to... | Read |
 |---|---|
+| Build, run, install or package the game | [Build and run](build-and-run.md) |
 | Understand the big picture | [Architecture overview](architecture.md) |
 | Use or extend the engine (ECS, game loop, events) | [Engine](engine.md) |
 | Know why we chose each technology | [Technical and comparative study](technical-study.md) and the [decision records](adr/README.md) |

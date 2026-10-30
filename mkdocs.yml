@@ -63,6 +63,7 @@ nav:
   - Network protocol: protocol.md
   - API reference: html/index.html
   - Guides:
+      - Build and run: build-and-run.md
       - How-to guides: how-to.md
       - Validation record: validation.md
       - Static analysis: static-analysis.md
