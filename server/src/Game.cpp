@@ -45,9 +45,6 @@ void Game::onPlayerJoined(PlayerId player)
     // we create a new entity in the ECS registry
     engine::ecs::Entity entity =
         spawnNetworked(protocol::EntityType::Player, static_cast<std::uint8_t>(player), 100.0f, 300.0f);
-    //_registry.add_component<rtype::components::Position>(entity, {100.0f, 300.0f});
-    //_registry.add_component<rtype::components::Velocity>(entity, {0.0f, 0.0f});
-    //_registry.add_component<rtype::components::Kind>(entity, {rtype::components::EntityKind::Player});
     _players[player] = entity;
 }
 
@@ -118,6 +115,19 @@ void Game::update(float dt)
                 vel.y = std::sin(pos.x * 0.02f) * 150.f;
             }
         });
+
+    static float ennemyShootTimer = 0.f;
+    ennemyShootTimer += dt;
+    if (ennemyShootTimer >= 2.0f) {
+        ennemyShootTimer = 0.f;
+        _registry.each<rtype::components::Position, rtype::components::Kind>(
+            [this](engine::ecs::Entity /*entity*/, const rtype::components::Position &pos, const rtype::components::Kind &kind) {
+                if (kind.type == protocol::EntityType::Enemy) {
+                    engine::ecs::Entity enemyMissile = spawnNetworked(protocol::EntityType::EnemyMissile, 0, pos.x - 30.0f, pos.y);
+                    _registry.emplace<rtype::components::Velocity>(enemyMissile, -350.0f, 0.0f);
+                }
+            });
+    }
 
     _registry.update(dt);
     // After movement, so collisions are tested on the positions sent in this tick's snapshot.
@@ -209,15 +219,16 @@ void Game::spawnEnemies(float dt)
                 engine::ecs::Entity enemy =
                     spawnNetworked(protocol::EntityType::Enemy, 0, WorldWidth + 100.0f, randomizedY);
                 _registry.emplace<rtype::components::Velocity>(enemy, -speed, 0.f);
+                
+                // Tâche #54 : Attribution de points de vie (ex: 3 PV par ennemi)
+                _registry.emplace<rtype::components::Health>(enemy, 3);
             }
             wave.isSpawned = true;
         }
     }
 }
 
-// A player missile touching an enemy destroys both and adds PointsPerEnemy to the score.
-// Entities are only collected inside each and killed afterwards: killing them during each would invalidate
-// the component references the loop is still using.
+// A player missile touching an enemy inflicts damage and adds PointsPerEnemy to the score if destroyed.
 void Game::handleCollisions()
 {
     using rtype::components::Kind;
@@ -239,10 +250,20 @@ void Game::handleCollisions()
         for (std::size_t i = 0; i < enemies.size(); i++) {
             if (!enemyHit[i] && engine::physics::overlaps(missileBox, enemies[i].second)) {
                 enemyHit[i] = true;
-                destroyed.push_back(missile);
-                destroyed.push_back(enemies[i].first);
-                _score += PointsPerEnemy;
-                return; // one missile destroys at most one enemy
+                destroyed.push_back(missile); // Le missile du joueur disparaît
+
+                // Tâche #54 : Gestion des dégâts multiples sur l'ennemi
+                if (auto *health = _registry.get<rtype::components::Health>(enemies[i].first)) {
+                    health->hp -= 1;
+                    if (health->hp <= 0) {
+                        destroyed.push_back(enemies[i].first);
+                        _score += PointsPerEnemy;
+                    }
+                } else {
+                    destroyed.push_back(enemies[i].first);
+                    _score += PointsPerEnemy;
+                }
+                return; // un missile détruit au plus un ennemi
             }
         }
     });
@@ -260,11 +281,29 @@ void Game::handleCollisions()
             if (!enemyHit[i] && engine::physics::overlaps(playerBox, enemies[i].second)) {
                 enemyHit[i] = true;
                 destroyed.push_back(playerEntity);     // Tue le joueur
-                destroyed.push_back(enemies[i].first); // Tue l'ennemi (optionnel)
+                destroyed.push_back(enemies[i].first); // Tue l'ennemi
             }
         }
     });
+    // Les missiles ennemis touchent le joueur
+    _registry.each<Position, Kind>([&](engine::ecs::Entity missile, const Position &position, const Kind &kind) {
+        if (kind.type != protocol::EntityType::EnemyMissile)
+            return;
+        
+        const engine::physics::Aabb missileBox{position.x, position.y, MissileWidth, MissileHeight};
 
+        _registry.each<Position, Kind>([&](engine::ecs::Entity playerEntity, const Position &playerPos, const Kind &playerKind) {
+            if (playerKind.type != protocol::EntityType::Player)
+                return;
+
+            const engine::physics::Aabb playerBox{playerPos.x, playerPos.y, PlayerWidth, PlayerHeight};
+
+            if (engine::physics::overlaps(missileBox, playerBox)) {
+                destroyed.push_back(missile);       // Le missile ennemi disparaît
+                destroyed.push_back(playerEntity);   // Le joueur est touché et détruit
+            }
+        });
+    });
     for (const engine::ecs::Entity entity : destroyed) {
         for (std::size_t player = 0; player < _players.size(); player++) {
             if (_players[player] == entity) {
