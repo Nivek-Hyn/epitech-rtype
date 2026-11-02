@@ -86,18 +86,46 @@ TEST(Game, HoldingShootKeepsSnapshotsWithinDatagramLimit)
 TEST(Game, EnemiesAppearOnlyWhilePlayersAreConnected)
 {
     Game game;
-    for (int tick = 0; tick < 180; tick++)
+    for (int tick = 0; tick < 240; tick++)
         game.update(1.f / 60.f);
     EXPECT_TRUE(game.snapshot().entities.empty());
 
     game.onPlayerJoined(0);
-    for (int tick = 0; tick < 180; tick++)
+    for (int tick = 0; tick < 240; tick++)
         game.update(1.f / 60.f);
     const auto snap = game.snapshot();
     const auto enemyCount = std::count_if(snap.entities.begin(), snap.entities.end(), [](const auto &entity) {
         return entity.type == protocol::EntityType::Enemy;
     });
     EXPECT_EQ(enemyCount, 1);
+}
+
+TEST(Game, DeadPlayerCannotControlAReusedEntity)
+{
+    Game game;
+    game.onPlayerJoined(0);
+    game.update(3.f);
+    game.update(12.f); // The first configured enemy reaches the stationary player.
+
+    const auto afterCollision = game.snapshot();
+    EXPECT_EQ(std::count_if(afterCollision.entities.begin(), afterCollision.entities.end(),
+                            [](const auto &entity) { return entity.type == protocol::EntityType::Player; }),
+              0);
+    EXPECT_NO_THROW(game.onInput(0, protocol::InputFlag::Right));
+
+    game.onPlayerJoined(1);
+    game.onPlayerJoined(2); // Both freed local ids are now reused.
+    EXPECT_NO_THROW(game.onInput(0, protocol::InputFlag::Right));
+    game.update(0.1f);
+    const auto afterInput = game.snapshot();
+    int playersFound = 0;
+    for (const auto &entity : afterInput.entities) {
+        if (entity.type == protocol::EntityType::Player) {
+            playersFound++;
+            EXPECT_FLOAT_EQ(entity.x, 100.f);
+        }
+    }
+    EXPECT_EQ(playersFound, 2);
 }
 
 TEST(Game, PlayerMissileDestroysEnemyAndScores)

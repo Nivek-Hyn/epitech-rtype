@@ -175,6 +175,11 @@ std::vector<protocol::Message> Game::takeEvents()
 
 void Game::spawnEnemies(float dt)
 {
+    const bool anyPlayer = std::any_of(_players.begin(), _players.end(),
+                                       [](engine::ecs::Entity player) { return player != engine::ecs::NullEntity; });
+    if (!anyPlayer)
+        return;
+
     _levelTimer += dt;
 
     // On parcourt les vagues du fichier JSON chargé pour le niveau actuel
@@ -246,6 +251,12 @@ void Game::handleCollisions()
     });
 
     for (const engine::ecs::Entity entity : destroyed) {
+        for (std::size_t player = 0; player < _players.size(); player++) {
+            if (_players[player] == entity) {
+                _players[player] = engine::ecs::NullEntity;
+                _shootCooldowns[player] = 0.f;
+            }
+        }
         if (const auto *networkId = _registry.get<rtype::components::NetworkId>(entity))
             _events.push_back(protocol::EntityDestroyed{networkId->id, protocol::DestroyReason::Killed});
         _registry.kill(entity);
