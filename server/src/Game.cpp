@@ -45,9 +45,6 @@ void Game::onPlayerJoined(PlayerId player)
     // we create a new entity in the ECS registry
     engine::ecs::Entity entity =
         spawnNetworked(protocol::EntityType::Player, static_cast<std::uint8_t>(player), 100.0f, 300.0f);
-    //_registry.add_component<rtype::components::Position>(entity, {100.0f, 300.0f});
-    //_registry.add_component<rtype::components::Velocity>(entity, {0.0f, 0.0f});
-    //_registry.add_component<rtype::components::Kind>(entity, {rtype::components::EntityKind::Player});
     _players[player] = entity;
 }
 
@@ -118,6 +115,19 @@ void Game::update(float dt)
                 vel.y = std::sin(pos.x * 0.02f) * 150.f;
             }
         });
+
+    static float ennemyShootTimer = 0.f;
+    ennemyShootTimer += dt;
+    if (ennemyShootTimer >= 2.0f) {
+        ennemyShootTimer = 0.f;
+        _registry.each<rtype::components::Position, rtype::components::Kind>(
+            [this](engine::ecs::Entity /*entity*/, const rtype::components::Position &pos, const rtype::components::Kind &kind) {
+                if (kind.type == protocol::EntityType::Enemy) {
+                    engine::ecs::Entity enemyMissile = spawnNetworked(protocol::EntityType::EnemyMissile, 0, pos.x - 30.0f, pos.y);
+                    _registry.emplace<rtype::components::Velocity>(enemyMissile, -350.0f, 0.0f);
+                }
+            });
+    }
 
     _registry.update(dt);
     // After movement, so collisions are tested on the positions sent in this tick's snapshot.
