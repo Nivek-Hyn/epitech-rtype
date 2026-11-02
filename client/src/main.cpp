@@ -2,6 +2,8 @@
 #include "common/Constants.hpp"
 #include "common/Protocol.hpp"
 #include "net/AsioNetworkClient.hpp"
+#include "ui/MainMenu.hpp"
+#include "ui/Starfield.hpp"
 
 #include <SFML/Graphics.hpp>
 
@@ -11,15 +13,25 @@
 #include <string>
 #include <vector>
 
+enum class AppState {
+    Menu,
+    Playing
+};
+
 int main(int argc, char **argv)
 {
     std::string host = "127.0.0.1";
     std::uint16_t port = rtype::DefaultPort;
+    bool directConnect = false;
+
     try {
-        if (argc > 1)
+        if (argc > 1) {
             host = argv[1];
-        if (argc > 2)
+            directConnect = true;
+        }
+        if (argc > 2) {
             port = static_cast<std::uint16_t>(std::stoul(argv[2]));
+        }
     } catch (const std::exception &) {
         std::cerr << "Usage: " << argv[0] << " [host] [port]\n";
         return 84;
@@ -36,81 +48,145 @@ int main(int argc, char **argv)
         std::cerr << "Warning: Could not load some assets. Make sure to run from repository root.\n";
     }
 
-    rtype::client::AsioNetworkClient network;
-    try {
-        network.connect(host, port);
-    } catch (const std::exception &error) {
-        std::cerr << "Could not connect to server " << host << ':' << port << ": " << error.what() << '\n';
-        return EXIT_FAILURE;
+    if (!resources.hasFont("default")) {
+        std::cerr << "Error: Default font could not be loaded.\n";
+        return 84;
     }
-    std::cout << "Connecting to " << host << ':' << port << " over UDP...\n";
-    std::cout << "Controls: [ZQSD / Arrows] to Move, [Space] to Shoot.\n";
+
+    rtype::client::ui::Starfield starfield;
+    rtype::client::ui::MainMenu menu(resources.getFont("default"));
+    rtype::client::AsioNetworkClient network;
+    AppState appState = AppState::Menu;
+
+    sf::Text waitingText(resources.getFont("default"), "CONNECTING TO SERVER...\nEnsure ./r-type_server is running\n\n[ESC] Return to Menu", 30);
+    waitingText.setFillColor(sf::Color(255, 204, 0));
+    waitingText.setPosition({600.f, 480.f});
+
+    if (directConnect) {
+        try {
+            network.connect(host, port);
+            appState = AppState::Playing;
+        } catch (const std::exception &e) {
+            std::cerr << "Direct connect failed: " << e.what() << '\n';
+        }
+    }
 
     std::vector<rtype::protocol::EntityState> entities;
     bool reportedConnected = false;
+    sf::Clock clock;
 
     while (window.isOpen()) {
+        const float dt = clock.restart().asSeconds();
+
         while (const std::optional<sf::Event> event = window.pollEvent()) {
-            if (event->is<sf::Event::Closed>())
+            if (event->is<sf::Event::Closed>()) {
                 window.close();
+            }
+
+            if (appState == AppState::Menu) {
+                menu.handleEvent(*event, window);
+            } else if (appState == AppState::Playing) {
+                if (const auto *key = event->getIf<sf::Event::KeyPressed>()) {
+                    if (key->code == sf::Keyboard::Key::Escape) {
+                        network.disconnect();
+                        appState = AppState::Menu;
+                        reportedConnected = false;
+                        entities.clear();
+                    }
+                }
+            }
         }
 
-        if (network.connected() && !reportedConnected) {
-            std::cout << "Connected to server!\n";
-            reportedConnected = true;
-        }
+        if (appState == AppState::Menu) {
+            menu.update(dt);
+            const auto action = menu.getAndResetAction();
+            if (action == rtype::client::ui::MenuAction::Exit) {
+                window.close();
+            } else if (action == rtype::client::ui::MenuAction::Connect) {
+                const auto &config = menu.getConfig();
+                try {
+                    const auto targetPort = static_cast<std::uint16_t>(std::stoul(config.joinPort));
+                    network.connect(config.joinIp, targetPort);
+                    appState = AppState::Playing;
+                    reportedConnected = false;
+                } catch (const std::exception &e) {
+                    menu.setStatusMessage("Connection failed: " + std::string(e.what()), sf::Color::Red);
+                }
+            }
+        } else if (appState == AppState::Playing) {
+            starfield.update(dt);
 
-        std::uint8_t inputFlags = 0;
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Z) || sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Up))
-            inputFlags |= rtype::protocol::InputFlag::Up;
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::S) || sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Down))
-            inputFlags |= rtype::protocol::InputFlag::Down;
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Q) || sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Left))
-            inputFlags |= rtype::protocol::InputFlag::Left;
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::D) || sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Right))
-            inputFlags |= rtype::protocol::InputFlag::Right;
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Space))
-            inputFlags |= rtype::protocol::InputFlag::Shoot;
+            if (network.connected() && !reportedConnected) {
+                std::cout << "Connected to server!\n";
+                reportedConnected = true;
+            }
 
-        if (network.connected())
-            network.send(rtype::protocol::Input{inputFlags});
+            std::uint8_t inputFlags = 0;
+            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Z) || sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Up))
+                inputFlags |= rtype::protocol::InputFlag::Up;
+            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::S) || sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Down))
+                inputFlags |= rtype::protocol::InputFlag::Down;
+            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Q) || sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Left))
+                inputFlags |= rtype::protocol::InputFlag::Left;
+            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::D) || sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Right))
+                inputFlags |= rtype::protocol::InputFlag::Right;
+            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Space))
+                inputFlags |= rtype::protocol::InputFlag::Shoot;
 
-        while (auto message = network.poll()) {
-            if (const auto *snapshot = std::get_if<rtype::protocol::Snapshot>(&*message))
-                entities = snapshot->entities;
-            else if (const auto *rejected = std::get_if<rtype::protocol::ConnectRejected>(&*message))
-                std::cerr << "Server rejected connection (reason " << static_cast<int>(rejected->reason) << ").\n";
+            if (network.connected())
+                network.send(rtype::protocol::Input{inputFlags});
+
+            while (auto message = network.poll()) {
+                if (const auto *snapshot = std::get_if<rtype::protocol::Snapshot>(&*message))
+                    entities = snapshot->entities;
+                else if (const auto *rejected = std::get_if<rtype::protocol::ConnectRejected>(&*message))
+                    std::cerr << "Server rejected connection (reason " << static_cast<int>(rejected->reason) << ").\n";
+            }
         }
 
         window.clear(sf::Color(10, 10, 25));
 
-        for (const auto &entity : entities) {
-            if (hasAssets) {
-                if (entity.type == rtype::protocol::EntityType::Player) {
-                    sf::Sprite sprite(resources.getTexture("player"));
-                    const int variant = static_cast<int>(entity.variant % 5);
-                    sprite.setTextureRect(sf::IntRect({0, variant * 17}, {33, 17}));
-                    sprite.setScale({2.f, 2.f});
-                    sprite.setPosition({entity.x, entity.y});
-                    window.draw(sprite);
-                } else if (entity.type == rtype::protocol::EntityType::PlayerMissile ||
-                           entity.type == rtype::protocol::EntityType::EnemyMissile) {
-                    sf::Sprite sprite(resources.getTexture("bullet"));
-                    sprite.setTextureRect(sf::IntRect({248, 102}, {18, 12}));
-                    sprite.setScale({2.f, 2.f});
-                    sprite.setPosition({entity.x, entity.y});
-                    window.draw(sprite);
-                } else if (entity.type == rtype::protocol::EntityType::Enemy) {
-                    sf::Sprite sprite(resources.getTexture("enemy"));
-                    sprite.setTextureRect(sf::IntRect({0, 0}, {33, 36}));
-                    sprite.setScale({2.f, 2.f});
-                    sprite.setPosition({entity.x, entity.y});
-                    window.draw(sprite);
+        if (appState == AppState::Menu) {
+            menu.draw(window);
+        } else if (appState == AppState::Playing) {
+            starfield.draw(window);
+
+            if (!reportedConnected || entities.empty()) {
+                window.draw(waitingText);
+            }
+
+            for (const auto &entity : entities) {
+                if (hasAssets) {
+                    if (entity.type == rtype::protocol::EntityType::Player) {
+                        sf::Sprite sprite(resources.getTexture("player"));
+                        const int variant = static_cast<int>(entity.variant % 5);
+                        sprite.setTextureRect(sf::IntRect({0, variant * 17}, {33, 17}));
+                        sprite.setScale({2.f, 2.f});
+                        sprite.setPosition({entity.x, entity.y});
+                        window.draw(sprite);
+                    } else if (entity.type == rtype::protocol::EntityType::PlayerMissile ||
+                               entity.type == rtype::protocol::EntityType::EnemyMissile) {
+                        sf::Sprite sprite(resources.getTexture("bullet"));
+                        sprite.setTextureRect(sf::IntRect({248, 102}, {18, 12}));
+                        sprite.setScale({2.f, 2.f});
+                        sprite.setPosition({entity.x, entity.y});
+                        window.draw(sprite);
+                    } else if (entity.type == rtype::protocol::EntityType::Enemy) {
+                        sf::Sprite sprite(resources.getTexture("enemy"));
+                        sprite.setTextureRect(sf::IntRect({0, 0}, {33, 36}));
+                        sprite.setScale({2.f, 2.f});
+                        sprite.setPosition({entity.x, entity.y});
+                        window.draw(sprite);
+                    }
                 }
             }
         }
+
         window.display();
     }
-    network.disconnect();
+
+    if (network.connected())
+        network.disconnect();
+
     return EXIT_SUCCESS;
 }
