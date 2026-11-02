@@ -34,19 +34,24 @@ Window pixels and world units are not interchangeable without that view conversi
 Shared components belong in `common/`; game-independent operations remain in `engine/`. Data used only by
 server gameplay belongs in `server/`, while textures, UI and SFML objects belong in `client/`.
 Health, configurable hitbox and control-state structs are not already supplied by Components.hpp.
-The current missile/enemy collision code builds AABBs from positions and fixed dimensions in Game.cpp.
+The current missile/enemy and player/enemy collision code builds AABBs from positions and fixed
+dimensions in Game.cpp. A player killed by a collision loses its local player/entity association before
+the id is recycled; a dead player's inputs are ignored.
 
 ## Input and state flow
 
 1. The client maps keys to `InputFlag` actions: up, down, left, right and shoot.
 2. The network layer decodes valid Input packets and assigns them to a player slot.
 3. Game changes that player's velocity and applies the server-side shooting cooldown.
-4. The fixed-step update moves entities and applies missile/enemy collisions.
+4. The fixed-step update advances configured waves, moves entities and applies collisions.
 5. Game builds a snapshot from Position, Kind and NetworkId; the client displays received states.
 
 Remapping a key changes the client mapping, not the meaning of an Input flag. The current client does not
 maintain a local Registry or interpolate remote states. Velocity is not implicitly transferred by including
 its C++ struct in common/.
+
+The server loads its initial wave schedule from `assets/levels/level1.json`. Level files configure timing,
+positions and speed; they do not change the wire format or provide campaign transitions by themselves.
 
 ## C++ storage and wire data
 

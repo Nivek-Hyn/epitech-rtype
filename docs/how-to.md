@@ -191,12 +191,36 @@ Changing `Kind::variant` alone does not add a behavior or a new sprite mapping.
 
 5. **Test the server side** like any system: spawn the enemy, run a few ticks, check its position or state.
 
-### Level data and the gameplay branch
+### Add a configured wave
 
-The checked revision uses fixed spawn intervals, rows and speed in Game.cpp; it does not load JSON levels.
-The level-loader work belongs to the gameplay branch (#111). Once it is integrated, its author should add
-an actual level/wave example here, list accepted fields and invalid-data behavior, and have another member
-follow the recipe. Do not treat an example JSON file that no code loads as a verified content pipeline.
+Game loads `assets/levels/level1.json` at startup through `server/src/levelLoader.cpp`.
+Start the server from the repository root or the installed game directory. Restart it after editing the file.
+The other supplied level files are not selected automatically: campaign progression remains separate work.
+
+Append an entry to the top-level `waves` array, keeping valid JSON commas:
+
+```json
+{
+  "wave_id": 3,
+  "delay_before_start": 10.0,
+  "enemies": [
+    { "type": "patrol", "spawn_y": 500, "speed": 120 }
+  ]
+}
+```
+
+The wave fires once when accumulated active simulation time reaches ten seconds. Time advances only
+while at least one player has a live ship. Delay is measured from the level's beginning, not from the
+previous wave. `spawn_y` is a world coordinate; positive `speed` moves the enemy left from the right edge.
+For the current 72-unit-high enemy, keep y between 0 and 1008 in the 1080-unit-high world.
+
+The loader reads `type`, `amplitude` and `frequency`, but the integrated spawner currently uses only y
+and speed: changing those other fields does not implement a new movement pattern. Missing files,
+malformed JSON and a missing/non-array `waves` field are rejected; not every numeric range or optional
+field shape is validated yet. Keep finite, nonnegative delays and sensible positions/speeds.
+
+Connect a client and verify the extra enemy appears at the configured active time and height.
+This is an extension recipe, not evidence that another team member has already followed it.
 
 Use configuration for values an existing behavior already consumes (timing, count, speed or positions).
 A new behavior still needs C++ unless a scripting mechanism capable of expressing it is actually implemented.

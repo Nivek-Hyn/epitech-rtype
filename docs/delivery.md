@@ -12,7 +12,7 @@ this page does not reassign another member's work.
 | Quality checks, #8 and #12 | Pinned format/tidy configuration, local runner, successful Linux checks | Windows Asio diagnostics remain unresolved; do not suppress them to report success. |
 | Installation/archives, #15 | Runtime installation, notices, Linux archives and Windows Release ZIP inspected and exercised | Windows server Ctrl+C and a second Windows runtime environment remain unverified. Main notices are not a complete license audit. |
 | README and documentation, #58 and #64 | Setup instructions, module/API guides, generated site and validation record | Each domain must update its page when its branch changes the implementation. |
-| Extension guide, #63 | Compilable custom component/system example | Gameplay owner must document the actual JSON/wave schema after integration; another member must follow the guides. |
+| Extension guide, #63 | Compilable custom component/system example and current JSON/wave recipe | Another member must follow the guides; update the recipe when new gameplay fields become active. |
 | Technical study, #115 | Engine alternatives, costs, storage/security limits and accessibility status | Include actual network measurements and final configurable gameplay results when those tasks land. |
 
 All new work must be reviewed at a named revision. A successful test of a private branch is not evidence

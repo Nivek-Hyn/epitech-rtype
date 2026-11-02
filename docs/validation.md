@@ -6,6 +6,25 @@ merged into `main`, or that every delivery criterion has passed.
 
 ## Tested revisions
 
+### Integration checked on 2 November 2026
+
+The integrated code at `ad0b67d` combines the engine/tooling work with the JSON-level gameplay already
+merged into the shared main branch. Linux checks passed: formatting, clang-tidy, 62 CTest tests and the
+separate installed-engine consumer. The included network test, originally written by the networking
+owner, accepted four loopback UDP clients and rejected a fifth; this is not four-player graphical cross-play.
+
+New regression checks exposed and then verified fixes for wave time advancing without live players and
+a dead player's stale entity association controlling a recycled id. Tests now run from the documented
+resource working directory. Runtime installation includes level JSON and nlohmann/json's notice even
+in server-only builds.
+
+Both Linux installations (client/server and server-only) were started from their installed directories,
+connected over UDP, produced a snapshot and exited with status 0 after SIGINT. A runtime TAR.GZ archive
+and SHA-256 were generated. These later changes have not been retested natively on Windows.
+The strict API/site build also passed; raw integration logs remain in ignored build directories.
+
+### Earlier feature-branch checks
+
 | Area | Current revision | Original tested revision | Scope |
 |---|---|---|---|
 | Standalone engine and extension guide | `b210202ac370b99fc12888dd90ccd6ed76c3cf06` | `f0e254ff370fadb6f1d74d3bd2228ad010b22a54` | Includes the standalone package, module options and custom-system example. |

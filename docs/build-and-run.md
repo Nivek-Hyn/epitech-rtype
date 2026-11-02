@@ -7,7 +7,7 @@ tested environments from outstanding checks.
 ## Dependencies and first build
 
 You need a C++20 compiler, a build tool, Git and CMake. SFML 3.1 requires CMake 3.28+ when the client is
-enabled; the server-only build and standalone engine require 3.24+. Asio, SFML and GoogleTest are fetched
+enabled; the server-only build and standalone engine require 3.24+. Asio, SFML, nlohmann/json and GoogleTest are fetched
 by `cmake/Dependencies.cmake`. The first configure/build needs Internet access and takes longer.
 
 Linux client builds also need platform libraries:
@@ -30,7 +30,7 @@ export CPM_SOURCE_CACHE="$HOME/.cache/CPM"
 ```
 
 In PowerShell the equivalent is `$env:CPM_SOURCE_CACHE="$HOME/.cache/CPM"`. This cache is optional.
-`cmake/Dependencies.cmake` calls `find_package` for Asio, SFML (client) and GoogleTest (tests).
+`cmake/Dependencies.cmake` calls `find_package` for Asio, nlohmann/json, SFML (client) and GoogleTest (tests).
 Each has its own `FindXXX.cmake` module backed by CPM, with the project's declared version and options.
 Do not copy CMake build directories, virtual environments or compiler caches between Linux and Windows.
 
@@ -63,7 +63,7 @@ ctest --test-dir build/windows -C Release --output-on-failure --no-tests=error
 
 Visual Studio places these executables in the configuration directory under the repository root:
 `Release/` or `Debug/`. A Ninja build uses the root output path instead. Keep the repository root as the
-client's working directory so `assets/` can be found.
+programs' working directory so `assets/` can be found. The server also needs `assets/levels/`.
 
 PowerShell does not automatically stop on every failed native command: inspect its output and
 `$LASTEXITCODE`. For the compilation database and clang-tidy, use the separate Ninja workflow in the

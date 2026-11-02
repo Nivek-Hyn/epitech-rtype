@@ -11,7 +11,10 @@ Status labels used below:
 - **Planned**: not started, candidate for part 2.
 
 This revision updates the engine and build choices against the combined local work. Network measurements,
-configurable gameplay, persistence and accessibility results still need contributions from their owners.
+complete campaign behavior, persistence and accessibility results still need contributions from their owners.
+The server now loads the first level's wave timing, positions and speed from JSON using nlohmann/json 3.11.3.
+Content changes need no recompile for those supported values; new movement behaviors still require code.
+Only the initial level is selected, and validation of all configuration bounds remains incomplete.
 
 ## 1. Language and tooling
 

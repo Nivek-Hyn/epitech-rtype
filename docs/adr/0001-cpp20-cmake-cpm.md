@@ -19,7 +19,7 @@ platform SDK/system prerequisites still need to be available.
 - **CMake** as build system generator.
 - **CPM** as package manager. Downloads are shared between build folders through `CPM_SOURCE_CACHE`.
 - Each direct dependency has a `FindXXX.cmake` module called through `find_package(... MODULE)`:
-  Asio 1.38.2, SFML 3.1.0 and GoogleTest 1.17.0. The modules retain the declared upstream tags,
+  Asio 1.38.2, SFML 3.1.0, nlohmann/json 3.11.3 and GoogleTest 1.17.0. The modules retain the declared upstream tags,
   build options and target names. They fetch through CPM instead of selecting arbitrary system versions.
   SFML manages its own font/audio dependencies internally.
 
