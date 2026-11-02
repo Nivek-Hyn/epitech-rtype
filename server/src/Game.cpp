@@ -10,6 +10,7 @@
 #include <utility>
 #include <vector>
 #include <cmath>
+#include <random>
 
 namespace rtype::server {
 
@@ -185,20 +186,25 @@ void Game::spawnEnemies(float dt)
 {
     _levelTimer += dt;
 
+    static std::random_device rd;
+    static std::mt19937 gen(rd());
+    static std::uniform_real_distribution<float> disVertical(0.0f, 1.0f);
+
     // On parcourt les vagues du fichier JSON chargé pour le niveau actuel
     for (auto& wave : _currentLevel.waves) {
         // Si la vague n'a pas encore spawn et que le timer correspond au délai du JSON
         if (!wave.isSpawned && _levelTimer >= wave.delay_before_start) {
             for (const auto& enemyConfig : wave.enemies) {
-                // On utilise directement les données du JSON !
                 float y = enemyConfig.spawn_y;
                 float speed = enemyConfig.speed;
-                
-                // Création de l'ennemi selon son type (patrol, sine_wave...)
-                engine::ecs::Entity enemy = spawnNetworked(protocol::EntityType::Enemy, 0, WorldWidth, y);
+                float randomizedY = y + (disVertical(gen) - 0.5f) * 300.0f;
+                randomizedY = std::clamp(randomizedY, 50.0f, WorldHeight - 50.0f);
+                engine::ecs::Entity enemy =
+                    spawnNetworked(protocol::EntityType::Enemy, 0, WorldWidth + 500.0f, randomizedY);
                 _registry.emplace<rtype::components::Velocity>(enemy, -speed, 0.f);
             }
-            wave.isSpawned = true; // La vague est lancée, on ne la relance plus
+            wave.isSpawned = true;
+            // break;
         }
     }
 }
