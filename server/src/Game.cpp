@@ -8,6 +8,8 @@
 #include <array>
 #include <utility>
 #include <vector>
+#include <cmath>
+#include <random>
 
 namespace rtype::server {
 
@@ -109,6 +111,14 @@ void Game::onInput(PlayerId player, std::uint8_t flags)
 void Game::update(float dt)
 {
     spawnEnemies(dt);
+    _registry.each<rtype::components::Position, rtype::components::Kind, rtype::components::Velocity>(
+        [](engine::ecs::Entity /*entity*/, const rtype::components::Position &pos, const rtype::components::Kind &kind,
+           rtype::components::Velocity &vel) {
+            if (kind.type == protocol::EntityType::Enemy) {
+                vel.y = std::sin(pos.x * 0.02f) * 150.f;
+            }
+        });
+
     _registry.update(dt);
     // After movement, so collisions are tested on the positions sent in this tick's snapshot.
     constexpr float PlayerWidth = 33.f;
@@ -175,27 +185,32 @@ std::vector<protocol::Message> Game::takeEvents()
 
 void Game::spawnEnemies(float dt)
 {
-    const bool anyPlayer = std::any_of(_players.begin(), _players.end(),
-                                       [](engine::ecs::Entity player) { return player != engine::ecs::NullEntity; });
-    if (!anyPlayer)
+    const bool anyPlayer = std::any_of(_players.begin(), _players.end(), [](engine::ecs::Entity player) { return player != engine::ecs::NullEntity; });
+    if (!anyPlayer) {
+        _levelTimer = 0.f;
+        for (auto &wave : _currentLevel.waves)
+            wave.isSpawned = false;
         return;
+    }
 
     _levelTimer += dt;
+
+    static std::random_device rd;
+    static std::mt19937 gen(rd());
+    static std::uniform_real_distribution<float> disVertical(50.0f, 650.0f);
 
     // On parcourt les vagues du fichier JSON chargé pour le niveau actuel
     for (auto &wave : _currentLevel.waves) {
         // Si la vague n'a pas encore spawn et que le timer correspond au délai du JSON
         if (!wave.isSpawned && _levelTimer >= wave.delay_before_start) {
             for (const auto &enemyConfig : wave.enemies) {
-                // On utilise directement les données du JSON !
-                float y = enemyConfig.spawn_y;
                 float speed = enemyConfig.speed;
-
-                // Création de l'ennemi selon son type (patrol, sine_wave...)
-                engine::ecs::Entity enemy = spawnNetworked(protocol::EntityType::Enemy, 0, WorldWidth, y);
+                float randomizedY = disVertical(gen);
+                engine::ecs::Entity enemy =
+                    spawnNetworked(protocol::EntityType::Enemy, 0, WorldWidth + 100.0f, randomizedY);
                 _registry.emplace<rtype::components::Velocity>(enemy, -speed, 0.f);
             }
-            wave.isSpawned = true; // La vague est lancée, on ne la relance plus
+            wave.isSpawned = true;
         }
     }
 }
