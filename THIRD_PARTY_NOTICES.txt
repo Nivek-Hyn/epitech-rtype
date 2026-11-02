@@ -1,12 +1,14 @@
 Third-party components
 ======================
 
-The runtime uses Asio for UDP transport. Client-enabled builds also link SFML,
+The runtime uses Asio for UDP transport and nlohmann/json for server level configuration.
+Client-enabled builds also link SFML,
 which uses FreeType, HarfBuzz, SheenBidi, Ogg, Vorbis and FLAC in this build.
 Copies of their main upstream notice files are installed under notices/.
 GoogleTest is used only by tests and is not part of the runtime installation.
 
 Asio: https://think-async.com/Asio/
+nlohmann/json: https://github.com/nlohmann/json
 SFML: https://www.sfml-dev.org/
 FreeType: https://freetype.org/
 HarfBuzz: https://harfbuzz.github.io/

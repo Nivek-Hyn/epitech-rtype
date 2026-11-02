@@ -5,6 +5,9 @@ install(TARGETS r-type_server RUNTIME DESTINATION . COMPONENT GameRuntime)
 if(RTYPE_BUILD_CLIENT)
     install(TARGETS r-type_client RUNTIME DESTINATION . COMPONENT GameRuntime)
     install(DIRECTORY "${PROJECT_SOURCE_DIR}/assets" DESTINATION . COMPONENT GameRuntime)
+else()
+    # The server loads its level configuration even when graphics are disabled.
+    install(DIRECTORY "${PROJECT_SOURCE_DIR}/assets/levels" DESTINATION assets COMPONENT GameRuntime)
 endif()
 
 configure_file(

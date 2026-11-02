@@ -1,7 +1,7 @@
 R-Type @PROJECT_VERSION@ - @CMAKE_SYSTEM_NAME@ @CMAKE_SYSTEM_PROCESSOR@
 
 Open a terminal in this directory before starting the programs.
-The client looks for assets/ relative to the current working directory.
+The server loads assets/levels/ and the client loads graphics relative to the current working directory.
 Keep the assets directory next to the executables when moving this installation.
 
 Linux:
@@ -19,7 +19,7 @@ Use arrow keys or ZQSD to move, and Space to shoot. Close the window to quit.
 Stop the server with Ctrl+C. Allow the selected UDP port through the server's firewall.
 
 This installation was configured with RTYPE_BUILD_CLIENT=@RTYPE_BUILD_CLIENT@.
-When OFF, the client and graphical assets are excluded.
+When OFF, the client and graphical assets are excluded; assets/levels/ is still required.
 
 See THIRD_PARTY_NOTICES.txt and notices/ for dependency notices and outstanding asset credits.
 Required operating-system libraries and compatible C/C++ runtimes must be available.

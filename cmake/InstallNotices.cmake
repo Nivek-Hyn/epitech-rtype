@@ -9,6 +9,7 @@ endfunction()
 
 rtype_install_notice(Asio "${asio_SOURCE_DIR}/COPYING")
 rtype_install_notice(Asio "${asio_SOURCE_DIR}/LICENSE_1_0.txt")
+rtype_install_notice(nlohmann_json "${nlohmann_json_SOURCE_DIR}/LICENSE.MIT")
 
 if(RTYPE_BUILD_CLIENT)
     rtype_install_notice(SFML "${SFML_SOURCE_DIR}/license.md")
