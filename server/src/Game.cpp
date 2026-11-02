@@ -112,9 +112,11 @@ void Game::onInput(PlayerId player, std::uint8_t flags)
 void Game::update(float dt)
 {
     spawnEnemies(dt);
-    _registry.each<rtype::components::Position, rtype::components::Kind, rtype::components::Velocity>([](engine::ecs::Entity /*entity*/, const rtype::components::Position &pos, const rtype::components::Kind &kind, rtype::components::Velocity &vel) {
+    _registry.each<rtype::components::Position, rtype::components::Kind, rtype::components::Velocity>(
+        [](engine::ecs::Entity /*entity*/, const rtype::components::Position &pos, const rtype::components::Kind &kind,
+           rtype::components::Velocity &vel) {
             if (kind.type == protocol::EntityType::Enemy) {
-                vel.y = std::sin(pos.x * 0.02f) * 150.f; 
+                vel.y = std::sin(pos.x * 0.02f) * 150.f;
             }
         });
 
@@ -184,6 +186,14 @@ std::vector<protocol::Message> Game::takeEvents()
 
 void Game::spawnEnemies(float dt)
 {
+    const bool anyPlayer = std::any_of(_players.begin(), _players.end(), [](engine::ecs::Entity player) { return player != engine::ecs::NullEntity; });
+    if (!anyPlayer) {
+        _levelTimer = 0.f;
+        for (auto &wave : _currentLevel.waves)
+            wave.isSpawned = false;
+        return;
+    }
+
     _levelTimer += dt;
 
     static std::random_device rd;
@@ -191,21 +201,17 @@ void Game::spawnEnemies(float dt)
     static std::uniform_real_distribution<float> disVertical(50.0f, 650.0f);
 
     // On parcourt les vagues du fichier JSON chargé pour le niveau actuel
-    for (auto& wave : _currentLevel.waves) {
+    for (auto &wave : _currentLevel.waves) {
         // Si la vague n'a pas encore spawn et que le timer correspond au délai du JSON
         if (!wave.isSpawned && _levelTimer >= wave.delay_before_start) {
-            for (const auto& enemyConfig : wave.enemies) {
-                //float y = enemyConfig.spawn_y;
+            for (const auto &enemyConfig : wave.enemies) {
                 float speed = enemyConfig.speed;
-                //float randomizedY = y + (disVertical(gen) - 0.5f) * 300.0f;
                 float randomizedY = disVertical(gen);
-                //randomizedY = std::clamp(randomizedY, 50.0f, WorldHeight - 50.0f);
                 engine::ecs::Entity enemy =
                     spawnNetworked(protocol::EntityType::Enemy, 0, WorldWidth + 100.0f, randomizedY);
                 _registry.emplace<rtype::components::Velocity>(enemy, -speed, 0.f);
             }
             wave.isSpawned = true;
-            // break;
         }
     }
 }
