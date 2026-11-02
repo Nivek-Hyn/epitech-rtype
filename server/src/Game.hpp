@@ -4,6 +4,8 @@
 #include "common/Protocol.hpp"
 #include "engine/ecs/Registry.hpp"
 #include "net/INetworkServer.hpp"
+#include "levelLoader.hpp"
+
 
 #include <array>
 #include <cstdint>
@@ -46,6 +48,11 @@ private:
     float _enemySpawnTimer = 0.f;
     std::uint32_t _enemiesSpawned = 0;
     std::uint32_t _score = 0;
+
+    LevelConfig _currentLevel;
+    float _levelTimer = 0.f;
 };
+
+LevelConfig loadLevelFromJson(const std::string& filepath);
 
 } // namespace rtype::server

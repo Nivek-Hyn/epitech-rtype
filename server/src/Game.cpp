@@ -2,6 +2,8 @@
 #include "common/Components.hpp"
 #include "engine/physics/Aabb.hpp"
 #include "engine/systems/Movement.hpp"
+#include "levelLoader.hpp"
+
 
 #include <algorithm>
 #include <array>
@@ -29,6 +31,9 @@ Game::Game()
 {
     _players.fill(engine::ecs::NullEntity);
     _registry.addSystem(engine::systems::movement<rtype::components::Position, rtype::components::Velocity>);
+
+    _currentLevel = loadLevelFromJson("assets/levels/level1.json");
+    _levelTimer = 0.f;
 }
 
 // TODO(gameplay): spawn the player's ship (NetworkId, Kind, Position, Velocity...) and remember it in _players.
@@ -107,6 +112,17 @@ void Game::update(float dt)
     spawnEnemies(dt);
     _registry.update(dt);
     // After movement, so collisions are tested on the positions sent in this tick's snapshot.
+    constexpr float PlayerWidth = 33.f;
+    constexpr float PlayerHeight = 36.f;
+
+    _registry.each<rtype::components::Position, rtype::components::Kind>([](engine::ecs::Entity /*entity*/, 
+        rtype::components::Position &pos, const rtype::components::Kind &kind) {
+        if (kind.type == protocol::EntityType::Player) {
+            pos.x = std::clamp(pos.x, 0.f, WorldWidth - PlayerWidth);
+            pos.y = std::clamp(pos.y, 0.f, WorldHeight - PlayerHeight);
+        }
+    });
+
     handleCollisions();
     for (float &cooldown : _shootCooldowns)
         cooldown = std::max(0.f, cooldown - dt);
@@ -158,22 +174,25 @@ std::vector<protocol::Message> Game::takeEvents()
     return events;
 }
 
-// Spawns an enemy on the right edge every EnemySpawnIntervalSeconds while at least one player is in the game.
 void Game::spawnEnemies(float dt)
 {
-    const bool anyPlayer = std::any_of(_players.begin(), _players.end(),
-                                       [](engine::ecs::Entity player) { return player != engine::ecs::NullEntity; });
-    if (!anyPlayer) {
-        _enemySpawnTimer = 0.f;
-        return;
-    }
-    _enemySpawnTimer += dt;
-    while (_enemySpawnTimer >= EnemySpawnIntervalSeconds) {
-        _enemySpawnTimer -= EnemySpawnIntervalSeconds;
-        const float y = EnemyRows[_enemiesSpawned % EnemyRows.size()];
-        const engine::ecs::Entity enemy = spawnNetworked(protocol::EntityType::Enemy, 0, WorldWidth - EnemyWidth, y);
-        _registry.emplace<rtype::components::Velocity>(enemy, -EnemySpeed, 0.f);
-        _enemiesSpawned++;
+    _levelTimer += dt;
+
+    // On parcourt les vagues du fichier JSON chargé pour le niveau actuel
+    for (auto& wave : _currentLevel.waves) {
+        // Si la vague n'a pas encore spawn et que le timer correspond au délai du JSON
+        if (!wave.isSpawned && _levelTimer >= wave.delay_before_start) {
+            for (const auto& enemyConfig : wave.enemies) {
+                // On utilise directement les données du JSON !
+                float y = enemyConfig.spawn_y;
+                float speed = enemyConfig.speed;
+                
+                // Création de l'ennemi selon son type (patrol, sine_wave...)
+                engine::ecs::Entity enemy = spawnNetworked(protocol::EntityType::Enemy, 0, WorldWidth, y);
+                _registry.emplace<rtype::components::Velocity>(enemy, -speed, 0.f);
+            }
+            wave.isSpawned = true; // La vague est lancée, on ne la relance plus
+        }
     }
 }
 
@@ -193,6 +212,7 @@ void Game::handleCollisions()
 
     std::vector<bool> enemyHit(enemies.size(), false);
     std::vector<engine::ecs::Entity> destroyed;
+
     _registry.each<Position, Kind>([&](engine::ecs::Entity missile, const Position &position, const Kind &kind) {
         if (kind.type != protocol::EntityType::PlayerMissile)
             return;
@@ -207,6 +227,25 @@ void Game::handleCollisions()
             }
         }
     });
+    
+    constexpr float PlayerWidth = 33.f;
+    constexpr float PlayerHeight = 36.f;
+
+    _registry.each<Position, Kind>([&](engine::ecs::Entity playerEntity, const Position &position, const Kind &kind) {
+        if (kind.type != protocol::EntityType::Player)
+            return;
+
+        const engine::physics::Aabb playerBox{position.x, position.y, PlayerWidth, PlayerHeight};
+
+        for (std::size_t i = 0; i < enemies.size(); i++) {
+            if (!enemyHit[i] && engine::physics::overlaps(playerBox, enemies[i].second)) {
+                enemyHit[i] = true;
+                destroyed.push_back(playerEntity);   // Tue le joueur
+                destroyed.push_back(enemies[i].first); // Tue l'ennemi (optionnel)
+            }
+        }
+    });
+
 
     for (const engine::ecs::Entity entity : destroyed) {
         if (const auto *networkId = _registry.get<rtype::components::NetworkId>(entity))
