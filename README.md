@@ -1,60 +1,89 @@
 # R-Type
 
-A networked multiplayer remake of the classic shoot'em up R-Type, built on our own C++ game engine.
-Up to 4 players connect to an authoritative server and fight waves of Bydos together.
+A C++ multiplayer shoot'em up built with our own reusable game engine. Up to four players connect to an
+authoritative UDP server. The current prototype includes movement, shooting, enemies and missile collisions.
+
+Linux and native Windows builds and two-player cross-play have been tested. See the
+[validation record](docs/validation.md) for exact revisions and outstanding checks. The final campaign,
+four-player acceptance and accessibility features remain tracked work.
 
 ## Requirements
 
-- A C++20 compiler: GCC 12+, Clang 16+ or MSVC 2022
-- CMake 3.24+
-- Git (dependencies are downloaded automatically by [CPM](https://github.com/cpm-cmake/CPM.cmake))
-- **Linux only**, system packages needed by SFML:
+- A C++20 compiler; tested with GCC 15 and MSVC 2022. See the validation record for exact versions.
+- CMake 3.28+ for the client, or 3.24+ for a server-only build, and the selected generator's build tool.
+- Git and Internet access for the first dependency download. CMake/CPM fetches Asio, SFML and GoogleTest.
+- On Linux, SFML also needs platform development libraries:
   - Fedora: `sudo dnf install libX11-devel libXrandr-devel libXcursor-devel libXi-devel mesa-libGL-devel systemd-devel`
   - Ubuntu/Debian: `sudo apt install libx11-dev libxrandr-dev libxcursor-dev libxi-dev libgl1-mesa-dev libudev-dev`
 
-## Build
+These platform libraries and graphics drivers are separate from application dependencies managed by CPM.
+
+## Build and run
+
+From a clone of this repository, on Linux:
 
 ```sh
-export CPM_SOURCE_CACHE=$HOME/.cache/CPM   # optional: share downloaded dependencies between builds
-cmake -S . -B build
-cmake --build build -j
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
+cmake --build build --parallel 4
+./r-type_server 4242
+# In another terminal, from the same repository directory:
+./r-type_client 127.0.0.1 4242
 ```
 
-The binaries `r-type_server` and `r-type_client` are created at the repository root.
+On Windows, from a Developer PowerShell with MSVC 2022:
 
-Options: `-DRTYPE_BUILD_CLIENT=OFF` (server only), `-DRTYPE_BUILD_TESTS=OFF`.
+```powershell
+cmake -S . -B build/windows -G "Visual Studio 17 2022" -A x64
+cmake --build build/windows --config Release --parallel 4
+.\Release\r-type_server.exe 4242
+# In another terminal, from the same repository directory:
+.\Release\r-type_client.exe 127.0.0.1 4242
+```
 
-## Run
+Run the client from the repository directory so it finds `assets/`. Default host/port are `127.0.0.1:4242`.
+Use arrows or ZQSD to move and Space to shoot. Close the client window to quit; use Ctrl+C in the server terminal.
+For another computer, replace the host with the server's LAN address and allow its UDP port on the private network.
+
+For a server-only build, add `-DRTYPE_BUILD_CLIENT=OFF`. To omit tests, add `-DRTYPE_BUILD_TESTS=OFF`.
+See [build, installation and archive instructions](docs/build-and-run.md) for downloads, output paths and troubleshooting.
+
+## Checks and engine reuse
 
 ```sh
-./r-type_server [port]          # default port: 4242
-./r-type_client [host] [port]   # default: 127.0.0.1 4242
+ctest --test-dir build --output-on-failure --no-tests=error
+scripts/check.sh  # Bash: formatting, build, clang-tidy and tests; tools must be installed first
 ```
 
-Run the client from the repository root so it finds `assets/`.
+For Visual Studio builds, use `ctest --test-dir build/windows -C Release --output-on-failure --no-tests=error`.
+Tool setup and native Windows quality commands are in the [quality guide](docs/static-analysis.md).
 
-## Tests
+The engine can also be built and installed independently:
 
 ```sh
-ctest --test-dir build --output-on-failure
-scripts/check.sh                 # formatting + build without warnings + tests, as the CI does
+cmake -P engine/cmake/CheckPackage.cmake
 ```
 
-## Project layout
+See [engine/README.md](engine/README.md) and the [extension guide](docs/how-to.md).
+The separate playable second game remains its own delivery task; it is not part of this prototype's launch commands.
 
-| Folder | Content |
+## Project and documentation
+
+| Directory | Responsibility |
 |---|---|
-| `engine/` | Generic game engine (ECS, game loop, events, collisions, serialization). Knows nothing about R-Type. |
-| `common/` | Code shared by server and client: network protocol, components, constants. |
-| `server/` | Authoritative game server. |
-| `client/` | Graphical client (SFML). |
-| `tests/` | Unit tests (GoogleTest). |
-| `docs/` | Documentation, starting at [docs/index.md](docs/index.md) (also buildable as a website, see that page). |
+| `engine/` | Generic ECS, timing, events, physics, binary buffers and queues; standard library only. |
+| `common/` | R-Type protocol, components and constants shared between client and server. |
+| `server/` | Authoritative simulation and Asio transport. |
+| `client/` | SFML rendering, input and Asio transport. |
+| `tests/` | GoogleTest tests. |
+| `docs/` | [Documentation index](docs/index.md), [architecture](docs/architecture.md), [study](docs/technical-study.md) and [protocol](docs/protocol.md). |
 
-## Contributing
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the workflow and [THIRD_PARTY_NOTICES.txt](THIRD_PARTY_NOTICES.txt)
+for dependency notices and asset provenance. Sprites were supplied by Epitech for this student project.
+No project-wide source license or public asset redistribution permission is declared here.
 
-See [CONTRIBUTING.md](CONTRIBUTING.md).
+## Team
 
-## Authors
-
-<!-- TODO: team members -->
+- [Nivek-Hyn](https://github.com/Nivek-Hyn): engine and project tooling.
+- [nael481](https://github.com/nael481): networking.
+- [Julien-Lnr](https://github.com/Julien-Lnr) / [Julienl01](https://github.com/Julienl01): client and rendering.
+- [katiaP18](https://github.com/katiaP18): gameplay and level content.

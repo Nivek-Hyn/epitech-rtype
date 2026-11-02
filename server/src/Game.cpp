@@ -4,7 +4,6 @@
 #include "engine/systems/Movement.hpp"
 #include "levelLoader.hpp"
 
-
 #include <algorithm>
 #include <array>
 #include <utility>
@@ -125,13 +124,13 @@ void Game::update(float dt)
     constexpr float PlayerWidth = 33.f;
     constexpr float PlayerHeight = 36.f;
 
-    _registry.each<rtype::components::Position, rtype::components::Kind>([](engine::ecs::Entity /*entity*/, 
-        rtype::components::Position &pos, const rtype::components::Kind &kind) {
-        if (kind.type == protocol::EntityType::Player) {
-            pos.x = std::clamp(pos.x, 0.f, WorldWidth - PlayerWidth);
-            pos.y = std::clamp(pos.y, 0.f, WorldHeight - PlayerHeight);
-        }
-    });
+    _registry.each<rtype::components::Position, rtype::components::Kind>(
+        [](engine::ecs::Entity /*entity*/, rtype::components::Position &pos, const rtype::components::Kind &kind) {
+            if (kind.type == protocol::EntityType::Player) {
+                pos.x = std::clamp(pos.x, 0.f, WorldWidth - PlayerWidth);
+                pos.y = std::clamp(pos.y, 0.f, WorldHeight - PlayerHeight);
+            }
+        });
 
     handleCollisions();
     for (float &cooldown : _shootCooldowns)
@@ -247,7 +246,7 @@ void Game::handleCollisions()
             }
         }
     });
-    
+
     constexpr float PlayerWidth = 33.f;
     constexpr float PlayerHeight = 36.f;
 
@@ -260,14 +259,19 @@ void Game::handleCollisions()
         for (std::size_t i = 0; i < enemies.size(); i++) {
             if (!enemyHit[i] && engine::physics::overlaps(playerBox, enemies[i].second)) {
                 enemyHit[i] = true;
-                destroyed.push_back(playerEntity);   // Tue le joueur
+                destroyed.push_back(playerEntity);     // Tue le joueur
                 destroyed.push_back(enemies[i].first); // Tue l'ennemi (optionnel)
             }
         }
     });
 
-
     for (const engine::ecs::Entity entity : destroyed) {
+        for (std::size_t player = 0; player < _players.size(); player++) {
+            if (_players[player] == entity) {
+                _players[player] = engine::ecs::NullEntity;
+                _shootCooldowns[player] = 0.f;
+            }
+        }
         if (const auto *networkId = _registry.get<rtype::components::NetworkId>(entity))
             _events.push_back(protocol::EntityDestroyed{networkId->id, protocol::DestroyReason::Killed});
         _registry.kill(entity);

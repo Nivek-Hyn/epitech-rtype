@@ -49,6 +49,7 @@ nav:
   - Architecture:
       - Overview: architecture.md
       - Engine: engine.md
+      - Shared data: shared-data.md
       - Technical study: technical-study.md
       - Decision records:
           - Index: adr/README.md
@@ -61,8 +62,13 @@ nav:
           - 0007 Authoritative snapshots: adr/0007-authoritative-snapshots.md
           - 0008 Binary protocol: adr/0008-binary-protocol.md
   - Network protocol: protocol.md
+  - API reference: html/index.html
   - Guides:
+      - Build and run: build-and-run.md
       - How-to guides: how-to.md
+      - Validation record: validation.md
+      - Delivery and defense: delivery.md
+      - Static analysis: static-analysis.md
   - Accessibility:
       - Accessibility study: accessibility.md
       - Documentation guidelines: documentation-guidelines.md

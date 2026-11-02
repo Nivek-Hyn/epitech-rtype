@@ -8,8 +8,8 @@ struct EnemySpawnConfig {
     std::string type;
     float spawn_y;
     float speed;
-    float amplitude;  //pour le sinusoidal
-    float frequency;  //pour le sinusoidal
+    float amplitude; // pour le sinusoidal
+    float frequency; // pour le sinusoidal
 };
 
 struct WaveConfig {
@@ -25,6 +25,6 @@ struct LevelConfig {
     std::vector<WaveConfig> waves;
 };
 
-LevelConfig loadLevelFromJson(const std::string& filepath);
+LevelConfig loadLevelFromJson(const std::string &filepath);
 
-}
+} // namespace rtype::server
