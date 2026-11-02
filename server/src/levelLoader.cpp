@@ -1,11 +1,12 @@
-#include <fstream>
-#include <stdexcept>
 #include "levelLoader.hpp"
+#include <fstream>
 #include <nlohmann/json.hpp>
+#include <stdexcept>
 
 namespace rtype::server {
 
-LevelConfig loadLevelFromJson(const std::string& filepath) {
+LevelConfig loadLevelFromJson(const std::string &filepath)
+{
     std::ifstream file(filepath);
     if (!file.is_open()) {
         throw std::runtime_error("Erreur critique : Impossible d'ouvrir le fichier de niveau : " + filepath);
@@ -14,7 +15,7 @@ LevelConfig loadLevelFromJson(const std::string& filepath) {
     nlohmann::json j;
     try {
         file >> j;
-    } catch (const std::exception& e) {
+    } catch (const std::exception &e) {
         throw std::runtime_error("Erreur : Le fichier JSON " + filepath + " est malformé ! Détails : " + e.what());
     }
 
@@ -26,13 +27,13 @@ LevelConfig loadLevelFromJson(const std::string& filepath) {
         throw std::runtime_error("Erreur : Le schéma du niveau est invalide (clé 'waves' manquante ou incorrecte).");
     }
 
-    for (const auto& w : j["waves"]) {
+    for (const auto &w : j["waves"]) {
         WaveConfig wave;
         wave.wave_id = w.value("wave_id", 0);
         wave.delay_before_start = w.value("delay_before_start", 0.f);
 
         if (w.contains("enemies") && w["enemies"].is_array()) {
-            for (const auto& e : w["enemies"]) {
+            for (const auto &e : w["enemies"]) {
                 EnemySpawnConfig enemy;
                 enemy.type = e.value("type", "standard");
                 enemy.spawn_y = e.value("spawn_y", 300.f);

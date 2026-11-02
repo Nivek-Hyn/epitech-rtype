@@ -3,9 +3,8 @@
 #include "common/Constants.hpp"
 #include "common/Protocol.hpp"
 #include "engine/ecs/Registry.hpp"
-#include "net/INetworkServer.hpp"
 #include "levelLoader.hpp"
-
+#include "net/INetworkServer.hpp"
 
 #include <array>
 #include <cstdint>
@@ -53,6 +52,6 @@ private:
     float _levelTimer = 0.f;
 };
 
-LevelConfig loadLevelFromJson(const std::string& filepath);
+LevelConfig loadLevelFromJson(const std::string &filepath);
 
 } // namespace rtype::server

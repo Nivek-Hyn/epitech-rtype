@@ -4,7 +4,6 @@
 #include "engine/systems/Movement.hpp"
 #include "levelLoader.hpp"
 
-
 #include <algorithm>
 #include <array>
 #include <utility>
@@ -115,13 +114,13 @@ void Game::update(float dt)
     constexpr float PlayerWidth = 33.f;
     constexpr float PlayerHeight = 36.f;
 
-    _registry.each<rtype::components::Position, rtype::components::Kind>([](engine::ecs::Entity /*entity*/, 
-        rtype::components::Position &pos, const rtype::components::Kind &kind) {
-        if (kind.type == protocol::EntityType::Player) {
-            pos.x = std::clamp(pos.x, 0.f, WorldWidth - PlayerWidth);
-            pos.y = std::clamp(pos.y, 0.f, WorldHeight - PlayerHeight);
-        }
-    });
+    _registry.each<rtype::components::Position, rtype::components::Kind>(
+        [](engine::ecs::Entity /*entity*/, rtype::components::Position &pos, const rtype::components::Kind &kind) {
+            if (kind.type == protocol::EntityType::Player) {
+                pos.x = std::clamp(pos.x, 0.f, WorldWidth - PlayerWidth);
+                pos.y = std::clamp(pos.y, 0.f, WorldHeight - PlayerHeight);
+            }
+        });
 
     handleCollisions();
     for (float &cooldown : _shootCooldowns)
@@ -179,14 +178,14 @@ void Game::spawnEnemies(float dt)
     _levelTimer += dt;
 
     // On parcourt les vagues du fichier JSON chargé pour le niveau actuel
-    for (auto& wave : _currentLevel.waves) {
+    for (auto &wave : _currentLevel.waves) {
         // Si la vague n'a pas encore spawn et que le timer correspond au délai du JSON
         if (!wave.isSpawned && _levelTimer >= wave.delay_before_start) {
-            for (const auto& enemyConfig : wave.enemies) {
+            for (const auto &enemyConfig : wave.enemies) {
                 // On utilise directement les données du JSON !
                 float y = enemyConfig.spawn_y;
                 float speed = enemyConfig.speed;
-                
+
                 // Création de l'ennemi selon son type (patrol, sine_wave...)
                 engine::ecs::Entity enemy = spawnNetworked(protocol::EntityType::Enemy, 0, WorldWidth, y);
                 _registry.emplace<rtype::components::Velocity>(enemy, -speed, 0.f);
@@ -227,7 +226,7 @@ void Game::handleCollisions()
             }
         }
     });
-    
+
     constexpr float PlayerWidth = 33.f;
     constexpr float PlayerHeight = 36.f;
 
@@ -240,12 +239,11 @@ void Game::handleCollisions()
         for (std::size_t i = 0; i < enemies.size(); i++) {
             if (!enemyHit[i] && engine::physics::overlaps(playerBox, enemies[i].second)) {
                 enemyHit[i] = true;
-                destroyed.push_back(playerEntity);   // Tue le joueur
+                destroyed.push_back(playerEntity);     // Tue le joueur
                 destroyed.push_back(enemies[i].first); // Tue l'ennemi (optionnel)
             }
         }
     });
-
 
     for (const engine::ecs::Entity entity : destroyed) {
         if (const auto *networkId = _registry.get<rtype::components::NetworkId>(entity))
