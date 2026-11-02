@@ -23,6 +23,20 @@ connected over UDP, produced a snapshot and exited with status 0 after SIGINT. A
 and SHA-256 were generated. These later changes have not been retested natively on Windows.
 The strict API/site build also passed; raw integration logs remain in ignored build directories.
 
+### Clean Linux Release build
+
+An additional Linux Release check on 2 November used a separate local clone of `645f4a9`, an empty
+build directory and disabled compiler caching. Only dependency source downloads were shared through
+CPM; existing project objects were not reused. Compilation completed without warnings and all 62 tests
+passed. The generated TAR.GZ checksum matched; it contained 45 assets (including three level files),
+11 upstream notices and no development headers/libraries.
+
+After extraction, with that clone's source and build directories temporarily renamed, both executables'
+ELF dependencies resolved on the host. The extracted server accepted a UDP connection, produced a
+snapshot and exited with status 0 after SIGINT. The graphical client was built but not manually played
+in this additional check. This proves a clean checkout build on the existing Linux development host,
+not installation on a fresh OS or renewed native Windows validation.
+
 ### Earlier feature-branch checks
 
 | Area | Current revision | Original tested revision | Scope |
