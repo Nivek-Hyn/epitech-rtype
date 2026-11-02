@@ -9,6 +9,7 @@
 #include <array>
 #include <utility>
 #include <vector>
+#include <cmath>
 
 namespace rtype::server {
 
@@ -110,6 +111,12 @@ void Game::onInput(PlayerId player, std::uint8_t flags)
 void Game::update(float dt)
 {
     spawnEnemies(dt);
+    _registry.each<rtype::components::Position, rtype::components::Kind, rtype::components::Velocity>([](engine::ecs::Entity /*entity*/, const rtype::components::Position &pos, const rtype::components::Kind &kind, rtype::components::Velocity &vel) {
+            if (kind.type == protocol::EntityType::Enemy) {
+                vel.y = std::sin(pos.x * 0.02f) * 150.f; 
+            }
+        });
+
     _registry.update(dt);
     // After movement, so collisions are tested on the positions sent in this tick's snapshot.
     constexpr float PlayerWidth = 33.f;
