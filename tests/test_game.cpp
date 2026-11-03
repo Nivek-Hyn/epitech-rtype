@@ -1,4 +1,6 @@
 #include "Game.hpp"
+#include "EnemyShootSystem.hpp"
+#include "common/Components.hpp"
 
 #include <gtest/gtest.h>
 
@@ -145,3 +147,31 @@ TEST(Game, PlayerMissileDestroysEnemyAndScores)
     });
     EXPECT_EQ(killed, 2); // the missile and the enemy
 }
+
+TEST(Game, EnemyZigzagShootingAppliesMovementPattern)
+{
+    engine::ecs::Registry registry;
+    auto enemy = registry.spawn();
+    registry.emplace<rtype::components::Position>(enemy, 500.f, 200.f);
+    registry.emplace<rtype::components::Kind>(enemy, protocol::EntityType::Enemy, 0);
+    registry.emplace<rtype::components::EnemyAttack>(enemy, 0.f, 0.5f, 300.f, 0, "zigzag");
+
+    engine::ecs::Entity spawnedBullet = engine::ecs::NullEntity;
+    updateEnemyShooting(registry, [&](protocol::EntityType type, std::uint8_t variant, float x, float y) {
+        spawnedBullet = registry.spawn();
+        registry.emplace<rtype::components::Kind>(spawnedBullet, type, variant);
+        registry.emplace<rtype::components::Position>(spawnedBullet, x, y);
+        registry.emplace<rtype::components::Velocity>(spawnedBullet, 0.f, 0.f);
+        return spawnedBullet;
+    }, 0.6f);
+
+    ASSERT_NE(spawnedBullet, engine::ecs::NullEntity);
+    const auto *pattern = registry.get<rtype::components::MovementPattern>(spawnedBullet);
+    ASSERT_NE(pattern, nullptr);
+    EXPECT_EQ(pattern->type, "zigzag");
+
+    const auto *vel = registry.get<rtype::components::Velocity>(spawnedBullet);
+    ASSERT_NE(vel, nullptr);
+    EXPECT_NE(vel->y, 0.f);
+}
+
