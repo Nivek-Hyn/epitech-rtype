@@ -3,6 +3,7 @@
 #include "engine/physics/Aabb.hpp"
 #include "engine/systems/Movement.hpp"
 #include "levelLoader.hpp"
+#include "MovementSystem.hpp"
 
 #include <algorithm>
 #include <array>
@@ -10,6 +11,8 @@
 #include <vector>
 #include <cmath>
 #include <random>
+#include <fstream>
+#include <nlohmann/json.hpp>
 
 namespace rtype::server {
 
@@ -35,7 +38,37 @@ Game::Game()
 
     _currentLevel = loadLevelFromJson("assets/levels/level1.json");
     _levelTimer = 0.f;
+
+    try {
+        std::ifstream file("assets/config/entities.json");
+        if (file.is_open()) {
+            nlohmann::json j;
+            file >> j;
+            if (j.contains("enemies") && j["enemies"].is_object()) {
+                for (auto &[key, val] : j["enemies"].items()) {
+                    EnemyDefinition def;
+                    def.health = val.value("health", 3);
+                    def.speed = val.value("speed", 100.f);
+                    def.pattern = val.value("pattern", "straight");
+                    
+                    _entityDefinitions[key] = def;
+                }
+            }
+        }
+    } catch (...) {
+    }
 }
+
+void Game::loadLevel(const std::string &filepath)
+{
+    _currentLevel = loadLevelFromJson(filepath);
+    _levelTimer = 0.f;
+
+    for (auto &wave : _currentLevel.waves) {
+        wave.isSpawned = false;
+    }
+}
+
 
 // TODO(gameplay): spawn the player's ship (NetworkId, Kind, Position, Velocity...) and remember it in _players.
 void Game::onPlayerJoined(PlayerId player)
@@ -108,13 +141,7 @@ void Game::onInput(PlayerId player, std::uint8_t flags)
 void Game::update(float dt)
 {
     spawnEnemies(dt);
-    _registry.each<rtype::components::Position, rtype::components::Kind, rtype::components::Velocity>(
-        [](engine::ecs::Entity /*entity*/, const rtype::components::Position &pos, const rtype::components::Kind &kind,
-           rtype::components::Velocity &vel) {
-            if (kind.type == protocol::EntityType::Enemy) {
-                vel.y = std::sin(pos.x * 0.02f) * 150.f;
-            }
-        });
+    updateEnemyMovements(_registry, dt);
 
     static float ennemyShootTimer = 0.f;
     ennemyShootTimer += dt;
@@ -130,7 +157,7 @@ void Game::update(float dt)
     }
 
     _registry.update(dt);
-    // After movement, so collisions are tested on the positions sent in this tick's snapshot.
+
     constexpr float PlayerWidth = 33.f;
     constexpr float PlayerHeight = 36.f;
 
@@ -208,20 +235,27 @@ void Game::spawnEnemies(float dt)
     static std::random_device rd;
     static std::mt19937 gen(rd());
     static std::uniform_real_distribution<float> disVertical(50.0f, 650.0f);
-
-    // On parcourt les vagues du fichier JSON chargé pour le niveau actuel
+    
     for (auto &wave : _currentLevel.waves) {
-        // Si la vague n'a pas encore spawn et que le timer correspond au délai du JSON
         if (!wave.isSpawned && _levelTimer >= wave.delay_before_start) {
             for (const auto &enemyConfig : wave.enemies) {
+                int hp = 3;
                 float speed = enemyConfig.speed;
+                std::string patternType = "straight";
+
+                if (_entityDefinitions.find(enemyConfig.type) != _entityDefinitions.end()) {
+                    hp = _entityDefinitions[enemyConfig.type].health;
+                    speed = _entityDefinitions[enemyConfig.type].speed;
+                    patternType = _entityDefinitions[enemyConfig.type].pattern;
+                }
+
                 float randomizedY = disVertical(gen);
                 engine::ecs::Entity enemy =
                     spawnNetworked(protocol::EntityType::Enemy, 0, WorldWidth + 100.0f, randomizedY);
-                _registry.emplace<rtype::components::Velocity>(enemy, -speed, 0.f);
                 
-                // Tâche #54 : Attribution de points de vie (ex: 3 PV par ennemi)
-                _registry.emplace<rtype::components::Health>(enemy, 3);
+                _registry.emplace<rtype::components::Velocity>(enemy, -speed, 0.f);
+                _registry.emplace<rtype::components::Health>(enemy, hp);
+                _registry.emplace<rtype::components::MovementPattern>(enemy, rtype::components::MovementPattern{patternType});
             }
             wave.isSpawned = true;
         }
