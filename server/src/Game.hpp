@@ -9,6 +9,8 @@
 #include <array>
 #include <cstdint>
 #include <vector>
+#include <string>
+#include <unordered_map>
 
 namespace rtype::server {
 
@@ -33,6 +35,19 @@ public:
 
     std::uint32_t tick() const { return _tick; }
 
+    struct EnemyDefinition {
+        int health = 3;
+        float speed = 100.f;
+        std::string pattern = "straight";
+        bool hasAttack = false;
+        float fireRate = 2.0f;
+        float bulletSpeed = 350.f;
+        std::uint8_t bulletVariant = 0;
+        std::string bulletPattern = "straight";
+    };
+
+    void loadLevel(const std::string &filepath);
+
 private:
     engine::ecs::Entity spawnNetworked(protocol::EntityType type, std::uint8_t variant, float x, float y);
     void spawnEnemies(float dt);
@@ -50,6 +65,8 @@ private:
 
     LevelConfig _currentLevel;
     float _levelTimer = 0.f;
+
+    std::unordered_map<std::string, EnemyDefinition> _entityDefinitions;
 };
 
 LevelConfig loadLevelFromJson(const std::string &filepath);
