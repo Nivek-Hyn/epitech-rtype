@@ -38,7 +38,12 @@ public:
     struct EnemyDefinition {
         int health = 3;
         float speed = 100.f;
-        std::string pattern = "straight"; // Optionnel pour plus tard
+        std::string pattern = "straight";
+        bool hasAttack = false;
+        float fireRate = 2.0f;
+        float bulletSpeed = 350.f;
+        std::uint8_t bulletVariant = 0;
+        std::string bulletPattern = "straight";
     };
 
     void loadLevel(const std::string &filepath);

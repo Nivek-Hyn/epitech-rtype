@@ -4,6 +4,7 @@
 #include "engine/systems/Movement.hpp"
 #include "levelLoader.hpp"
 #include "MovementSystem.hpp"
+#include "EnemyShootSystem.hpp"
 
 #include <algorithm>
 #include <array>
@@ -51,11 +52,20 @@ Game::Game()
                     def.speed = val.value("speed", 100.f);
                     def.pattern = val.value("pattern", "straight");
                     
+                    if (val.contains("attack")) {
+                        def.hasAttack = true;
+                        def.fireRate = val["attack"].value("fire_rate", 2.0f);
+                        def.bulletSpeed = val["attack"].value("bullet_speed", 350.f);
+                        def.bulletVariant = val["attack"].value<std::uint8_t>("bullet_variant", 0);
+                        def.bulletPattern = val["attack"].value("bullet_pattern", "straight");
+                    } else {
+                        def.hasAttack = false;
+                    }
                     _entityDefinitions[key] = def;
                 }
             }
         }
-    } catch (...) {
+    }catch (...) {
     }
 }
 
@@ -143,26 +153,16 @@ void Game::update(float dt)
     spawnEnemies(dt);
     updateEnemyMovements(_registry, dt);
 
-    static float ennemyShootTimer = 0.f;
-    ennemyShootTimer += dt;
-    if (ennemyShootTimer >= 2.0f) {
-        ennemyShootTimer = 0.f;
-        _registry.each<rtype::components::Position, rtype::components::Kind>(
-            [this](engine::ecs::Entity /*entity*/, const rtype::components::Position &pos, const rtype::components::Kind &kind) {
-                if (kind.type == protocol::EntityType::Enemy) {
-                    engine::ecs::Entity enemyMissile = spawnNetworked(protocol::EntityType::EnemyMissile, 0, pos.x - 30.0f, pos.y);
-                    _registry.emplace<rtype::components::Velocity>(enemyMissile, -350.0f, 0.0f);
-                }
-            });
-    }
+    updateEnemyShooting(_registry, [this](protocol::EntityType type, std::uint8_t variant, float x, float y) {
+        return spawnNetworked(type, variant, x, y);
+    }, dt);
 
     _registry.update(dt);
 
     constexpr float PlayerWidth = 33.f;
     constexpr float PlayerHeight = 36.f;
 
-    _registry.each<rtype::components::Position, rtype::components::Kind>(
-        [](engine::ecs::Entity /*entity*/, rtype::components::Position &pos, const rtype::components::Kind &kind) {
+    _registry.each<rtype::components::Position, rtype::components::Kind>([](engine::ecs::Entity /*entity*/, rtype::components::Position &pos, const rtype::components::Kind &kind) {
             if (kind.type == protocol::EntityType::Player) {
                 pos.x = std::clamp(pos.x, 0.f, WorldWidth - PlayerWidth);
                 pos.y = std::clamp(pos.y, 0.f, WorldHeight - PlayerHeight);
@@ -242,11 +242,22 @@ void Game::spawnEnemies(float dt)
                 int hp = 3;
                 float speed = enemyConfig.speed;
                 std::string patternType = "straight";
+                bool hasAttack = false;
+                float fireRate = 2.0f;
+                float bulletSpeed = 350.f;
+                std::uint8_t bulletVariant = 0;
+                std::string bulletPattern = "straight";
 
                 if (_entityDefinitions.find(enemyConfig.type) != _entityDefinitions.end()) {
-                    hp = _entityDefinitions[enemyConfig.type].health;
-                    speed = _entityDefinitions[enemyConfig.type].speed;
-                    patternType = _entityDefinitions[enemyConfig.type].pattern;
+                    const auto &def = _entityDefinitions[enemyConfig.type];
+                    hp = def.health;
+                    speed = def.speed;
+                    patternType = def.pattern;
+                    hasAttack = def.hasAttack;
+                    fireRate = def.fireRate;
+                    bulletSpeed = def.bulletSpeed;
+                    bulletVariant = def.bulletVariant;
+                    bulletPattern = def.bulletPattern;
                 }
 
                 float randomizedY = disVertical(gen);
@@ -256,6 +267,11 @@ void Game::spawnEnemies(float dt)
                 _registry.emplace<rtype::components::Velocity>(enemy, -speed, 0.f);
                 _registry.emplace<rtype::components::Health>(enemy, hp);
                 _registry.emplace<rtype::components::MovementPattern>(enemy, rtype::components::MovementPattern{patternType});
+
+                if (hasAttack) {
+                    _registry.emplace<rtype::components::EnemyAttack>(
+                        enemy, rtype::components::EnemyAttack{0.f, fireRate, bulletSpeed, bulletVariant, bulletPattern});
+                }
             }
             wave.isSpawned = true;
         }

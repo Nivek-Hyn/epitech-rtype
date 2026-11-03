@@ -40,4 +40,12 @@ struct MovementPattern {
     std::string type = "straight"; // straight, sine_wave, zigzag, dive, etc.
 };
 
+struct EnemyAttack {
+    float shootTimer = 0.f;
+    float fireRate = 2.0f;
+    float bulletSpeed = 350.f;
+    std::uint8_t bulletVariant = 0; // Pour choisir le sprite du tir
+    std::string bulletPattern = "straight"; // straight, sine_wave, zigzag, dive, etc.
+};
+
 } // namespace rtype::components
