@@ -1,0 +1,15 @@
+{
+  "enemies": {
+    "standard_red": {
+      "health": 3,
+      "speed": 100.0,
+      "pattern": "sine_wave"
+    },
+    "boss_45": {
+      "health": 50,
+      "speed": 40.0,
+      "pattern": "boss_hover"
+    }
+  }
+}
+
