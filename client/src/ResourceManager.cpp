@@ -20,6 +20,16 @@ bool ResourceManager::loadDefaults()
         std::cerr << "[ResourceManager] Failed to load assets/r-typesheet1.gif\n";
         success = false;
     }
+
+    if (!loadFont("default", "assets/font.ttf")) {
+        if (!loadFont("default", "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf") &&
+            !loadFont("default", "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf") &&
+            !loadFont("default", "/usr/share/fonts/truetype/ubuntu/Ubuntu-B.ttf")) {
+            std::cerr << "[ResourceManager] Warning: Failed to load default font.\n";
+            success = false;
+        }
+    }
+
     return success;
 }
 
@@ -40,4 +50,26 @@ const sf::Texture &ResourceManager::getTexture(const std::string &id) const
     return it->second;
 }
 
-} // namespace rtype::client
+bool ResourceManager::loadFont(const std::string &id, const std::string &path)
+{
+    sf::Font font;
+    if (!font.openFromFile(path))
+        return false;
+    _fonts[id] = std::move(font);
+    return true;
+}
+
+const sf::Font &ResourceManager::getFont(const std::string &id) const
+{
+    const auto it = _fonts.find(id);
+    if (it == _fonts.end())
+        throw std::out_of_range("Font not found: " + id);
+    return it->second;
+}
+
+bool ResourceManager::hasFont(const std::string &id) const
+{
+    return _fonts.find(id) != _fonts.end();
+}
+
+}
