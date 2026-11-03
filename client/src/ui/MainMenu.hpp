@@ -10,6 +10,10 @@
 #include <string>
 #include <vector>
 
+namespace rtype::client {
+class ResourceManager;
+}
+
 namespace rtype::client::ui {
 
 enum class MenuScreen {
@@ -33,11 +37,15 @@ struct GameConfig {
 
     std::string joinIp{"127.0.0.1"};
     std::string joinPort{"4242"};
+
+    float sfxVolume{100.f};
+    float musicVolume{100.f};
 };
 
 class MainMenu {
 public:
-    explicit MainMenu(const sf::Font &font);
+    explicit MainMenu(const sf::Font &font, ResourceManager *resources = nullptr);
+    void setResourceManager(ResourceManager *resources);
 
     void handleEvent(const sf::Event &event, const sf::RenderWindow &window);
     void update(float dt);
@@ -55,8 +63,10 @@ private:
 
     void navigateMenu(int direction);
     void triggerCurrentSelection();
+    void playUiSound(const std::string &id = "click");
 
     const sf::Font &_font;
+    ResourceManager *_resources{nullptr};
     Starfield _starfield;
     MenuScreen _currentScreen{MenuScreen::Root};
     MenuAction _pendingAction{MenuAction::None};

@@ -68,6 +68,14 @@ bool OptionSelector::handleMouseClick(sf::Vector2f mousePos)
     if (!_enabled)
         return false;
 
+    if (_arrowLeft.getGlobalBounds().contains(mousePos)) {
+        previous();
+        return true;
+    }
+    if (_arrowRight.getGlobalBounds().contains(mousePos)) {
+        next();
+        return true;
+    }
     if (_box.getGlobalBounds().contains(mousePos)) {
         const float midX = _box.getPosition().x + (_box.getSize().x / 2.f);
         if (mousePos.x < midX) {
@@ -77,13 +85,17 @@ bool OptionSelector::handleMouseClick(sf::Vector2f mousePos)
         }
         return true;
     }
+    if (_label.getGlobalBounds().contains(mousePos)) {
+        next();
+        return true;
+    }
     return false;
 }
 
 void OptionSelector::handleMouseMove(sf::Vector2f mousePos)
 {
     if (_enabled) {
-        setSelected(_box.getGlobalBounds().contains(mousePos));
+        setSelected(_box.getGlobalBounds().contains(mousePos) || _label.getGlobalBounds().contains(mousePos));
     }
 }
 
