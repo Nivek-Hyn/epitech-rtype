@@ -1,4 +1,5 @@
 #include "common/Protocol.hpp"
+#include "common/SnapshotAssembler.hpp"
 
 #include <gtest/gtest.h>
 
@@ -117,4 +118,75 @@ TEST(Protocol, RejectsReservedInputFlagsAndUnknownEnumValues)
     auto entityType = encode({1, Snapshot{1, GameState::Playing, 0, {{1, EntityType::Player, 0, 0.f, 0.f}}}});
     entityType[HeaderSize + SnapshotFixedSize + 4] = 0;
     EXPECT_FALSE(decode(entityType));
+}
+
+namespace {
+
+Snapshot makeSnapshot(std::uint32_t tick, std::uint32_t firstId, std::size_t count)
+{
+    Snapshot snapshot{tick, GameState::Playing, 300, {}};
+    for (std::size_t i = 0; i < count; ++i)
+        snapshot.entities.push_back({firstId + static_cast<std::uint32_t>(i), EntityType::EnemyMissile, 0, 1.f, 2.f});
+    return snapshot;
+}
+
+} // namespace
+
+TEST(Protocol, SplitSnapshotKeepsSmallSnapshotsWhole)
+{
+    EXPECT_EQ(splitSnapshot(makeSnapshot(3, 1, 0)).size(), 1u);
+    EXPECT_EQ(splitSnapshot(makeSnapshot(3, 1, MaxEntitiesPerSnapshot)).size(), 1u);
+}
+
+TEST(Protocol, SplitSnapshotProducesEncodablePartsWithTheSameTick)
+{
+    const Snapshot big = makeSnapshot(9, 1, MaxEntitiesPerSnapshot * 2 + 5);
+    const auto parts = splitSnapshot(big);
+    ASSERT_EQ(parts.size(), 3u);
+
+    std::size_t total = 0;
+    for (const Snapshot &part : parts) {
+        EXPECT_EQ(part.tick, 9u);
+        EXPECT_EQ(part.score, 300u);
+        EXPECT_LE(part.entities.size(), MaxEntitiesPerSnapshot);
+        EXPECT_TRUE(decode(encode({1, part})));
+        total += part.entities.size();
+    }
+    EXPECT_EQ(total, big.entities.size());
+}
+
+TEST(SnapshotAssembler, MergesPacketsOfTheSameTick)
+{
+    SnapshotAssembler assembler;
+    for (const Snapshot &part : splitSnapshot(makeSnapshot(5, 1, 200)))
+        EXPECT_TRUE(assembler.add(part));
+    EXPECT_EQ(assembler.entities().size(), 200u);
+    EXPECT_EQ(assembler.score(), 300u);
+}
+
+TEST(SnapshotAssembler, NewerTickReplacesEntities)
+{
+    SnapshotAssembler assembler;
+    assembler.add(makeSnapshot(5, 1, 10));
+    assembler.add(makeSnapshot(6, 100, 3));
+    EXPECT_EQ(assembler.entities().size(), 3u);
+    EXPECT_EQ(assembler.tick(), 6u);
+}
+
+TEST(SnapshotAssembler, IgnoresOlderTicksAndDuplicatedPackets)
+{
+    SnapshotAssembler assembler;
+    assembler.add(makeSnapshot(6, 1, 4));
+    EXPECT_FALSE(assembler.add(makeSnapshot(5, 50, 9)));
+    EXPECT_TRUE(assembler.add(makeSnapshot(6, 1, 4)));
+    EXPECT_EQ(assembler.entities().size(), 4u);
+}
+
+TEST(SnapshotAssembler, ResetAcceptsTicksThatStartAgain)
+{
+    SnapshotAssembler assembler;
+    assembler.add(makeSnapshot(500, 1, 4));
+    assembler.reset();
+    EXPECT_TRUE(assembler.add(makeSnapshot(1, 7, 2)));
+    EXPECT_EQ(assembler.entities().size(), 2u);
 }

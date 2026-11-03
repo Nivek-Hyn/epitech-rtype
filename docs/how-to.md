@@ -162,12 +162,17 @@ Use the event bus when a system must trigger something it should not know about 
 An enemy is an entity, not a class. Game.cpp currently spawns enemies and checks player-missile collisions;
 the client displays an enemy sprite. A new subtype combines component values, a behavior and a rendering choice.
 Changing `Kind::variant` alone does not add a behavior or a new sprite mapping.
+An enemy is an entity, not a class: a new enemy type is a new combination of components and a new value of
+`Kind::variant`. The current prototype already spawns a basic enemy on a timer, moves it left, and lets player
+missiles destroy it. The game loop and renderer are in place; extending enemy behavior still requires server and
+client changes.
 
 1. **Pick a variant number.** `Kind{EntityType::Enemy, variant}` identifies the enemy type for the client.
    Keep the list of variants in one place (a comment or an enum in `common/`), so the server and the client
    agree on it.
 
-2. **Spawn it on the server** with the components every networked entity needs, plus its own behavior:
+2. **Spawn it on the server** with the components every networked entity needs, plus its own behavior. The
+   current implementation is in `Game::spawnEnemies()` and `Game::spawnNetworked()`:
 
    ```cpp
    const std::uint8_t variant = 1;
@@ -180,6 +185,8 @@ Changing `Kind::variant` alone does not add a behavior or a new sprite mapping.
    This snippet belongs inside a Game method: `spawnNetworked` is private, not a free function callable by
    arbitrary code. It already gives the entity NetworkId, Kind, Position and a zero Velocity; the example
    replaces Velocity. The snapshot sends NetworkId, Kind and Position, not every component automatically.
+   `spawnNetworked` gives the entity a `NetworkId`, `Kind`, `Position` and `Velocity`, which are used by the
+   snapshot and movement system. The current spawn timer, enemy rows and speed are constants in `Game.cpp`.
 
 3. **Give it a behavior.** Reuse existing systems when possible (movement, shooting). For a new movement pattern,
    add a server-only component holding its parameters and a system that updates Velocity. Run that behavior
@@ -188,6 +195,9 @@ Changing `Kind::variant` alone does not add a behavior or a new sprite mapping.
 4. **Display it on the client.** The current enemy branch uses one texture rectangle regardless of variant.
    Add an explicit variant-to-sprite mapping and test its fallback. Reusing type/variant needs no new wire
    field; adding health or other state requires the shared-contract review described above.
+4. **Display it on the client.** Add or load a texture through `client/src/ResourceManager.cpp`, then map the
+   entity type/variant to a sprite in `client/src/main.cpp`. The protocol does not change if the existing
+   `EntityType::Enemy` and `variant` fields are sufficient; a new entity category requires a protocol update.
 
 5. **Test the server side** like any system: spawn the enemy, run a few ticks, check its position or state.
 

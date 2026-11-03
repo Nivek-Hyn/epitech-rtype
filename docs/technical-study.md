@@ -139,9 +139,9 @@ keeping the fraction. Without this limit a slow server could accumulate an endle
 | Type erasure (`ISparseArray`, `IHandlerList`) | `Registry`, `EventBus` | — | Lets one container hold storages of different types; `kill` can clear every component of an entity. |
 | Filtered iteration | `Registry::each<A, B>` | Expected O(allocated ids × requested component types), excluding callback work | No secondary index to maintain. Empty/dead ids still contribute to the scan; no performance benchmark is claimed. |
 | AABB overlap test | `engine::physics::overlaps` | O(1) per pair | Four comparisons; sprites in a shoot'em up are well approximated by rectangles. |
-| Nested missile/enemy checks | `Game::handleCollisions` | O(missiles × enemies), plus ECS scans | Simple implementation for player-missile/enemy collisions. A grid or quadtree is a candidate if profiling shows this becomes expensive; no negligible-cost claim has been measured. |
+| Player missile/enemy AABB checks | `server/src/Game.cpp` | O(M × E) | The prototype compares each player missile against the current enemy list. A uniform grid or quadtree is **planned** only if entity counts grow. |
 | Accumulator with catch-up limit | `FixedTimestep::advance` | O(steps) | See section 3. |
-| Thread-safe queue | network thread → game thread | Queue operations are constant-time apart from allocation and mutex waiting | `tryPop` does not wait for a new message, but can wait to acquire its mutex. Lock-free alternatives add implementation constraints; no speed comparison has been measured. |
+| Thread-safe queue | `engine/core/ThreadSafeQueue.hpp` | O(1) | A mutex-protected FIFO passes messages between network and main threads; lock-free queues are faster but much harder to get right. |
 
 ### Known limits
 
@@ -161,6 +161,7 @@ keeping the fraction. Without this limit a slow server could accumulate an endle
 | **UDP** | TCP | Required by the subject for in-game traffic. UDP does not retransmit lost packets; ordering and stale-state rejection remain application responsibilities. |
 | **Authoritative server**, clients send inputs only ([ADR 0007](adr/0007-authoritative-snapshots.md)) | Peer-to-peer, client authority | The server decides everything: a modified client cannot move faster or teleport, it can only send key presses. |
 | **Snapshots every tick** | Delta snapshots, events only | A later received snapshot can replace lost state. The next datagram can also be lost or reordered; this does not make individual events reliable. |
+| **Full snapshots every tick** | Delta snapshots, events only | A lost snapshot is replaced by the next one about 16.7 ms later. One-off events are not acknowledged or retransmitted in the current prototype. |
 | **Binary protocol** ([ADR 0008](adr/0008-binary-protocol.md), [specification](protocol.md)) | JSON, text | Compact and fast to parse. One entity takes 14 bytes in binary, about 50 to 60 bytes in JSON. |
 
 Bandwidth estimate, worst case (a full snapshot packet: 10-byte header + 11 bytes + 84 entities × 14 bytes = 1,197 bytes):
@@ -219,6 +220,10 @@ it chose to connect to.
 | Reading past the end of a buffer | `ByteReader` returns 0 and marks itself as failed instead of reading out of bounds. Fields are read one by one, never with `memcpy` of structs. | Implemented; this alone is not a proof of all memory safety properties. |
 | Cheating with a modified client | Authoritative server: clients only send input flags. Positions, damage and score are computed on the server. | Implemented in the architecture |
 | Too many clients / resource exhaustion | At most 4 players; a client silent for 5 seconds is removed. The player cap does not bound queue growth or packet rate. | Cap and timeout implemented; further bounds remain separate work. |
+| Malformed or malicious packet (crash, buffer overflow) | Strict validation: size between 10 and 1,200 bytes, magic, version, exact payload size, known type and enum values. Decoding returns `std::optional`; invalid packets are dropped. Unit tests cover truncated packets and lying counts. | Implemented and tested |
+| Reading past the end of a buffer | `ByteReader` returns 0 and marks itself as failed instead of reading out of bounds. Fields are read one by one, never with `memcpy` of structs. | Implemented |
+| Cheating with a modified client | Authoritative server: clients only send input flags. Positions, damage and score are computed on the server. | Implemented in the architecture |
+| Too many clients / resource exhaustion | At most 4 players; a client silent for 5 seconds is removed. Integration tests cover the four-player limit and fifth-client rejection. | Implemented; timeout behavior is not integration-tested yet |
 | Flooding the server with packets | Invalid packets are dropped before any game logic. Rate limiting per address is **planned**. | Partial |
 | Spoofed source address (sending inputs as another player) | Not covered: UDP has no authentication. A random session token returned in `ConnectAccepted` and required in every packet is **planned**. | Planned |
 | Eavesdropping | Not covered: traffic is not encrypted. The game exchanges no personal data, so the risk is low. | Accepted |

@@ -2,6 +2,8 @@
 
 #include "engine/net/ByteBuffer.hpp"
 
+#include <algorithm>
+#include <cstddef>
 #include <stdexcept>
 #include <type_traits>
 #include <utility>
@@ -96,6 +98,20 @@ std::vector<std::uint8_t> encode(const Packet &packet)
     writer.u16(static_cast<std::uint16_t>(payload.size()));
     writer.data().insert(writer.data().end(), payload.data().begin(), payload.data().end());
     return writer.data();
+}
+
+std::vector<Snapshot> splitSnapshot(const Snapshot &snapshot)
+{
+    std::vector<Snapshot> parts;
+    std::size_t offset = 0;
+    do {
+        const std::size_t count = std::min(MaxEntitiesPerSnapshot, snapshot.entities.size() - offset);
+        const auto first = snapshot.entities.begin() + static_cast<std::ptrdiff_t>(offset);
+        parts.push_back({snapshot.tick, snapshot.state, snapshot.score,
+                         std::vector<EntityState>(first, first + static_cast<std::ptrdiff_t>(count))});
+        offset += count;
+    } while (offset < snapshot.entities.size());
+    return parts;
 }
 
 std::optional<Packet> decode(std::span<const std::uint8_t> datagram)

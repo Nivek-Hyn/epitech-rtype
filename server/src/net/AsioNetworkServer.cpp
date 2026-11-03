@@ -2,6 +2,8 @@
 
 #include "common/Constants.hpp"
 
+#include <exception>
+#include <iostream>
 #include <memory>
 #include <utility>
 
@@ -24,7 +26,22 @@ void AsioNetworkServer::start(std::uint16_t port)
     _socket.bind(Udp::endpoint(Udp::v4(), port));
     receive();
     scheduleTimeoutCheck();
-    _thread = std::thread([this] { _io.run(); });
+    _thread = std::thread([this] { runIo(); });
+}
+
+// An exception escaping the I/O thread would terminate the whole server: report it and keep serving.
+void AsioNetworkServer::runIo()
+{
+    for (;;) {
+        try {
+            _io.run();
+            return;
+        } catch (const std::exception &error) {
+            std::cerr << "r-type_server: network error: " << error.what() << '\n';
+        } catch (...) {
+            std::cerr << "r-type_server: unknown network error\n";
+        }
+    }
 }
 
 void AsioNetworkServer::stop()
@@ -61,8 +78,13 @@ void AsioNetworkServer::receive()
 {
     _socket.async_receive_from(asio::buffer(_receiveBuffer), _sender,
                                [this](const asio::error_code &error, std::size_t size) {
-                                   if (!error)
-                                       handleDatagram(size);
+                                   if (!error) {
+                                       try {
+                                           handleDatagram(size);
+                                       } catch (const std::exception &failure) {
+                                           std::cerr << "r-type_server: dropped a datagram: " << failure.what() << '\n';
+                                       }
+                                   }
                                    if (_socket.is_open())
                                        receive();
                                });
@@ -130,8 +152,14 @@ void AsioNetworkServer::sendTo(const Udp::endpoint &endpoint, protocol::Message 
 
 void AsioNetworkServer::sendToPlayer(PlayerId player, protocol::Message message)
 {
-    if (player < MaxPlayers && _clients[player].active)
-        sendTo(_clients[player].endpoint, std::move(message));
+    if (player >= MaxPlayers || !_clients[player].active)
+        return;
+    if (const auto *snapshot = std::get_if<protocol::Snapshot>(&message)) {
+        for (auto &part : protocol::splitSnapshot(*snapshot))
+            sendTo(_clients[player].endpoint, std::move(part));
+        return;
+    }
+    sendTo(_clients[player].endpoint, std::move(message));
 }
 
 std::optional<PlayerId> AsioNetworkServer::findClient(const Udp::endpoint &endpoint) const
@@ -149,6 +177,8 @@ void AsioNetworkServer::removeClient(PlayerId player, protocol::LeaveReason reas
         return;
     _clients[player].active = false;
     _events.push(PlayerDisconnected{player, reason});
+    for (PlayerId other = 0; other < MaxPlayers; ++other)
+        sendToPlayer(other, protocol::PlayerLeft{player, reason});
 }
 
 } // namespace rtype::server

@@ -1,6 +1,7 @@
 #include "ResourceManager.hpp"
 #include "common/Constants.hpp"
 #include "common/Protocol.hpp"
+#include "common/SnapshotAssembler.hpp"
 #include "net/AsioNetworkClient.hpp"
 #include "ui/MainMenu.hpp"
 #include "ui/Starfield.hpp"
@@ -73,7 +74,7 @@ int main(int argc, char **argv)
         }
     }
 
-    std::vector<rtype::protocol::EntityState> entities;
+    rtype::protocol::SnapshotAssembler world;
     bool reportedConnected = false;
     sf::Clock clock;
 
@@ -175,6 +176,31 @@ int main(int argc, char **argv)
                 } else if (const auto *rejected = std::get_if<rtype::protocol::ConnectRejected>(&*message)) {
                     std::cerr << "Server rejected connection (reason " << static_cast<int>(rejected->reason) << ").\n";
                 }
+        std::uint8_t inputFlags = 0;
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Z) || sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Up))
+            inputFlags |= rtype::protocol::InputFlag::Up;
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::S) || sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Down))
+            inputFlags |= rtype::protocol::InputFlag::Down;
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Q) || sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Left))
+            inputFlags |= rtype::protocol::InputFlag::Left;
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::D) || sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Right))
+            inputFlags |= rtype::protocol::InputFlag::Right;
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Space))
+            inputFlags |= rtype::protocol::InputFlag::Shoot;
+
+        if (network.connected())
+            network.send(rtype::protocol::Input{inputFlags});
+
+        while (auto message = network.poll()) {
+            if (const auto *snapshot = std::get_if<rtype::protocol::Snapshot>(&*message))
+                world.add(*snapshot);
+            else if (std::holds_alternative<rtype::protocol::ConnectAccepted>(*message))
+                world.reset(); // a new session: the server's ticks may start again from zero
+            else if (const auto *rejected = std::get_if<rtype::protocol::ConnectRejected>(&*message)) {
+                const char *reason = rejected->reason == rtype::protocol::RejectReason::ServerFull
+                                         ? "server is full"
+                                         : "protocol version mismatch";
+                std::cerr << "Connection rejected: " << reason << ".\n";
             }
         }
         resources.updateAudio();
@@ -213,6 +239,28 @@ int main(int argc, char **argv)
                         sprite.setPosition({entity.x, entity.y});
                         window.draw(sprite);
                     }
+        for (const auto &entity : world.entities()) {
+            if (hasAssets) {
+                if (entity.type == rtype::protocol::EntityType::Player) {
+                    sf::Sprite sprite(resources.getTexture("player"));
+                    const int variant = static_cast<int>(entity.variant % 5);
+                    sprite.setTextureRect(sf::IntRect({0, variant * 17}, {33, 17}));
+                    sprite.setScale({2.f, 2.f});
+                    sprite.setPosition({entity.x, entity.y});
+                    window.draw(sprite);
+                } else if (entity.type == rtype::protocol::EntityType::PlayerMissile ||
+                           entity.type == rtype::protocol::EntityType::EnemyMissile) {
+                    sf::Sprite sprite(resources.getTexture("bullet"));
+                    sprite.setTextureRect(sf::IntRect({248, 102}, {18, 12}));
+                    sprite.setScale({2.f, 2.f});
+                    sprite.setPosition({entity.x, entity.y});
+                    window.draw(sprite);
+                } else if (entity.type == rtype::protocol::EntityType::Enemy) {
+                    sf::Sprite sprite(resources.getTexture("enemy"));
+                    sprite.setTextureRect(sf::IntRect({0, 0}, {33, 36}));
+                    sprite.setScale({2.f, 2.f});
+                    sprite.setPosition({entity.x, entity.y});
+                    window.draw(sprite);
                 }
             }
         }

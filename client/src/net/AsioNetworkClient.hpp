@@ -28,6 +28,7 @@ private:
     using Udp = asio::ip::udp;
     using Clock = std::chrono::steady_clock;
 
+    void runIo();
     void receive();
     void scheduleConnectRetry();
     void scheduleTimeoutCheck();
@@ -42,6 +43,7 @@ private:
     std::array<std::uint8_t, protocol::MaxPacketSize> _receiveBuffer{};
     engine::core::ThreadSafeQueue<protocol::Message> _messages;
     std::atomic<bool> _connected{false};
+    std::atomic<bool> _connectionRejected{false};
     std::atomic<bool> _running{false};
     std::atomic<std::uint32_t> _nextSequence{0};
     Clock::time_point _lastReceive{};
