@@ -56,7 +56,7 @@ int main(int argc, char **argv)
     }
 
     rtype::client::ui::Starfield starfield;
-    rtype::client::ui::MainMenu menu(resources.getFont("default"));
+    rtype::client::ui::MainMenu menu(resources.getFont("default"), &resources);
     rtype::client::AsioNetworkClient network;
     AppState appState = AppState::Menu;
 

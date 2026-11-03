@@ -32,6 +32,7 @@ bool ResourceManager::loadDefaults()
     loadSound("shoot", "assets/audio/shoot.wav");
     loadSound("explosion", "assets/audio/explosion.wav");
     loadSound("hit", "assets/audio/hit.wav");
+    loadSound("click", "assets/audio/click.wav");
 
     return success;
 }

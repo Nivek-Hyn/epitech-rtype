@@ -1,9 +1,11 @@
 #include "MainMenu.hpp"
+#include "ResourceManager.hpp"
 
 namespace rtype::client::ui {
 
-MainMenu::MainMenu(const sf::Font &font)
+MainMenu::MainMenu(const sf::Font &font, ResourceManager *resources)
     : _font(font),
+      _resources(resources),
       _titleText(font, "R - T Y P E", 80),
       _subtitleText(font, "A SPACE SHOOTER", 22),
       _screenTitleText(font, "", 36),
@@ -118,6 +120,18 @@ void MainMenu::setStatusMessage(const std::string &message, sf::Color color)
     _statusTimer = 5.0f;
 }
 
+void MainMenu::setResourceManager(ResourceManager *resources)
+{
+    _resources = resources;
+}
+
+void MainMenu::playUiSound(const std::string &id)
+{
+    if (_resources) {
+        _resources->playSound(id, 75.f);
+    }
+}
+
 void MainMenu::update(float dt)
 {
     _starfield.update(dt);
@@ -192,12 +206,17 @@ void MainMenu::handleEvent(const sf::Event &event, const sf::RenderWindow &windo
         } else if (const auto *click = event.getIf<sf::Event::MouseButtonPressed>()) {
             if (click->button == sf::Mouse::Button::Left) {
                 const auto clickedPos = window.mapPixelToCoords(click->position);
-                _hostModeSelector->handleMouseClick(clickedPos);
-                _hostDifficultySelector->handleMouseClick(clickedPos);
-                _hostMissionSelector->handleMouseClick(clickedPos);
-                _hostPortInput->handleMouseClick(clickedPos);
+                if (_hostModeSelector->handleMouseClick(clickedPos))
+                    playUiSound("click");
+                if (_hostDifficultySelector->handleMouseClick(clickedPos))
+                    playUiSound("click");
+                if (_hostMissionSelector->handleMouseClick(clickedPos))
+                    playUiSound("click");
+                if (_hostPortInput->handleMouseClick(clickedPos))
+                    playUiSound("click");
 
                 if (_hostButtons[0]->handleMouseClick(clickedPos)) {
+                    playUiSound("click");
                     _config.gameMode = static_cast<int>(_hostModeSelector->getSelectedIndex());
                     _config.difficulty = static_cast<int>(_hostDifficultySelector->getSelectedIndex());
                     _config.mission = static_cast<int>(_hostMissionSelector->getSelectedIndex());
@@ -207,11 +226,13 @@ void MainMenu::handleEvent(const sf::Event &event, const sf::RenderWindow &windo
                                      " | Difficulty: " + _hostDifficultySelector->getSelectedValue() +
                                      " | Port: " + _config.hostPort + "]", sf::Color::Green);
                 } else if (_hostButtons[1]->handleMouseClick(clickedPos)) {
+                    playUiSound("click");
                     _currentScreen = MenuScreen::Root;
                 }
             }
         } else if (const auto *key = event.getIf<sf::Event::KeyPressed>()) {
             if (key->code == sf::Keyboard::Key::Escape) {
+                playUiSound("click");
                 _currentScreen = MenuScreen::Root;
             } else {
                 _hostModeSelector->handleKeyPress(key->code);
@@ -234,17 +255,21 @@ void MainMenu::handleEvent(const sf::Event &event, const sf::RenderWindow &windo
                 _joinPortInput->handleMouseClick(clickedPos);
 
                 if (_joinButtons[0]->handleMouseClick(clickedPos)) {
+                    playUiSound("click");
                     _config.joinIp = _joinIpInput->getValue().empty() ? "127.0.0.1" : _joinIpInput->getValue();
                     _config.joinPort = _joinPortInput->getValue().empty() ? "4242" : _joinPortInput->getValue();
                     _pendingAction = MenuAction::Connect;
                 } else if (_joinButtons[1]->handleMouseClick(clickedPos)) {
+                    playUiSound("click");
                     _currentScreen = MenuScreen::Root;
                 }
             }
         } else if (const auto *key = event.getIf<sf::Event::KeyPressed>()) {
             if (key->code == sf::Keyboard::Key::Escape) {
+                playUiSound("click");
                 _currentScreen = MenuScreen::Root;
             } else if (key->code == sf::Keyboard::Key::Enter) {
+                playUiSound("click");
                 _config.joinIp = _joinIpInput->getValue().empty() ? "127.0.0.1" : _joinIpInput->getValue();
                 _config.joinPort = _joinPortInput->getValue().empty() ? "4242" : _joinPortInput->getValue();
                 _pendingAction = MenuAction::Connect;
@@ -260,17 +285,21 @@ void MainMenu::handleEvent(const sf::Event &event, const sf::RenderWindow &windo
         } else if (const auto *click = event.getIf<sf::Event::MouseButtonPressed>()) {
             if (click->button == sf::Mouse::Button::Left) {
                 const auto clickedPos = window.mapPixelToCoords(click->position);
-                _sfxVolumeSelector->handleMouseClick(clickedPos);
-                _musicVolumeSelector->handleMouseClick(clickedPos);
+                if (_sfxVolumeSelector->handleMouseClick(clickedPos))
+                    playUiSound("click");
+                if (_musicVolumeSelector->handleMouseClick(clickedPos))
+                    playUiSound("click");
                 _config.sfxVolume = static_cast<float>(_sfxVolumeSelector->getSelectedIndex()) * 25.f;
                 _config.musicVolume = static_cast<float>(_musicVolumeSelector->getSelectedIndex()) * 25.f;
 
                 if (_settingsButtons[0]->handleMouseClick(clickedPos)) {
+                    playUiSound("click");
                     _currentScreen = MenuScreen::Root;
                 }
             }
         } else if (const auto *key = event.getIf<sf::Event::KeyPressed>()) {
             if (key->code == sf::Keyboard::Key::Escape) {
+                playUiSound("click");
                 _currentScreen = MenuScreen::Root;
             } else if (key->code == sf::Keyboard::Key::Up || key->code == sf::Keyboard::Key::Z) {
                 _settingsSelectedIndex = (_settingsSelectedIndex + 2) % 3;
@@ -283,6 +312,7 @@ void MainMenu::handleEvent(const sf::Event &event, const sf::RenderWindow &windo
                 _musicVolumeSelector->setSelected(_settingsSelectedIndex == 1);
                 _settingsButtons[0]->setSelected(_settingsSelectedIndex == 2);
             } else if (key->code == sf::Keyboard::Key::Left || key->code == sf::Keyboard::Key::Q) {
+                playUiSound("click");
                 if (_settingsSelectedIndex == 0)
                     _sfxVolumeSelector->previous();
                 else if (_settingsSelectedIndex == 1)
@@ -290,6 +320,7 @@ void MainMenu::handleEvent(const sf::Event &event, const sf::RenderWindow &windo
                 _config.sfxVolume = static_cast<float>(_sfxVolumeSelector->getSelectedIndex()) * 25.f;
                 _config.musicVolume = static_cast<float>(_musicVolumeSelector->getSelectedIndex()) * 25.f;
             } else if (key->code == sf::Keyboard::Key::Right || key->code == sf::Keyboard::Key::D) {
+                playUiSound("click");
                 if (_settingsSelectedIndex == 0)
                     _sfxVolumeSelector->next();
                 else if (_settingsSelectedIndex == 1)
@@ -298,6 +329,7 @@ void MainMenu::handleEvent(const sf::Event &event, const sf::RenderWindow &windo
                 _config.musicVolume = static_cast<float>(_musicVolumeSelector->getSelectedIndex()) * 25.f;
             } else if (key->code == sf::Keyboard::Key::Enter) {
                 if (_settingsSelectedIndex == 2) {
+                    playUiSound("click");
                     _currentScreen = MenuScreen::Root;
                 }
             }
@@ -323,6 +355,7 @@ void MainMenu::navigateMenu(int direction)
 
 void MainMenu::triggerCurrentSelection()
 {
+    playUiSound("click");
     if (_currentScreen == MenuScreen::Root) {
         if (_rootSelectedIndex == 0) {
             _pendingAction = MenuAction::Connect;

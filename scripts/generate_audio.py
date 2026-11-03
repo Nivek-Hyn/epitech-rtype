@@ -100,6 +100,22 @@ def generate_hit(path: Path):
         
     write_wav(path, samples)
 
+def generate_click(path: Path):
+    """Subtle, crisp retro UI blip/click."""
+    duration = 0.04
+    total_samples = int(duration * SAMPLE_RATE)
+    samples = []
+    
+    phase = 0.0
+    for i in range(total_samples):
+        t = i / total_samples
+        freq = 1800.0 - 1000.0 * t
+        phase += 2.0 * math.pi * freq / SAMPLE_RATE
+        env = (1.0 - t) ** 2.2
+        samples.append(math.sin(phase) * env * 0.55)
+        
+    write_wav(path, samples)
+
 def generate_music_loop(path: Path):
     """
     Seamless retro synthwave / chiptune loop (8 bars, 130 BPM).
@@ -199,6 +215,7 @@ def main():
     generate_shoot(assets_dir / "shoot.wav")
     generate_explosion(assets_dir / "explosion.wav")
     generate_hit(assets_dir / "hit.wav")
+    generate_click(assets_dir / "click.wav")
     generate_music_loop(assets_dir / "music.wav")
     print("All audio files generated successfully in assets/audio/")
 
