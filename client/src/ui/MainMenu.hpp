@@ -33,6 +33,9 @@ struct GameConfig {
 
     std::string joinIp{"127.0.0.1"};
     std::string joinPort{"4242"};
+
+    float sfxVolume{100.f};
+    float musicVolume{100.f};
 };
 
 class MainMenu {

@@ -29,6 +29,9 @@ bool ResourceManager::loadDefaults()
             success = false;
         }
     }
+    loadSound("shoot", "assets/audio/shoot.wav");
+    loadSound("explosion", "assets/audio/explosion.wav");
+    loadSound("hit", "assets/audio/hit.wav");
 
     return success;
 }
@@ -72,4 +75,95 @@ bool ResourceManager::hasFont(const std::string &id) const
     return _fonts.find(id) != _fonts.end();
 }
 
+bool ResourceManager::loadSound(const std::string &id, const std::string &path)
+{
+    sf::SoundBuffer buffer;
+    if (!buffer.loadFromFile(path)) {
+        std::cerr << "[ResourceManager] Warning: Failed to load sound " << path << '\n';
+        return false;
+    }
+    _soundBuffers[id] = std::move(buffer);
+    return true;
 }
+
+const sf::SoundBuffer &ResourceManager::getSound(const std::string &id) const
+{
+    const auto it = _soundBuffers.find(id);
+    if (it == _soundBuffers.end())
+        throw std::out_of_range("Sound buffer not found: " + id);
+    return it->second;
+}
+
+bool ResourceManager::hasSound(const std::string &id) const
+{
+    return _soundBuffers.find(id) != _soundBuffers.end();
+}
+
+void ResourceManager::playSound(const std::string &id, float volume)
+{
+    if (_sfxVolume <= 0.01f)
+        return;
+
+    const auto it = _soundBuffers.find(id);
+    if (it == _soundBuffers.end())
+        return;
+
+    updateAudio();
+
+    if (_activeSounds.size() > 20) {
+        _activeSounds.erase(_activeSounds.begin());
+    }
+
+    auto sound = std::make_unique<sf::Sound>(it->second);
+    sound->setVolume(_sfxVolume * (volume / 100.f));
+    sound->play();
+    _activeSounds.push_back(std::move(sound));
+}
+
+void ResourceManager::updateAudio()
+{
+    std::erase_if(_activeSounds, [](const auto &soundPtr) {
+        return !soundPtr || soundPtr->getStatus() == sf::Sound::Status::Stopped;
+    });
+}
+
+bool ResourceManager::playMusic(const std::string &path, float volume, bool loop)
+{
+    if (!_music.openFromFile(path)) {
+        std::cerr << "[ResourceManager] Warning: Failed to open music " << path << '\n';
+        return false;
+    }
+    _musicVolume = volume;
+    _music.setVolume(_musicVolume);
+    _music.setLooping(loop);
+    _music.play();
+    return true;
+}
+
+void ResourceManager::stopMusic()
+{
+    _music.stop();
+}
+
+void ResourceManager::setMusicVolume(float volume)
+{
+    _musicVolume = volume;
+    _music.setVolume(_musicVolume);
+}
+
+void ResourceManager::setSfxVolume(float volume)
+{
+    _sfxVolume = volume;
+}
+
+float ResourceManager::getSfxVolume() const
+{
+    return _sfxVolume;
+}
+
+float ResourceManager::getMusicVolume() const
+{
+    return _musicVolume;
+}
+
+} // namespace rtype::client

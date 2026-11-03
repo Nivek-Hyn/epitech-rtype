@@ -11,6 +11,7 @@
 #include <exception>
 #include <iostream>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 enum class AppState {
@@ -47,6 +48,7 @@ int main(int argc, char **argv)
     if (!hasAssets) {
         std::cerr << "Warning: Could not load some assets. Make sure to run from repository root.\n";
     }
+    resources.playMusic("assets/audio/music.wav", 50.f, true);
 
     if (!resources.hasFont("default")) {
         std::cerr << "Error: Default font could not be loaded.\n";
@@ -77,6 +79,14 @@ int main(int argc, char **argv)
 
     while (window.isOpen()) {
         const float dt = clock.restart().asSeconds();
+        const auto &cfg = menu.getConfig();
+        resources.setSfxVolume(cfg.sfxVolume);
+        resources.setMusicVolume(cfg.musicVolume);
+        static float lastSfxVolume = 100.f;
+        if (std::abs(cfg.sfxVolume - lastSfxVolume) > 1.f) {
+            resources.playSound("shoot", 80.f);
+            lastSfxVolume = cfg.sfxVolume;
+        }
 
         while (const std::optional<sf::Event> event = window.pollEvent()) {
             if (event->is<sf::Event::Closed>()) {
@@ -130,19 +140,44 @@ int main(int argc, char **argv)
                 inputFlags |= rtype::protocol::InputFlag::Left;
             if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::D) || sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Right))
                 inputFlags |= rtype::protocol::InputFlag::Right;
-            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Space))
+
+            static float shootCooldown = 0.f;
+            shootCooldown -= dt;
+            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Space)) {
                 inputFlags |= rtype::protocol::InputFlag::Shoot;
+                if (shootCooldown <= 0.f) {
+                    resources.playSound("shoot", 80.f);
+                    shootCooldown = 0.22f;
+                }
+            }
 
             if (network.connected())
                 network.send(rtype::protocol::Input{inputFlags});
 
             while (auto message = network.poll()) {
-                if (const auto *snapshot = std::get_if<rtype::protocol::Snapshot>(&*message))
+                if (const auto *snapshot = std::get_if<rtype::protocol::Snapshot>(&*message)) {
+                    if (!entities.empty()) {
+                        std::unordered_set<std::uint32_t> currentEnemies;
+                        for (const auto &ent : snapshot->entities) {
+                            if (ent.type == rtype::protocol::EntityType::Enemy)
+                                currentEnemies.insert(ent.netId);
+                        }
+                        for (const auto &prev : entities) {
+                            if (prev.type == rtype::protocol::EntityType::Enemy &&
+                                !currentEnemies.contains(prev.netId) &&
+                                prev.x > 30.f && prev.x < rtype::WorldWidth + 100.f) {
+                                resources.playSound("explosion", 90.f);
+                                break;
+                            }
+                        }
+                    }
                     entities = snapshot->entities;
-                else if (const auto *rejected = std::get_if<rtype::protocol::ConnectRejected>(&*message))
+                } else if (const auto *rejected = std::get_if<rtype::protocol::ConnectRejected>(&*message)) {
                     std::cerr << "Server rejected connection (reason " << static_cast<int>(rejected->reason) << ").\n";
+                }
             }
         }
+        resources.updateAudio();
 
         window.clear(sf::Color(10, 10, 25));
 

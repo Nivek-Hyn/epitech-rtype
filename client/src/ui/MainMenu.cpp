@@ -137,6 +137,10 @@ void MainMenu::update(float dt)
             _statusText.setString("");
         }
     }
+    if (_sfxVolumeSelector)
+        _config.sfxVolume = static_cast<float>(_sfxVolumeSelector->getSelectedIndex()) * 25.f;
+    if (_musicVolumeSelector)
+        _config.musicVolume = static_cast<float>(_musicVolumeSelector->getSelectedIndex()) * 25.f;
 }
 
 void MainMenu::handleEvent(const sf::Event &event, const sf::RenderWindow &window)
@@ -258,6 +262,8 @@ void MainMenu::handleEvent(const sf::Event &event, const sf::RenderWindow &windo
                 const auto clickedPos = window.mapPixelToCoords(click->position);
                 _sfxVolumeSelector->handleMouseClick(clickedPos);
                 _musicVolumeSelector->handleMouseClick(clickedPos);
+                _config.sfxVolume = static_cast<float>(_sfxVolumeSelector->getSelectedIndex()) * 25.f;
+                _config.musicVolume = static_cast<float>(_musicVolumeSelector->getSelectedIndex()) * 25.f;
 
                 if (_settingsButtons[0]->handleMouseClick(clickedPos)) {
                     _currentScreen = MenuScreen::Root;
@@ -266,9 +272,34 @@ void MainMenu::handleEvent(const sf::Event &event, const sf::RenderWindow &windo
         } else if (const auto *key = event.getIf<sf::Event::KeyPressed>()) {
             if (key->code == sf::Keyboard::Key::Escape) {
                 _currentScreen = MenuScreen::Root;
-            } else {
-                _sfxVolumeSelector->handleKeyPress(key->code);
-                _musicVolumeSelector->handleKeyPress(key->code);
+            } else if (key->code == sf::Keyboard::Key::Up || key->code == sf::Keyboard::Key::Z) {
+                _settingsSelectedIndex = (_settingsSelectedIndex + 2) % 3;
+                _sfxVolumeSelector->setSelected(_settingsSelectedIndex == 0);
+                _musicVolumeSelector->setSelected(_settingsSelectedIndex == 1);
+                _settingsButtons[0]->setSelected(_settingsSelectedIndex == 2);
+            } else if (key->code == sf::Keyboard::Key::Down || key->code == sf::Keyboard::Key::S) {
+                _settingsSelectedIndex = (_settingsSelectedIndex + 1) % 3;
+                _sfxVolumeSelector->setSelected(_settingsSelectedIndex == 0);
+                _musicVolumeSelector->setSelected(_settingsSelectedIndex == 1);
+                _settingsButtons[0]->setSelected(_settingsSelectedIndex == 2);
+            } else if (key->code == sf::Keyboard::Key::Left || key->code == sf::Keyboard::Key::Q) {
+                if (_settingsSelectedIndex == 0)
+                    _sfxVolumeSelector->previous();
+                else if (_settingsSelectedIndex == 1)
+                    _musicVolumeSelector->previous();
+                _config.sfxVolume = static_cast<float>(_sfxVolumeSelector->getSelectedIndex()) * 25.f;
+                _config.musicVolume = static_cast<float>(_musicVolumeSelector->getSelectedIndex()) * 25.f;
+            } else if (key->code == sf::Keyboard::Key::Right || key->code == sf::Keyboard::Key::D) {
+                if (_settingsSelectedIndex == 0)
+                    _sfxVolumeSelector->next();
+                else if (_settingsSelectedIndex == 1)
+                    _musicVolumeSelector->next();
+                _config.sfxVolume = static_cast<float>(_sfxVolumeSelector->getSelectedIndex()) * 25.f;
+                _config.musicVolume = static_cast<float>(_musicVolumeSelector->getSelectedIndex()) * 25.f;
+            } else if (key->code == sf::Keyboard::Key::Enter) {
+                if (_settingsSelectedIndex == 2) {
+                    _currentScreen = MenuScreen::Root;
+                }
             }
         }
     }
