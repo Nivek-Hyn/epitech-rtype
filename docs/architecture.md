@@ -31,10 +31,15 @@ both `common` (the protocol they share) and `engine` (ECS, game loop), but never
 
 | Module | Responsibility | Third-party libraries | CMake target |
 |---|---|---|---|
-| `engine/` | Generic game engine: knows nothing about R-Type | none | `rtype_engine` (static library) |
+| `engine/` | Generic game engine: knows nothing about R-Type | none | `rtype_engine` / `RTypeEngine::Engine` (interface target grouping enabled modules) |
 | `common/` | What the server and the client must agree on: protocol, components, constants | none | `rtype_common` (static library) |
 | `server/` | Authoritative game simulation and server networking | Asio | `rtype_server_lib` (game logic, tested) + `r-type_server` |
-| `client/` | Display, keyboard input, sound and client networking | SFML, Asio | `r-type_client` |
+| `client/` | Display, keyboard input and client networking; sound integration remains pending | SFML, Asio | `r-type_client` |
+
+The engine is also a separate CMake project. ECS and Core are static libraries; Physics, Net and Systems
+are header-only targets. Systems depends on ECS, and Core provides the platform thread dependency.
+Modules are selected at build time and exported for `find_package` consumers; no dynamic plugin loader exists.
+See the [engine guide](engine.md) and [technical study](technical-study.md#standalone-engine-and-module-choices-implemented).
 
 Rules every contributor follows ([CONTRIBUTING](https://github.com/EpitechPGE3-2026/G-ING-500-MAR-5-1-rtype-5/blob/main/CONTRIBUTING.md)):
 - `engine/` never includes anything from `common/`, `server/` or `client/`.
@@ -125,7 +130,7 @@ sequenceDiagram
     end
 ```
 
-*Text description: the client network thread retries `Connect` every 500 ms until the server accepts or rejects it.
+*Text description: the client network thread retries `Connect` every 500 ms while it is not connected.
 The server assigns one of four player ids. The client sends its held input flags while connected. The server
 converts received datagrams into game-thread events and broadcasts a snapshot after each simulation tick. The
 client's rendering thread drains decoded messages and displays the latest snapshot. A disconnect or timeout
@@ -165,7 +170,7 @@ A **thread** is a second flow of execution running another function at the same 
 with the same memory (`std::thread`). Each program has two:
 
 - the **network thread**, which runs Asio's asynchronous receive, timer and send handlers;
-- the **game thread** (on the client, the rendering thread), the one running `main`, which must never wait.
+- the **game thread** (on the client, the rendering thread), the one running `main` and processing queued messages.
 
 Asio receives datagrams asynchronously on its own I/O thread. The game and rendering loops therefore do not
 wait for network packets.
@@ -182,18 +187,18 @@ flowchart LR
     Clients(["Clients"])
     Clients -- "datagrams (Input...)" --> Receive
     Receive -- "push" --> Queue
-    Queue -- "tryPop, never waits" --> Simulation
+    Queue -- "tryPop, empty gives nullopt" --> Simulation
     Simulation -- "send / broadcast: encode + send_to" --> Clients
 ```
 
 *Text description: clients send datagrams to the server's UDP port. Asio's I/O thread decodes each valid packet
 and pushes the resulting event (player joined, left, input) into a thread-safe queue. At each step, the game
-thread drains the queue without waiting, runs the simulation and posts snapshots and game events to the network
+thread drains the available messages, runs the simulation and posts snapshots and game events to the network
 thread for delivery.*
 
 **The queue between the two threads.** Both threads use the same queue. A mutex protects its internal FIFO
 storage from concurrent access. `tryPop` never waits for a message: when the queue is empty it returns
-`std::nullopt`.
+`std::nullopt` after acquiring its mutex. It can wait for that mutex; it is not a lock-free queue.
 
 ```cpp
 // Network thread, after decoding an Input datagram:
@@ -214,7 +219,7 @@ sender address of each datagram it receives.
 
 The client follows the same idea: its network thread fills a queue that the main (rendering) thread empties every
 frame before drawing. The client sends held input flags while connected; the server remains authoritative for
-player positions. The current client draws the snapshot entities directly as simple shapes rather than storing
+player positions. The current client draws the snapshot entities directly as sprites rather than storing
 them in a local ECS.
 
 ## 6. Inside the engine: the ECS

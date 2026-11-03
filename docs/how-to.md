@@ -2,6 +2,45 @@
 
 Short recipes for the most common changes. They assume you know the concepts from the
 [engine documentation](engine.md): entities, components, systems and the event bus.
+Before changing data shared across domains, read the [shared data reference](shared-data.md).
+
+## Run the component and system example
+
+`engine/examples/basic/` is a complete consumer project. It defines its own components and adds a system
+without changing the engine. It requires a C++20 compiler, CMake 3.24+ and a build tool, with no SFML,
+Asio, game assets or GoogleTest. From the repository root:
+
+```sh
+cmake -S engine -B build/engine-tutorial -DCMAKE_BUILD_TYPE=Debug
+cmake --build build/engine-tutorial --config Debug --parallel 4
+cmake --install build/engine-tutorial --config Debug --prefix "$PWD/build/engine-tutorial-install"
+cmake -S engine/examples/basic -B build/engine-tutorial-consumer -DCMAKE_BUILD_TYPE=Debug -DCMAKE_PREFIX_PATH="$PWD/build/engine-tutorial-install"
+cmake --build build/engine-tutorial-consumer --config Debug --parallel 4
+ctest --test-dir build/engine-tutorial-consumer -C Debug --output-on-failure --verbose
+```
+
+These commands also work in PowerShell; use a Developer PowerShell for MSVC and keep `--config Debug`
+and `-C Debug` for Visual Studio generators. Use matching engine/consumer compilers and configurations.
+The test prints `Custom component and system: movement, lifetime and deferred destruction passed`.
+Alternatively, `cmake -P engine/cmake/CheckPackage.cmake` builds, installs and tests the example in one command.
+
+Read `engine/examples/basic/main.cpp` in this order:
+
+1. `Lifetime` holds the remaining lifetime in seconds. The struct belongs to the consumer; the Registry
+   needs no new registration or code change to store it.
+2. `lifetimeSystem` receives the Registry and the duration of one simulated step. Its `each<Lifetime>`
+   callback visits only live entities with that component and subtracts the step duration.
+3. Expired ids are collected in a vector. The following loop kills those entities after `each` has finished,
+   so none of its component references is accessed after destruction.
+4. `main` registers movement first, then lifetime. Each `update(0.5f)` runs both systems in that order.
+   The temporary entity starts with one second of lifetime; the other entity has no Lifetime component.
+5. After the first update, both entities have moved and the temporary entity has half a second left.
+   After the second, the temporary entity and all its components are removed; the permanent one survives.
+   Fresh pointers are obtained after the systems run.
+
+The two updates represent simulated time; this console example does not sleep for a real second.
+To experiment, change the initial lifetime to `1.5f` and adjust the checks to expect half a second remaining
+after the two updates. Keep the engine unchanged: the new behavior belongs to the consumer.
 
 ## Add a component
 
@@ -120,6 +159,9 @@ Use the event bus when a system must trigger something it should not know about 
 
 ## Add an enemy type
 
+An enemy is an entity, not a class. Game.cpp currently spawns enemies and checks player-missile collisions;
+the client displays an enemy sprite. A new subtype combines component values, a behavior and a rendering choice.
+Changing `Kind::variant` alone does not add a behavior or a new sprite mapping.
 An enemy is an entity, not a class: a new enemy type is a new combination of components and a new value of
 `Kind::variant`. The current prototype already spawns a basic enemy on a timer, moves it left, and lets player
 missiles destroy it. The game loop and renderer are in place; extending enemy behavior still requires server and
@@ -133,22 +175,65 @@ client changes.
    current implementation is in `Game::spawnEnemies()` and `Game::spawnNetworked()`:
 
    ```cpp
-   engine::ecs::Entity enemy = spawnNetworked(protocol::EntityType::Enemy, variant, x, y);
+   const std::uint8_t variant = 1;
+   engine::ecs::Entity enemy =
+       spawnNetworked(protocol::EntityType::Enemy, variant, rtype::WorldWidth - EnemyWidth, 300.f);
    _registry.emplace<rtype::components::Velocity>(enemy, -200.f, 0.f);
    // + server-only components: health, hitbox, movement pattern, shooting...
    ```
 
+   This snippet belongs inside a Game method: `spawnNetworked` is private, not a free function callable by
+   arbitrary code. It already gives the entity NetworkId, Kind, Position and a zero Velocity; the example
+   replaces Velocity. The snapshot sends NetworkId, Kind and Position, not every component automatically.
    `spawnNetworked` gives the entity a `NetworkId`, `Kind`, `Position` and `Velocity`, which are used by the
    snapshot and movement system. The current spawn timer, enemy rows and speed are constants in `Game.cpp`.
 
 3. **Give it a behavior.** Reuse existing systems when possible (movement, shooting). For a new movement pattern,
-   add a component holding its parameters and a system that updates the `Velocity` from it.
+   add a server-only component holding its parameters and a system that updates Velocity. Run that behavior
+   before movement if the current tick must use the new velocity. Keep resource/render code outside the server.
 
+4. **Display it on the client.** The current enemy branch uses one texture rectangle regardless of variant.
+   Add an explicit variant-to-sprite mapping and test its fallback. Reusing type/variant needs no new wire
+   field; adding health or other state requires the shared-contract review described above.
 4. **Display it on the client.** Add or load a texture through `client/src/ResourceManager.cpp`, then map the
    entity type/variant to a sprite in `client/src/main.cpp`. The protocol does not change if the existing
    `EntityType::Enemy` and `variant` fields are sufficient; a new entity category requires a protocol update.
 
 5. **Test the server side** like any system: spawn the enemy, run a few ticks, check its position or state.
+
+### Add a configured wave
+
+Game loads `assets/levels/level1.json` at startup through `server/src/levelLoader.cpp`.
+Start the server from the repository root or the installed game directory. Restart it after editing the file.
+The other supplied level files are not selected automatically: campaign progression remains separate work.
+
+Append an entry to the top-level `waves` array, keeping valid JSON commas:
+
+```json
+{
+  "wave_id": 3,
+  "delay_before_start": 10.0,
+  "enemies": [
+    { "type": "patrol", "spawn_y": 500, "speed": 120 }
+  ]
+}
+```
+
+The wave fires once when accumulated active simulation time reaches ten seconds. Time advances only
+while at least one player has a live ship. Delay is measured from the level's beginning, not from the
+previous wave. `spawn_y` is a world coordinate; positive `speed` moves the enemy left from the right edge.
+For the current 72-unit-high enemy, keep y between 0 and 1008 in the 1080-unit-high world.
+
+The loader reads `type`, `amplitude` and `frequency`, but the integrated spawner currently uses only y
+and speed: changing those other fields does not implement a new movement pattern. Missing files,
+malformed JSON and a missing/non-array `waves` field are rejected; not every numeric range or optional
+field shape is validated yet. Keep finite, nonnegative delays and sensible positions/speeds.
+
+Connect a client and verify the extra enemy appears at the configured active time and height.
+This is an extension recipe, not evidence that another team member has already followed it.
+
+Use configuration for values an existing behavior already consumes (timing, count, speed or positions).
+A new behavior still needs C++ unless a scripting mechanism capable of expressing it is actually implemented.
 
 ## Change the network protocol
 

@@ -16,23 +16,24 @@ MessageType typeOf(const Message &message)
         []<typename T>(const T &) {
             if constexpr (std::is_same_v<T, Connect>)
                 return MessageType::Connect;
-            if constexpr (std::is_same_v<T, Input>)
+            else if constexpr (std::is_same_v<T, Input>)
                 return MessageType::Input;
-            if constexpr (std::is_same_v<T, Disconnect>)
+            else if constexpr (std::is_same_v<T, Disconnect>)
                 return MessageType::Disconnect;
-            if constexpr (std::is_same_v<T, Ping>)
+            else if constexpr (std::is_same_v<T, Ping>)
                 return MessageType::Ping;
-            if constexpr (std::is_same_v<T, ConnectAccepted>)
+            else if constexpr (std::is_same_v<T, ConnectAccepted>)
                 return MessageType::ConnectAccepted;
-            if constexpr (std::is_same_v<T, ConnectRejected>)
+            else if constexpr (std::is_same_v<T, ConnectRejected>)
                 return MessageType::ConnectRejected;
-            if constexpr (std::is_same_v<T, Snapshot>)
+            else if constexpr (std::is_same_v<T, Snapshot>)
                 return MessageType::Snapshot;
-            if constexpr (std::is_same_v<T, EntityDestroyed>)
+            else if constexpr (std::is_same_v<T, EntityDestroyed>)
                 return MessageType::EntityDestroyed;
-            if constexpr (std::is_same_v<T, PlayerLeft>)
+            else if constexpr (std::is_same_v<T, PlayerLeft>)
                 return MessageType::PlayerLeft;
-            return MessageType::Pong;
+            else
+                return MessageType::Pong;
         },
         message);
 }

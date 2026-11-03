@@ -31,4 +31,8 @@ struct Kind {
     std::uint8_t variant = 0; // player index (0-3) for players, subtype for enemies
 };
 
+struct Health {
+    int hp = 3;
+};
+
 } // namespace rtype::components

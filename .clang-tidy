@@ -1,0 +1,17 @@
+# Focus on correctness; clang-format owns formatting and naming remains a review concern.
+Checks: >-
+  -*,
+  clang-analyzer-core.*,
+  clang-analyzer-cplusplus.*,
+  clang-analyzer-deadcode.DeadStores,
+  bugprone-dangling-handle,
+  bugprone-inaccurate-erase,
+  bugprone-move-forwarding-reference,
+  bugprone-sizeof-container,
+  bugprone-stringview-nullptr,
+  bugprone-unused-raii,
+  bugprone-use-after-move
+WarningsAsErrors: '*'
+HeaderFilterRegex: '(^|[/\\])(engine|common|server|client|tests)[/\\]'
+SystemHeaders: false
+FormatStyle: file
