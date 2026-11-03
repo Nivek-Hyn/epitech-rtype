@@ -28,6 +28,7 @@ private:
     using Udp = asio::ip::udp;
     using Clock = std::chrono::steady_clock;
 
+    void runIo();
     void receive();
     void scheduleConnectRetry();
     void scheduleTimeoutCheck();

@@ -1,6 +1,7 @@
 #include "ResourceManager.hpp"
 #include "common/Constants.hpp"
 #include "common/Protocol.hpp"
+#include "common/SnapshotAssembler.hpp"
 #include "net/AsioNetworkClient.hpp"
 
 #include <SFML/Graphics.hpp>
@@ -46,7 +47,7 @@ int main(int argc, char **argv)
     std::cout << "Connecting to " << host << ':' << port << " over UDP...\n";
     std::cout << "Controls: [ZQSD / Arrows] to Move, [Space] to Shoot.\n";
 
-    std::vector<rtype::protocol::EntityState> entities;
+    rtype::protocol::SnapshotAssembler world;
     bool reportedConnected = false;
 
     while (window.isOpen()) {
@@ -77,7 +78,9 @@ int main(int argc, char **argv)
 
         while (auto message = network.poll()) {
             if (const auto *snapshot = std::get_if<rtype::protocol::Snapshot>(&*message))
-                entities = snapshot->entities;
+                world.add(*snapshot);
+            else if (std::holds_alternative<rtype::protocol::ConnectAccepted>(*message))
+                world.reset(); // a new session: the server's ticks may start again from zero
             else if (const auto *rejected = std::get_if<rtype::protocol::ConnectRejected>(&*message)) {
                 const char *reason = rejected->reason == rtype::protocol::RejectReason::ServerFull
                                          ? "server is full"
@@ -88,7 +91,7 @@ int main(int argc, char **argv)
 
         window.clear(sf::Color(10, 10, 25));
 
-        for (const auto &entity : entities) {
+        for (const auto &entity : world.entities()) {
             if (hasAssets) {
                 if (entity.type == rtype::protocol::EntityType::Player) {
                     sf::Sprite sprite(resources.getTexture("player"));

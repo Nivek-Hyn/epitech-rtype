@@ -35,6 +35,7 @@ private:
         Clock::time_point lastSeen{};
     };
 
+    void runIo();
     void receive();
     void handleDatagram(std::size_t size);
     void scheduleTimeoutCheck();

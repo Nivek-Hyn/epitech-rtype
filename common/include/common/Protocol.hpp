@@ -115,6 +115,10 @@ struct Packet {
 
 std::vector<std::uint8_t> encode(const Packet &packet);
 
+// Cuts a snapshot into one or more snapshots that each fit in a datagram (at most MaxEntitiesPerSnapshot entities).
+// Every part keeps the tick, state and score; there is always at least one part, even without entities.
+std::vector<Snapshot> splitSnapshot(const Snapshot &snapshot);
+
 // Returns nullopt for any invalid datagram (bad magic/version, unknown type, wrong size...). Never throws.
 std::optional<Packet> decode(std::span<const std::uint8_t> datagram);
 

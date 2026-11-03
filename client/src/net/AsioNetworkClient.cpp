@@ -2,6 +2,8 @@
 
 #include "common/Constants.hpp"
 
+#include <exception>
+#include <iostream>
 #include <memory>
 #include <stdexcept>
 #include <utility>
@@ -36,7 +38,22 @@ void AsioNetworkClient::connect(const std::string &host, std::uint16_t port)
     sendDatagram(protocol::Connect{});
     scheduleConnectRetry();
     scheduleTimeoutCheck();
-    _thread = std::thread([this] { _io.run(); });
+    _thread = std::thread([this] { runIo(); });
+}
+
+// An exception escaping the I/O thread would terminate the whole client: report it and keep running.
+void AsioNetworkClient::runIo()
+{
+    for (;;) {
+        try {
+            _io.run();
+            return;
+        } catch (const std::exception &error) {
+            std::cerr << "r-type_client: network error: " << error.what() << '\n';
+        } catch (...) {
+            std::cerr << "r-type_client: unknown network error\n";
+        }
+    }
 }
 
 void AsioNetworkClient::disconnect()
