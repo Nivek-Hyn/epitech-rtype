@@ -1,4 +1,4 @@
-# R-Type Network Protocol — version 1 (draft)
+# R-Type Network Protocol — version 1
 
 This document describes every message exchanged between `r-type_client` and `r-type_server`.
 It should be enough to write a new client. The reference implementation is `common/src/Protocol.cpp`. This is
@@ -86,14 +86,16 @@ Since a snapshot is sent every tick, this information cannot be lost.
 
 1. The client sends **Connect** until it receives **ConnectAccepted** or **ConnectRejected**.
 2. The client sends **Input** every tick. The server sends **Snapshot** every tick to every client.
-3. The client creates an entity the first time its `net_id` appears in a snapshot. It removes it on
-   **EntityDestroyed**, or when it hasn't appeared in any snapshot for 500 ms.
+3. The client keeps the entities of the newest tick it has received: the Snapshot packets of one tick are merged
+   (duplicates are ignored), a Snapshot of a newer tick replaces them, and one of an older tick is dropped. An
+   entity missing from the newest tick therefore disappears, even if its **EntityDestroyed** was lost. The client
+   also removes it on **EntityDestroyed**. A new session (**ConnectAccepted**) resets the tick counter.
 4. A client that sends nothing for **5 seconds** is considered gone: the server removes its ship and sends
    **PlayerLeft** (reason `2`) to the other clients. A **Disconnect** gives the same result with reason `1`.
 
 ## 6. Runtime conformance notes
 
 The protocol defines the intended wire format and message set. The current runtime does not yet implement every
-specified behavior: it does not split snapshots above 84 entities, send `PlayerLeft`, reject a version mismatch,
-or remove client-side entities using the 500 ms stale timeout. See the
+specified behavior: it does not reject a version mismatch with `ConnectRejected` (a datagram with another
+version is silently dropped), and the server does not filter duplicated or out-of-order client packets. See the
 [networking implementation guide](networking.md) for the current behavior and limitations.

@@ -177,6 +177,8 @@ void AsioNetworkServer::removeClient(PlayerId player, protocol::LeaveReason reas
         return;
     _clients[player].active = false;
     _events.push(PlayerDisconnected{player, reason});
+    for (PlayerId other = 0; other < MaxPlayers; ++other)
+        sendToPlayer(other, protocol::PlayerLeft{player, reason});
 }
 
 } // namespace rtype::server

@@ -180,12 +180,14 @@ server-owned player positions.
 - The sequence number is included in packets, but receivers do not yet filter duplicate or out-of-order packets.
 - Clients display the newest snapshot directly; interpolation, prediction, and reconciliation are not
   implemented.
-- The current server removes a departed player's entity and broadcasts `EntityDestroyed`. The protocol also
-  defines `PlayerLeft`, but the server does not currently send that message.
-- The protocol limit is 84 entities per snapshot. The runtime does not split larger snapshots; encoding one
-  throws if the limit is exceeded. The graphical client also does not reassemble multiple snapshots for one tick.
-- The protocol specification describes `VersionMismatch` rejection and stale-entity removal; those behaviors
-  are not currently implemented by the runtime.
+- When a player leaves or times out, the server broadcasts `EntityDestroyed` for its ship and sends `PlayerLeft`
+  to the remaining clients. Neither message is acknowledged or retransmitted.
+- The protocol limit is 84 entities per snapshot. The server splits larger snapshots into several packets with
+  the same tick, and the client merges them with `SnapshotAssembler`, ignoring older ticks and duplicates. If a
+  packet of a tick is lost, that tick is displayed incomplete until the next one.
+- The protocol specification describes `VersionMismatch` rejection; it is not implemented: a datagram with
+  another version is dropped without answer, so such a client retries `Connect` forever.
+- The server does not filter duplicated or out-of-order client packets.
 
 These are follow-up improvements, not prerequisites for the current local multiplayer prototype.
 
@@ -362,13 +364,14 @@ des joueurs calculées par le serveur.
   paquets arrivés dans le désordre.
 - Les clients affichent directement le snapshot le plus récent ; l’interpolation, la prédiction et la
   réconciliation ne sont pas implémentées.
-- Lorsqu’un joueur part, le serveur supprime son entité et diffuse `EntityDestroyed`. Le protocole définit aussi
-  `PlayerLeft`, mais le serveur n’envoie pas actuellement ce message.
-- Un snapshot est limité à 84 entités. Le runtime ne découpe pas les snapshots plus grands ; l’encodage échoue
-  si cette limite est dépassée. Le client graphique ne réassemble pas non plus plusieurs snapshots d’un même
-  tick.
-- La spécification décrit le refus `VersionMismatch` et la suppression des entités qui ne sont plus vues ; ces
-  comportements ne sont pas encore implémentés dans le runtime.
+- Lorsqu’un joueur part ou expire, le serveur diffuse `EntityDestroyed` pour son vaisseau et envoie `PlayerLeft`
+  aux clients restants. Aucun de ces messages n’est acquitté ni retransmis.
+- Un snapshot est limité à 84 entités. Le serveur découpe les snapshots plus grands en plusieurs paquets de même
+  tick, et le client les fusionne avec `SnapshotAssembler` en ignorant les ticks plus anciens et les doublons. Si
+  un paquet d’un tick est perdu, ce tick s’affiche incomplet jusqu’au suivant.
+- La spécification décrit le refus `VersionMismatch` ; il n’est pas implémenté : un datagramme d’une autre
+  version est ignoré sans réponse, donc ce client réessaie `Connect` indéfiniment.
+- Le serveur ne filtre pas les paquets clients dupliqués ou arrivés dans le désordre.
 
 Ces améliorations pourront être faites plus tard ; elles ne sont pas nécessaires au prototype multijoueur local
 actuel.

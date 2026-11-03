@@ -119,3 +119,33 @@ TEST(NetworkIntegration, SplitsSnapshotsLargerThanOneDatagramAndStaysAlive)
     ASSERT_TRUE(pong);
     ASSERT_TRUE(std::holds_alternative<rtype::protocol::Pong>(pong->message));
 }
+
+TEST(NetworkIntegration, NotifiesRemainingClientsWhenAPlayerDisconnects)
+{
+    rtype::server::AsioNetworkServer server;
+    const std::uint16_t serverPort = findAvailablePort();
+    ASSERT_NO_THROW(server.start(serverPort));
+
+    asio::io_context io;
+    const Udp::endpoint serverEndpoint(asio::ip::address_v4::loopback(), serverPort);
+    std::vector<Udp::socket> clients;
+    for (int i = 0; i < 2; ++i) {
+        clients.emplace_back(io, Udp::endpoint(Udp::v4(), 0));
+        clients.back().non_blocking(true);
+        clients.back().send_to(asio::buffer(rtype::protocol::encode({1, rtype::protocol::Connect{}})), serverEndpoint);
+        Udp::endpoint sender;
+        const auto accepted = receivePacket(clients.back(), sender);
+        ASSERT_TRUE(accepted);
+        ASSERT_TRUE(std::holds_alternative<rtype::protocol::ConnectAccepted>(accepted->message));
+    }
+
+    clients[0].send_to(asio::buffer(rtype::protocol::encode({2, rtype::protocol::Disconnect{}})), serverEndpoint);
+
+    Udp::endpoint sender;
+    const auto notice = receivePacket(clients[1], sender);
+    ASSERT_TRUE(notice);
+    const auto *left = std::get_if<rtype::protocol::PlayerLeft>(&notice->message);
+    ASSERT_NE(left, nullptr);
+    EXPECT_EQ(left->playerId, 0);
+    EXPECT_EQ(left->reason, rtype::protocol::LeaveReason::Disconnected);
+}
