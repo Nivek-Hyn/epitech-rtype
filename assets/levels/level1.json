@@ -1,20 +1,16 @@
 {
   "stage": 1,
-  "level_name": "Niveau 1 - Zone d'Entraînement",
+  "level_name": "Stage 1",
   "waves": [
     {
       "wave_id": 1,
-      "delay_before_start": 3.0,
+      "delay_before_start": 2.0,
       "enemies": [
-        { "type": "patrol", "spawn_y": 300, "speed": 120 }
-      ]
-    },
-    {
-      "wave_id": 2,
-      "delay_before_start": 7.0,
-      "enemies": [
-        { "type": "patrol", "spawn_y": 200, "speed": 120 },
-        { "type": "patrol", "spawn_y": 400, "speed": 120 }
+        {
+          "type": "standard_red",
+          "spawn_y": 300.0,
+          "speed": 100.0
+        }
       ]
     }
   ]

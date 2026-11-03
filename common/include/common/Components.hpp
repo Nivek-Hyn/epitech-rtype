@@ -3,6 +3,7 @@
 #include "common/Protocol.hpp"
 
 #include <cstdint>
+#include <string>
 
 // Components used by both the server and the client.
 // Server-only components (Health, Hitbox, AI...) go in server/, client-only ones (Sprite, Animation...) in client/.
@@ -29,6 +30,14 @@ struct NetworkId {
 struct Kind {
     protocol::EntityType type = protocol::EntityType::Player;
     std::uint8_t variant = 0; // player index (0-3) for players, subtype for enemies
+};
+
+struct Health {
+    int hp = 3;
+};
+
+struct MovementPattern {
+    std::string type = "straight"; // straight, sine_wave, zigzag, dive, etc.
 };
 
 } // namespace rtype::components

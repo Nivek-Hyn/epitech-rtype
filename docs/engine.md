@@ -11,11 +11,48 @@ For step-by-step guides, see the [how-to guides](how-to.md).
 | Event bus | `engine/core/EventBus.hpp` | `engine::core` | Implemented |
 | Collision shapes | `engine/physics/Aabb.hpp` | `engine::physics` | Implemented |
 | Movement system | `engine/systems/Movement.hpp` | `engine::systems` | Implemented |
-| Byte serialization | `engine/net/ByteBuffer.hpp` | `engine::net` | Designed (network team) |
-| Thread-safe queue | `engine/core/ThreadSafeQueue.hpp` | `engine::core` | Designed (network team) |
+| Byte serialization | `engine/net/ByteBuffer.hpp` | `engine::net` | Implemented |
+| Thread-safe queue | `engine/core/ThreadSafeQueue.hpp` | `engine::core` | Implemented |
 
-All headers are under `engine/include/`. Link with the `rtype_engine` CMake target.
+All headers are under `engine/include/`. The repository uses the `rtype_engine` umbrella CMake target.
+An external project can use the installed `RTypeEngine::Engine` target or select individual modules.
+See the [standalone build and installation walkthrough](how-to.md#run-the-component-and-system-example).
+Additional module-selection recipes are in `engine/README.md` in the source repository.
 The expected behavior of every part is specified by the unit tests in `tests/test_*.cpp`.
+
+## Build boundaries and module selection
+
+The engine requires C++20 and the standard library. It does not include `common/`, SFML or Asio.
+The game supplies its own components, networking transport, rendering and rules.
+
+| Installed target | Provides | Links to |
+|---|---|---|
+| `RTypeEngine::ECS` | Registry and component storage | Standard library |
+| `RTypeEngine::Core` | Timing, event bus, thread-safe queue | `Threads::Threads` |
+| `RTypeEngine::Physics` | AABB overlap functions | Standard library |
+| `RTypeEngine::Net` | Binary buffers, without socket transport | Standard library |
+| `RTypeEngine::Systems` | Generic movement | `RTypeEngine::ECS` |
+| `RTypeEngine::Engine` | All enabled modules | Each enabled target above |
+
+ECS and Core are static libraries. Physics, Net and Systems are header-only interface targets.
+Every target propagates its include directory and C++20 requirement to consumers.
+Modules are selected at CMake configuration time, not enabled or unloaded while the game runs.
+This is not a dynamic plugin API. Disabling ECS also requires disabling Systems.
+
+For example, a game using only collisions can request the Physics component:
+
+```cmake
+find_package(RTypeEngine 0.1 CONFIG REQUIRED COMPONENTS Physics)
+target_link_libraries(my_game PRIVATE RTypeEngine::Physics)
+```
+
+The basic consumer in `engine/examples/basic/main.cpp` defines its own Position and Velocity types,
+registers the generic movement system and checks the result. Its separate CMake project uses the
+installed package rather than the engine's source tree. Run the complete check from the repository root:
+
+```sh
+cmake -P engine/cmake/CheckPackage.cmake
+```
 
 ## 1. Entity-Component-System
 
@@ -82,6 +119,23 @@ The Registry finds the storage of a type with a `std::unordered_map<std::type_in
 | Never send an `Entity` over the network | Ids are local to each machine. Send a `NetworkId` component instead. |
 | Do not add a system from inside a running system | `update` is iterating over the list of systems. |
 | Inside `each`, do not kill entities or add components of the visited types | It can invalidate the references passed to the callback. Use `EventBus::enqueue` and react after the systems have run. |
+
+`get<C>` returns a borrowed pointer: it transfers no ownership. Removing or replacing that component,
+killing its entity, destroying the Registry, or growing that component's vector can invalidate it,
+even within the same system. Read the pointer again after a storage-changing operation.
+
+### Failure behavior
+
+| Operation | Result |
+|---|---|
+| `spawn` when no usable id remains | Throws `std::overflow_error`. |
+| `emplace<C>` on a dead or unknown entity | Throws `std::invalid_argument`. |
+| `get<C>` on a dead entity or an absent component | Returns `nullptr`; no storage is created. |
+| `kill` on a dead entity, or `remove<C>` on an absent component | Does nothing. |
+| `addSystem` with an empty function | Throws `std::invalid_argument`. |
+
+Allocation failures and exceptions thrown by component constructors or systems are not caught by the
+Registry. If a system throws during `update`, later systems are not called by that invocation.
 
 ## 2. Fixed timestep clock
 
@@ -159,13 +213,15 @@ registry.addSystem(engine::systems::movement<rtype::components::Position, rtype:
 
 Velocity is in world units per second, so movement speed does not depend on the tick rate.
 
-## 5. Networking utilities (designed)
+## 5. Networking utilities
 
-These two parts are specified by their headers and implemented by the network team.
+These utilities are implemented in engine headers; they do not implement UDP or the R-Type protocol.
 
 - `ByteWriter` / `ByteReader` write and read integers and floats in big-endian, field by field. Reading past the
   end never overflows: the reader returns 0 and `ok()` becomes false.
-- `ThreadSafeQueue<T>` passes values from the network thread to the game thread. `tryPop` never blocks.
+- `ThreadSafeQueue<T>` passes values from the network thread to the game thread. `tryPop` returns
+  `std::nullopt` immediately when the queue is empty after acquiring its mutex. It can wait for that mutex;
+  this is not a lock-free queue and it does not wait for a new value to arrive. The queue has no capacity limit.
 
 ## 6. Tests
 

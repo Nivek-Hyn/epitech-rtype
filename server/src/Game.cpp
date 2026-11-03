@@ -3,12 +3,16 @@
 #include "engine/physics/Aabb.hpp"
 #include "engine/systems/Movement.hpp"
 #include "levelLoader.hpp"
-
+#include "MovementSystem.hpp"
 
 #include <algorithm>
 #include <array>
 #include <utility>
 #include <vector>
+#include <cmath>
+#include <random>
+#include <fstream>
+#include <nlohmann/json.hpp>
 
 namespace rtype::server {
 
@@ -34,7 +38,37 @@ Game::Game()
 
     _currentLevel = loadLevelFromJson("assets/levels/level1.json");
     _levelTimer = 0.f;
+
+    try {
+        std::ifstream file("assets/config/entities.json");
+        if (file.is_open()) {
+            nlohmann::json j;
+            file >> j;
+            if (j.contains("enemies") && j["enemies"].is_object()) {
+                for (auto &[key, val] : j["enemies"].items()) {
+                    EnemyDefinition def;
+                    def.health = val.value("health", 3);
+                    def.speed = val.value("speed", 100.f);
+                    def.pattern = val.value("pattern", "straight");
+                    
+                    _entityDefinitions[key] = def;
+                }
+            }
+        }
+    } catch (...) {
+    }
 }
+
+void Game::loadLevel(const std::string &filepath)
+{
+    _currentLevel = loadLevelFromJson(filepath);
+    _levelTimer = 0.f;
+
+    for (auto &wave : _currentLevel.waves) {
+        wave.isSpawned = false;
+    }
+}
+
 
 // TODO(gameplay): spawn the player's ship (NetworkId, Kind, Position, Velocity...) and remember it in _players.
 void Game::onPlayerJoined(PlayerId player)
@@ -44,9 +78,6 @@ void Game::onPlayerJoined(PlayerId player)
     // we create a new entity in the ECS registry
     engine::ecs::Entity entity =
         spawnNetworked(protocol::EntityType::Player, static_cast<std::uint8_t>(player), 100.0f, 300.0f);
-    //_registry.add_component<rtype::components::Position>(entity, {100.0f, 300.0f});
-    //_registry.add_component<rtype::components::Velocity>(entity, {0.0f, 0.0f});
-    //_registry.add_component<rtype::components::Kind>(entity, {rtype::components::EntityKind::Player});
     _players[player] = entity;
 }
 
@@ -110,18 +141,33 @@ void Game::onInput(PlayerId player, std::uint8_t flags)
 void Game::update(float dt)
 {
     spawnEnemies(dt);
+    updateEnemyMovements(_registry, dt);
+
+    static float ennemyShootTimer = 0.f;
+    ennemyShootTimer += dt;
+    if (ennemyShootTimer >= 2.0f) {
+        ennemyShootTimer = 0.f;
+        _registry.each<rtype::components::Position, rtype::components::Kind>(
+            [this](engine::ecs::Entity /*entity*/, const rtype::components::Position &pos, const rtype::components::Kind &kind) {
+                if (kind.type == protocol::EntityType::Enemy) {
+                    engine::ecs::Entity enemyMissile = spawnNetworked(protocol::EntityType::EnemyMissile, 0, pos.x - 30.0f, pos.y);
+                    _registry.emplace<rtype::components::Velocity>(enemyMissile, -350.0f, 0.0f);
+                }
+            });
+    }
+
     _registry.update(dt);
-    // After movement, so collisions are tested on the positions sent in this tick's snapshot.
+
     constexpr float PlayerWidth = 33.f;
     constexpr float PlayerHeight = 36.f;
 
-    _registry.each<rtype::components::Position, rtype::components::Kind>([](engine::ecs::Entity /*entity*/, 
-        rtype::components::Position &pos, const rtype::components::Kind &kind) {
-        if (kind.type == protocol::EntityType::Player) {
-            pos.x = std::clamp(pos.x, 0.f, WorldWidth - PlayerWidth);
-            pos.y = std::clamp(pos.y, 0.f, WorldHeight - PlayerHeight);
-        }
-    });
+    _registry.each<rtype::components::Position, rtype::components::Kind>(
+        [](engine::ecs::Entity /*entity*/, rtype::components::Position &pos, const rtype::components::Kind &kind) {
+            if (kind.type == protocol::EntityType::Player) {
+                pos.x = std::clamp(pos.x, 0.f, WorldWidth - PlayerWidth);
+                pos.y = std::clamp(pos.y, 0.f, WorldHeight - PlayerHeight);
+            }
+        });
 
     handleCollisions();
     for (float &cooldown : _shootCooldowns)
@@ -176,29 +222,47 @@ std::vector<protocol::Message> Game::takeEvents()
 
 void Game::spawnEnemies(float dt)
 {
+    const bool anyPlayer = std::any_of(_players.begin(), _players.end(), [](engine::ecs::Entity player) { return player != engine::ecs::NullEntity; });
+    if (!anyPlayer) {
+        _levelTimer = 0.f;
+        for (auto &wave : _currentLevel.waves)
+            wave.isSpawned = false;
+        return;
+    }
+
     _levelTimer += dt;
 
-    // On parcourt les vagues du fichier JSON chargé pour le niveau actuel
-    for (auto& wave : _currentLevel.waves) {
-        // Si la vague n'a pas encore spawn et que le timer correspond au délai du JSON
+    static std::random_device rd;
+    static std::mt19937 gen(rd());
+    static std::uniform_real_distribution<float> disVertical(50.0f, 650.0f);
+    
+    for (auto &wave : _currentLevel.waves) {
         if (!wave.isSpawned && _levelTimer >= wave.delay_before_start) {
-            for (const auto& enemyConfig : wave.enemies) {
-                // On utilise directement les données du JSON !
-                float y = enemyConfig.spawn_y;
+            for (const auto &enemyConfig : wave.enemies) {
+                int hp = 3;
                 float speed = enemyConfig.speed;
+                std::string patternType = "straight";
+
+                if (_entityDefinitions.find(enemyConfig.type) != _entityDefinitions.end()) {
+                    hp = _entityDefinitions[enemyConfig.type].health;
+                    speed = _entityDefinitions[enemyConfig.type].speed;
+                    patternType = _entityDefinitions[enemyConfig.type].pattern;
+                }
+
+                float randomizedY = disVertical(gen);
+                engine::ecs::Entity enemy =
+                    spawnNetworked(protocol::EntityType::Enemy, 0, WorldWidth + 100.0f, randomizedY);
                 
-                // Création de l'ennemi selon son type (patrol, sine_wave...)
-                engine::ecs::Entity enemy = spawnNetworked(protocol::EntityType::Enemy, 0, WorldWidth, y);
                 _registry.emplace<rtype::components::Velocity>(enemy, -speed, 0.f);
+                _registry.emplace<rtype::components::Health>(enemy, hp);
+                _registry.emplace<rtype::components::MovementPattern>(enemy, rtype::components::MovementPattern{patternType});
             }
-            wave.isSpawned = true; // La vague est lancée, on ne la relance plus
+            wave.isSpawned = true;
         }
     }
 }
 
-// A player missile touching an enemy destroys both and adds PointsPerEnemy to the score.
-// Entities are only collected inside each and killed afterwards: killing them during each would invalidate
-// the component references the loop is still using.
+// A player missile touching an enemy inflicts damage and adds PointsPerEnemy to the score if destroyed.
 void Game::handleCollisions()
 {
     using rtype::components::Kind;
@@ -220,14 +284,24 @@ void Game::handleCollisions()
         for (std::size_t i = 0; i < enemies.size(); i++) {
             if (!enemyHit[i] && engine::physics::overlaps(missileBox, enemies[i].second)) {
                 enemyHit[i] = true;
-                destroyed.push_back(missile);
-                destroyed.push_back(enemies[i].first);
-                _score += PointsPerEnemy;
-                return; // one missile destroys at most one enemy
+                destroyed.push_back(missile); // Le missile du joueur disparaît
+
+                // Tâche #54 : Gestion des dégâts multiples sur l'ennemi
+                if (auto *health = _registry.get<rtype::components::Health>(enemies[i].first)) {
+                    health->hp -= 1;
+                    if (health->hp <= 0) {
+                        destroyed.push_back(enemies[i].first);
+                        _score += PointsPerEnemy;
+                    }
+                } else {
+                    destroyed.push_back(enemies[i].first);
+                    _score += PointsPerEnemy;
+                }
+                return; // un missile détruit au plus un ennemi
             }
         }
     });
-    
+
     constexpr float PlayerWidth = 33.f;
     constexpr float PlayerHeight = 36.f;
 
@@ -240,14 +314,37 @@ void Game::handleCollisions()
         for (std::size_t i = 0; i < enemies.size(); i++) {
             if (!enemyHit[i] && engine::physics::overlaps(playerBox, enemies[i].second)) {
                 enemyHit[i] = true;
-                destroyed.push_back(playerEntity);   // Tue le joueur
-                destroyed.push_back(enemies[i].first); // Tue l'ennemi (optionnel)
+                destroyed.push_back(playerEntity);     // Tue le joueur
+                destroyed.push_back(enemies[i].first); // Tue l'ennemi
             }
         }
     });
+    // Les missiles ennemis touchent le joueur
+    _registry.each<Position, Kind>([&](engine::ecs::Entity missile, const Position &position, const Kind &kind) {
+        if (kind.type != protocol::EntityType::EnemyMissile)
+            return;
+        
+        const engine::physics::Aabb missileBox{position.x, position.y, MissileWidth, MissileHeight};
 
+        _registry.each<Position, Kind>([&](engine::ecs::Entity playerEntity, const Position &playerPos, const Kind &playerKind) {
+            if (playerKind.type != protocol::EntityType::Player)
+                return;
 
+            const engine::physics::Aabb playerBox{playerPos.x, playerPos.y, PlayerWidth, PlayerHeight};
+
+            if (engine::physics::overlaps(missileBox, playerBox)) {
+                destroyed.push_back(missile);       // Le missile ennemi disparaît
+                destroyed.push_back(playerEntity);   // Le joueur est touché et détruit
+            }
+        });
+    });
     for (const engine::ecs::Entity entity : destroyed) {
+        for (std::size_t player = 0; player < _players.size(); player++) {
+            if (_players[player] == entity) {
+                _players[player] = engine::ecs::NullEntity;
+                _shootCooldowns[player] = 0.f;
+            }
+        }
         if (const auto *networkId = _registry.get<rtype::components::NetworkId>(entity))
             _events.push_back(protocol::EntityDestroyed{networkId->id, protocol::DestroyReason::Killed});
         _registry.kill(entity);
