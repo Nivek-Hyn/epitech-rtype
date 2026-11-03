@@ -102,7 +102,7 @@ int main(int argc, char **argv)
                         network.disconnect();
                         appState = AppState::Menu;
                         reportedConnected = false;
-                        entities.clear();
+                        world.reset();
                     }
                 }
             }
@@ -155,52 +155,37 @@ int main(int argc, char **argv)
             if (network.connected())
                 network.send(rtype::protocol::Input{inputFlags});
 
+            const std::vector<rtype::protocol::EntityState> previousEntities = world.entities();
+            const std::uint32_t previousTick = world.tick();
+            bool newSession = false;
             while (auto message = network.poll()) {
                 if (const auto *snapshot = std::get_if<rtype::protocol::Snapshot>(&*message)) {
-                    if (!entities.empty()) {
-                        std::unordered_set<std::uint32_t> currentEnemies;
-                        for (const auto &ent : snapshot->entities) {
-                            if (ent.type == rtype::protocol::EntityType::Enemy)
-                                currentEnemies.insert(ent.netId);
-                        }
-                        for (const auto &prev : entities) {
-                            if (prev.type == rtype::protocol::EntityType::Enemy &&
-                                !currentEnemies.contains(prev.netId) &&
-                                prev.x > 30.f && prev.x < rtype::WorldWidth + 100.f) {
-                                resources.playSound("explosion", 90.f);
-                                break;
-                            }
-                        }
-                    }
-                    entities = snapshot->entities;
+                    world.add(*snapshot);
+                } else if (std::holds_alternative<rtype::protocol::ConnectAccepted>(*message)) {
+                    world.reset(); // a new session: the server's ticks may start again from zero
+                    newSession = true;
                 } else if (const auto *rejected = std::get_if<rtype::protocol::ConnectRejected>(&*message)) {
-                    std::cerr << "Server rejected connection (reason " << static_cast<int>(rejected->reason) << ").\n";
+                    const char *reason = rejected->reason == rtype::protocol::RejectReason::ServerFull
+                                             ? "server is full"
+                                             : "protocol version mismatch";
+                    std::cerr << "Connection rejected: " << reason << ".\n";
                 }
-        std::uint8_t inputFlags = 0;
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Z) || sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Up))
-            inputFlags |= rtype::protocol::InputFlag::Up;
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::S) || sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Down))
-            inputFlags |= rtype::protocol::InputFlag::Down;
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Q) || sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Left))
-            inputFlags |= rtype::protocol::InputFlag::Left;
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::D) || sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Right))
-            inputFlags |= rtype::protocol::InputFlag::Right;
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Space))
-            inputFlags |= rtype::protocol::InputFlag::Shoot;
+            }
 
-        if (network.connected())
-            network.send(rtype::protocol::Input{inputFlags});
-
-        while (auto message = network.poll()) {
-            if (const auto *snapshot = std::get_if<rtype::protocol::Snapshot>(&*message))
-                world.add(*snapshot);
-            else if (std::holds_alternative<rtype::protocol::ConnectAccepted>(*message))
-                world.reset(); // a new session: the server's ticks may start again from zero
-            else if (const auto *rejected = std::get_if<rtype::protocol::ConnectRejected>(&*message)) {
-                const char *reason = rejected->reason == rtype::protocol::RejectReason::ServerFull
-                                         ? "server is full"
-                                         : "protocol version mismatch";
-                std::cerr << "Connection rejected: " << reason << ".\n";
+            // Compared once per drained batch: the packets of a split tick are only complete after the loop.
+            if (!newSession && world.tick() != previousTick) {
+                std::unordered_set<std::uint32_t> currentEnemies;
+                for (const auto &entity : world.entities()) {
+                    if (entity.type == rtype::protocol::EntityType::Enemy)
+                        currentEnemies.insert(entity.netId);
+                }
+                for (const auto &previous : previousEntities) {
+                    if (previous.type == rtype::protocol::EntityType::Enemy && !currentEnemies.contains(previous.netId) &&
+                        previous.x > 30.f && previous.x < rtype::WorldWidth + 100.f) {
+                        resources.playSound("explosion", 90.f);
+                        break;
+                    }
+                }
             }
         }
         resources.updateAudio();
@@ -212,11 +197,11 @@ int main(int argc, char **argv)
         } else if (appState == AppState::Playing) {
             starfield.draw(window);
 
-            if (!reportedConnected || entities.empty()) {
+            if (!reportedConnected || world.entities().empty()) {
                 window.draw(waitingText);
             }
 
-            for (const auto &entity : entities) {
+            for (const auto &entity : world.entities()) {
                 if (hasAssets) {
                     if (entity.type == rtype::protocol::EntityType::Player) {
                         sf::Sprite sprite(resources.getTexture("player"));
@@ -239,28 +224,6 @@ int main(int argc, char **argv)
                         sprite.setPosition({entity.x, entity.y});
                         window.draw(sprite);
                     }
-        for (const auto &entity : world.entities()) {
-            if (hasAssets) {
-                if (entity.type == rtype::protocol::EntityType::Player) {
-                    sf::Sprite sprite(resources.getTexture("player"));
-                    const int variant = static_cast<int>(entity.variant % 5);
-                    sprite.setTextureRect(sf::IntRect({0, variant * 17}, {33, 17}));
-                    sprite.setScale({2.f, 2.f});
-                    sprite.setPosition({entity.x, entity.y});
-                    window.draw(sprite);
-                } else if (entity.type == rtype::protocol::EntityType::PlayerMissile ||
-                           entity.type == rtype::protocol::EntityType::EnemyMissile) {
-                    sf::Sprite sprite(resources.getTexture("bullet"));
-                    sprite.setTextureRect(sf::IntRect({248, 102}, {18, 12}));
-                    sprite.setScale({2.f, 2.f});
-                    sprite.setPosition({entity.x, entity.y});
-                    window.draw(sprite);
-                } else if (entity.type == rtype::protocol::EntityType::Enemy) {
-                    sf::Sprite sprite(resources.getTexture("enemy"));
-                    sprite.setTextureRect(sf::IntRect({0, 0}, {33, 36}));
-                    sprite.setScale({2.f, 2.f});
-                    sprite.setPosition({entity.x, entity.y});
-                    window.draw(sprite);
                 }
             }
         }

@@ -5,9 +5,56 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <cmath>
+#include <filesystem>
+#include <fstream>
 
 using namespace rtype;
 using namespace rtype::server;
+
+namespace {
+
+// Enemies appear at a random height and the configured ones move and shoot, so these tests use a level whose
+// enemy type is unknown to the game: it flies straight, never shoots and has the default 3 hit points.
+std::string writeStraightEnemyLevel()
+{
+    const auto path = std::filesystem::temp_directory_path() / "rtype_test_straight_enemy_level.json";
+    std::ofstream(path) << R"({"stage": 1, "level_name": "Test", "waves": [{"wave_id": 1, "delay_before_start": 0.0,
+        "enemies": [{"type": "test_straight", "spawn_y": 300.0, "speed": 100.0}]}]})";
+    return path.string();
+}
+
+std::size_t countOfType(const protocol::Snapshot &snapshot, protocol::EntityType type)
+{
+    return static_cast<std::size_t>(
+        std::count_if(snapshot.entities.begin(), snapshot.entities.end(),
+                      [type](const protocol::EntityState &entity) { return entity.type == type; }));
+}
+
+// Spawns the level's enemy, then flies the ship of `player` to its height so it is hit or can shoot it.
+void alignShipWithEnemy(Game &game, PlayerId player)
+{
+    game.update(1.f / 60.f);
+    for (int tick = 0; tick < 600; ++tick) {
+        const auto snapshot = game.snapshot();
+        float shipY = 0.f;
+        float enemyY = 0.f;
+        for (const auto &entity : snapshot.entities) {
+            if (entity.type == protocol::EntityType::Player && entity.variant == player)
+                shipY = entity.y;
+            else if (entity.type == protocol::EntityType::Enemy)
+                enemyY = entity.y;
+        }
+        if (std::abs(shipY - enemyY) < 10.f) {
+            game.onInput(player, 0);
+            return;
+        }
+        game.onInput(player, shipY > enemyY ? protocol::InputFlag::Up : protocol::InputFlag::Down);
+        game.update(1.f / 60.f);
+    }
+}
+
+} // namespace
 
 TEST(Game, PlayerJoinAppearsInSnapshot)
 {
@@ -105,14 +152,15 @@ TEST(Game, EnemiesAppearOnlyWhilePlayersAreConnected)
 TEST(Game, DeadPlayerCannotControlAReusedEntity)
 {
     Game game;
+    game.loadLevel(writeStraightEnemyLevel());
     game.onPlayerJoined(0);
-    game.update(3.f);
-    game.update(12.f); // The first configured enemy reaches the stationary player.
+    alignShipWithEnemy(game, 0);
+    // The enemy flies on and reaches the stationary ship.
+    for (int step = 0; step < 200 && countOfType(game.snapshot(), protocol::EntityType::Player) > 0; ++step)
+        game.update(0.25f);
 
     const auto afterCollision = game.snapshot();
-    EXPECT_EQ(std::count_if(afterCollision.entities.begin(), afterCollision.entities.end(),
-                            [](const auto &entity) { return entity.type == protocol::EntityType::Player; }),
-              0);
+    EXPECT_EQ(countOfType(afterCollision, protocol::EntityType::Player), 0u);
     EXPECT_NO_THROW(game.onInput(0, protocol::InputFlag::Right));
 
     game.onPlayerJoined(1);
@@ -133,19 +181,23 @@ TEST(Game, DeadPlayerCannotControlAReusedEntity)
 TEST(Game, PlayerMissileDestroysEnemyAndScores)
 {
     Game game;
-    game.onPlayerJoined(0); // ship at y = 300, level with the first enemy
-    game.onInput(0, protocol::InputFlag::Shoot);
-    game.onInput(0, 0);
-    for (int tick = 0; tick < 300; tick++)
+    game.loadLevel(writeStraightEnemyLevel());
+    game.onPlayerJoined(0);
+    alignShipWithEnemy(game, 0);
+    // The enemy has 3 hit points: hold the trigger until it is destroyed.
+    for (int tick = 0; tick < 600 && countOfType(game.snapshot(), protocol::EntityType::Enemy) > 0; ++tick) {
+        game.onInput(0, protocol::InputFlag::Shoot);
         game.update(1.f / 60.f);
+    }
 
+    EXPECT_EQ(countOfType(game.snapshot(), protocol::EntityType::Enemy), 0u);
     EXPECT_EQ(game.snapshot().score, 100u);
     const auto events = game.takeEvents();
     const auto killed = std::count_if(events.begin(), events.end(), [](const protocol::Message &message) {
         const auto *destroyed = std::get_if<protocol::EntityDestroyed>(&message);
         return destroyed && destroyed->reason == protocol::DestroyReason::Killed;
     });
-    EXPECT_EQ(killed, 2); // the missile and the enemy
+    EXPECT_GE(killed, 2); // at least the missile and the enemy
 }
 
 TEST(Game, EnemyZigzagShootingAppliesMovementPattern)
