@@ -1,5 +1,6 @@
 #pragma once
 
+#include <SFML/Graphics/Font.hpp>
 #include <SFML/Graphics/Texture.hpp>
 
 #include <string>
@@ -27,9 +28,13 @@ public:
     /// @return Const reference to the SFML texture.
     /// @throws std::out_of_range if the texture is not found.
     const sf::Texture &getTexture(const std::string &id) const;
+    bool loadFont(const std::string &id, const std::string &path);
+    const sf::Font &getFont(const std::string &id) const;
+    bool hasFont(const std::string &id) const;
 
 private:
     std::unordered_map<std::string, sf::Texture> _textures;
+    std::unordered_map<std::string, sf::Font> _fonts;
 };
 
 } // namespace rtype::client
