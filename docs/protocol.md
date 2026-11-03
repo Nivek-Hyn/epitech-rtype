@@ -1,7 +1,8 @@
 # R-Type Network Protocol — version 1 (draft)
 
 This document describes every message exchanged between `r-type_client` and `r-type_server`.
-It should be enough to write a new client. The reference implementation is `common/src/Protocol.cpp`.
+It should be enough to write a new client. The reference implementation is `common/src/Protocol.cpp`. This is
+the protocol specification; runtime gaps are listed in the [networking implementation guide](networking.md).
 
 ## 1. Transport
 
@@ -89,3 +90,10 @@ Since a snapshot is sent every tick, this information cannot be lost.
    **EntityDestroyed**, or when it hasn't appeared in any snapshot for 500 ms.
 4. A client that sends nothing for **5 seconds** is considered gone: the server removes its ship and sends
    **PlayerLeft** (reason `2`) to the other clients. A **Disconnect** gives the same result with reason `1`.
+
+## 6. Runtime conformance notes
+
+The protocol defines the intended wire format and message set. The current runtime does not yet implement every
+specified behavior: it does not split snapshots above 84 entities, send `PlayerLeft`, reject a version mismatch,
+or remove client-side entities using the 500 ms stale timeout. See the
+[networking implementation guide](networking.md) for the current behavior and limitations.

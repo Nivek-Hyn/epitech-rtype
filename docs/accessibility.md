@@ -70,3 +70,23 @@ There are no accessibility pass results for the unimplemented tracked features a
 Before marking one of those issues complete, record the implementation revision, the setting/control path,
 the platform, the expected outcome and an actual test result. Revisit this page after integrating client,
 gameplay and audio changes. Text descriptions and status words must remain usable without interpreting colors.
+| Solution | Why | Inspiration | Status |
+|---|---|---|---|
+| Few actions: 4 directions and 1 fire action; arrows or ZQSD move, Space fires | Less to remember; the whole game can be learnt in seconds | Classic arcade games | Implemented (client and protocol) |
+| Controls shown on the waiting screen | Players do not have to remember them or read a manual | Game Accessibility Guidelines (basic) | Planned (part 1, #45) |
+| Clear game states: waiting, playing, finished, each with its own screen | The player always knows what is happening and what to do next | — | Planned (part 1, #45, #47) |
+| Simple connection screen with default values (address and port prefilled) | Fewer steps and fewer chances of error | — | Planned (part 1, #45) |
+| Consistent visual language: same shape and color meaning everywhere | Reduces what the player has to interpret | Game Accessibility Guidelines (basic) | Rule for every new feature |
+| Difficulty settings (enemy count and speed) | Lets players with slower processing enjoy the game | *Celeste* Assist Mode | Planned (part 2) |
+
+## 4. Summary
+
+| Category | Part 1 | Part 2 |
+|---|---|---|
+| Physical and motor | Reconfigurable keys | Auto-fire, gamepad, game speed |
+| Visual | Shapes in addition to colors, high contrast, large HUD, no flashing | Color blindness filters |
+| Audio | Visual cues, separate volumes | Subtitles for any spoken content |
+| Cognitive | Few controls, controls on screen, clear game states | Difficulty settings |
+
+The architecture helps: input is sent as actions and the server never decides how things look, so most
+accessibility features only touch the client and never change the protocol or the game logic.

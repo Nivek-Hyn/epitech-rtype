@@ -29,6 +29,7 @@ void AsioNetworkClient::connect(const std::string &host, std::uint16_t port)
     _io.restart();
     _socket.open(Udp::v4());
     _connected = false;
+    _connectionRejected = false;
     _running = true;
     _lastReceive = Clock::now();
     receive();
@@ -87,10 +88,13 @@ void AsioNetworkClient::receive()
             if (!error && _sender == _server) {
                 if (const auto packet = protocol::decode(std::span(_receiveBuffer).first(size))) {
                     _lastReceive = Clock::now();
-                    if (std::holds_alternative<protocol::ConnectAccepted>(packet->message))
+                    if (std::holds_alternative<protocol::ConnectAccepted>(packet->message)) {
                         _connected = true;
-                    else if (std::holds_alternative<protocol::ConnectRejected>(packet->message))
+                        _connectionRejected = false;
+                    } else if (std::holds_alternative<protocol::ConnectRejected>(packet->message)) {
                         _connected = false;
+                        _connectionRejected = true;
+                    }
                     _messages.push(packet->message);
                 }
             }
@@ -103,7 +107,7 @@ void AsioNetworkClient::scheduleConnectRetry()
 {
     _connectTimer.expires_after(std::chrono::milliseconds(500));
     _connectTimer.async_wait([this](const asio::error_code &error) {
-        if (error || !_running)
+        if (error || !_running || _connectionRejected)
             return;
         if (!_connected)
             sendDatagram(protocol::Connect{});

@@ -59,8 +59,10 @@ TEST(NetworkIntegration, AcceptsFourUdpClientsAndRejectsTheFifth)
     }
 
     for (std::size_t i = 0; i < clients.size(); ++i) {
-        const auto request = rtype::protocol::encode({static_cast<std::uint32_t>(i + 1), rtype::protocol::Connect{}});
-        clients[i].send_to(asio::buffer(request), Udp::endpoint(asio::ip::address_v4::loopback(), serverPort));
+        const auto request = rtype::protocol::encode(
+            {static_cast<std::uint32_t>(i + 1), rtype::protocol::Connect{}});
+        clients[i].send_to(asio::buffer(request),
+                           Udp::endpoint(asio::ip::address_v4::loopback(), serverPort));
 
         Udp::endpoint sender;
         const auto response = receivePacket(clients[i], sender);

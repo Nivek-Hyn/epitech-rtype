@@ -48,6 +48,7 @@ nav:
   - Home: index.md
   - Architecture:
       - Overview: architecture.md
+      - Cross-platform support: cross-platform.md
       - Engine: engine.md
       - Shared data: shared-data.md
       - Technical study: technical-study.md
@@ -63,6 +64,7 @@ nav:
           - 0008 Binary protocol: adr/0008-binary-protocol.md
   - Network protocol: protocol.md
   - API reference: html/index.html
+  - Networking implementation: networking.md
   - Guides:
       - Build and run: build-and-run.md
       - How-to guides: how-to.md
