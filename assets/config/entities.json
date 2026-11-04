@@ -1,24 +1,14 @@
 {
   "enemies": {
     "standard_red": {
-      "health": 3,
+      "health": 1,
       "speed": 100.0,
-      "pattern": "sine_wave",
+      "pattern": "straight",
       "attack": {
         "fire_rate": 2.0,
         "bullet_speed": 350.0,
         "bullet_variant": 0,
-        "bullet_pattern": "zigzag"
-      }
-    },
-    "boss_heavy": {
-      "health": 50,
-      "speed": 40.0,
-      "pattern": "straight",
-      "attack": {
-        "fire_rate": 0.8,
-        "bullet_speed": 500.0,
-        "bullet_variant": 1
+        "bullet_pattern": "straight"
       }
     },
     "tentacle_creature": {
@@ -31,6 +21,253 @@
         "bullet_variant": 0,
         "bullet_pattern": "zigzag"
       }
+    },
+    "boss_heavy": {
+      "health": 50,
+      "speed": 40.0,
+      "pattern": "straight",
+      "attacks": [
+        {
+          "name": "canon_frontal",
+          "offset_y": 0.0,
+          "fire_rate": 0.8,
+          "bullet_speed": 480.0,
+          "bullet_variant": 1,
+          "bullet_pattern": "straight"
+        },
+        {
+          "name": "lance_missiles_haut",
+          "offset_y": -30.0,
+          "fire_rate": 2.0,
+          "bullet_speed": 280.0,
+          "bullet_variant": 0,
+          "bullet_pattern": "zigzag"
+        },
+        {
+          "name": "lance_missiles_bas",
+          "offset_y": 30.0,
+          "fire_rate": 2.0,
+          "bullet_speed": 280.0,
+          "bullet_variant": 0,
+          "bullet_pattern": "zigzag"
+        }
+      ]
+    },
+    "satellite_scout": {
+      "health": 2,
+      "speed": 110.0,
+      "pattern": "orbital",
+      "attack": {
+        "fire_rate": 2.2,
+        "bullet_speed": 320.0,
+        "bullet_variant": 0,
+        "bullet_pattern": "zigzag"
+      }
+    },
+    "orbital_probe": {
+      "health": 4,
+      "speed": 90.0,
+      "pattern": "sine_wave",
+      "attack": {
+        "fire_rate": 1.8,
+        "bullet_speed": 360.0,
+        "bullet_variant": 0,
+        "bullet_pattern": "straight"
+      }
+    },
+    "solar_relay": {
+      "health": 8,
+      "speed": 60.0,
+      "pattern": "back_and_forth",
+      "attacks": [
+        {
+          "name": "laser_haut",
+          "offset_y": -20.0,
+          "fire_rate": 1.6,
+          "bullet_speed": 380.0,
+          "bullet_variant": 0,
+          "bullet_pattern": "straight"
+        },
+        {
+          "name": "laser_bas",
+          "offset_y": 20.0,
+          "fire_rate": 1.6,
+          "bullet_speed": 380.0,
+          "bullet_variant": 0,
+          "bullet_pattern": "straight"
+        }
+      ]
+    },
+    "boss_orbital_carrier": {
+      "health": 60,
+      "speed": 30.0,
+      "pattern": "orbital",
+      "attacks": [
+        {
+          "name": "plasma_canon",
+          "offset_y": 0.0,
+          "fire_rate": 0.9,
+          "bullet_speed": 450.0,
+          "bullet_variant": 1,
+          "bullet_pattern": "straight"
+        },
+        {
+          "name": "orbital_pod_top",
+          "offset_y": -35.0,
+          "fire_rate": 1.8,
+          "bullet_speed": 300.0,
+          "bullet_variant": 0,
+          "bullet_pattern": "zigzag"
+        },
+        {
+          "name": "orbital_pod_bottom",
+          "offset_y": 35.0,
+          "fire_rate": 1.8,
+          "bullet_speed": 300.0,
+          "bullet_variant": 0,
+          "bullet_pattern": "zigzag"
+        }
+      ]
+    },
+    "martian_hopper": {
+      "health": 3,
+      "speed": 120.0,
+      "pattern": "parabolic",
+      "attack": {
+        "fire_rate": 2.0,
+        "bullet_speed": 340.0,
+        "bullet_variant": 0,
+        "bullet_pattern": "straight"
+      }
+    },
+    "gravity_diver": {
+      "health": 2,
+      "speed": 150.0,
+      "pattern": "gravity_dive",
+      "attack": {
+        "fire_rate": 1.4,
+        "bullet_speed": 380.0,
+        "bullet_variant": 0,
+        "bullet_pattern": "straight"
+      }
+    },
+    "dust_striker": {
+      "health": 5,
+      "speed": 130.0,
+      "pattern": "straight",
+      "attack": {
+        "fire_rate": 1.2,
+        "bullet_speed": 420.0,
+        "bullet_variant": 0,
+        "bullet_pattern": "zigzag"
+      }
+    },
+    "boss_mars_excavator": {
+      "health": 80,
+      "speed": 35.0,
+      "pattern": "parabolic",
+      "attacks": [
+        {
+          "name": "gravitational_drill",
+          "offset_y": 0.0,
+          "fire_rate": 0.7,
+          "bullet_speed": 500.0,
+          "bullet_variant": 1,
+          "bullet_pattern": "straight"
+        },
+        {
+          "name": "magma_launcher_high",
+          "offset_y": -40.0,
+          "fire_rate": 1.6,
+          "bullet_speed": 320.0,
+          "bullet_variant": 0,
+          "bullet_pattern": "zigzag"
+        },
+        {
+          "name": "magma_launcher_low",
+          "offset_y": 40.0,
+          "fire_rate": 1.6,
+          "bullet_speed": 320.0,
+          "bullet_variant": 0,
+          "bullet_pattern": "zigzag"
+        }
+      ]
+    },
+    "quantum_shifter": {
+      "health": 4,
+      "speed": 140.0,
+      "pattern": "quantum_erratic",
+      "attack": {
+        "fire_rate": 1.5,
+        "bullet_speed": 360.0,
+        "bullet_variant": 0,
+        "bullet_pattern": "zigzag"
+      }
+    },
+    "vortex_drone": {
+      "health": 6,
+      "speed": 100.0,
+      "pattern": "vortex_spiral",
+      "attack": {
+        "fire_rate": 1.4,
+        "bullet_speed": 320.0,
+        "bullet_variant": 0,
+        "bullet_pattern": "sine_wave"
+      }
+    },
+    "singularity_fragment": {
+      "health": 12,
+      "speed": 50.0,
+      "pattern": "back_and_forth",
+      "attacks": [
+        {
+          "name": "pulsar_wave_1",
+          "offset_y": -15.0,
+          "fire_rate": 1.0,
+          "bullet_speed": 400.0,
+          "bullet_variant": 1,
+          "bullet_pattern": "straight"
+        },
+        {
+          "name": "pulsar_wave_2",
+          "offset_y": 15.0,
+          "fire_rate": 1.0,
+          "bullet_speed": 400.0,
+          "bullet_variant": 1,
+          "bullet_pattern": "straight"
+        }
+      ]
+    },
+    "boss_singularity_core": {
+      "health": 100,
+      "speed": 25.0,
+      "pattern": "vortex_spiral",
+      "attacks": [
+        {
+          "name": "event_horizon_beam",
+          "offset_y": 0.0,
+          "fire_rate": 0.6,
+          "bullet_speed": 520.0,
+          "bullet_variant": 1,
+          "bullet_pattern": "straight"
+        },
+        {
+          "name": "quantum_distortion_top",
+          "offset_y": -45.0,
+          "fire_rate": 1.4,
+          "bullet_speed": 350.0,
+          "bullet_variant": 0,
+          "bullet_pattern": "zigzag"
+        },
+        {
+          "name": "quantum_distortion_bottom",
+          "offset_y": 45.0,
+          "fire_rate": 1.4,
+          "bullet_speed": 350.0,
+          "bullet_variant": 0,
+          "bullet_pattern": "zigzag"
+        }
+      ]
     }
   }
 }
