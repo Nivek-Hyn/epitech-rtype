@@ -38,6 +38,8 @@ struct Health {
 
 struct MovementPattern {
     std::string type = "straight"; // straight, sine_wave, zigzag, dive, etc.
+    float amplitude = 150.f;
+    float frequency = 0.02f;
 };
 
 struct EnemyAttack {

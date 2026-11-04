@@ -1,24 +1,14 @@
 {
   "enemies": {
     "standard_red": {
-      "health": 3,
+      "health": 1,
       "speed": 100.0,
-      "pattern": "sine_wave",
+      "pattern": "straight",
       "attack": {
         "fire_rate": 2.0,
         "bullet_speed": 350.0,
         "bullet_variant": 0,
-        "bullet_pattern": "zigzag"
-      }
-    },
-    "boss_heavy": {
-      "health": 50,
-      "speed": 40.0,
-      "pattern": "straight",
-      "attack": {
-        "fire_rate": 0.8,
-        "bullet_speed": 500.0,
-        "bullet_variant": 1
+        "bullet_pattern": "straight"
       }
     },
     "tentacle_creature": {
@@ -30,6 +20,17 @@
         "bullet_speed": 300.0,
         "bullet_variant": 0,
         "bullet_pattern": "zigzag"
+      }
+    },
+    "boss_heavy": {
+      "health": 50,
+      "speed": 40.0,
+      "pattern": "straight",
+      "attack": {
+        "fire_rate": 0.8,
+        "bullet_speed": 500.0,
+        "bullet_variant": 1,
+        "bullet_pattern": "straight"
       }
     }
   }

@@ -40,6 +40,7 @@ LevelConfig loadLevelFromJson(const std::string &filepath)
                 enemy.speed = e.value("speed", 150.f);
                 enemy.amplitude = e.value("amplitude", 0.f);
                 enemy.frequency = e.value("frequency", 0.f);
+                enemy.health = e.value("hp", e.value("health", 0));
                 wave.enemies.push_back(enemy);
             }
         }

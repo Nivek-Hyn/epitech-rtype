@@ -175,3 +175,104 @@ TEST(Game, EnemyZigzagShootingAppliesMovementPattern)
     EXPECT_NE(vel->y, 0.f);
 }
 
+TEST(Game, GameRulesLoadedCorrectlyForGameDesigner)
+{
+    Game game;
+    const auto &rules = game.rules();
+    EXPECT_GE(rules.campaignLevels.size(), 3u);
+    EXPECT_GT(rules.infinite.maxBulletSpeed, 0.f);
+    EXPECT_GT(rules.infinite.healthGrowthPerLoop, 0.f);
+    EXPECT_GT(rules.infinite.scoreMultiplierPerLoop, 0.f);
+    EXPECT_EQ(rules.difficulties.at(Game::Difficulty::Normal).healthMultiplier, 1.0f);
+    EXPECT_LT(rules.difficulties.at(Game::Difficulty::Easy).healthMultiplier, 1.0f);
+    EXPECT_GT(rules.difficulties.at(Game::Difficulty::Hard).healthMultiplier, 1.0f);
+}
+
+TEST(Game, DifficultySettingsChangeGameModeAndDifficulty)
+{
+    Game game;
+    EXPECT_EQ(game.gameMode(), Game::GameMode::Campaign);
+    EXPECT_EQ(game.difficulty(), Game::Difficulty::Normal);
+
+    game.setGameMode(Game::GameMode::Infinite);
+    EXPECT_EQ(game.gameMode(), Game::GameMode::Infinite);
+
+    game.setDifficulty(Game::Difficulty::Hard);
+    EXPECT_EQ(game.difficulty(), Game::Difficulty::Hard);
+}
+
+TEST(Game, CampaignProgressionAdvancesLevelsAndFinishes)
+{
+    Game game;
+    game.setGameMode(Game::GameMode::Campaign);
+    game.rules().intermissionDelay = 0.0f;
+    game.onPlayerJoined(0);
+
+    // Move player safely out of the horizontal line of enemy fire
+    for (int tick = 0; tick < 120; ++tick) {
+        game.onInput(0, protocol::InputFlag::Up);
+        game.update(1.f / 60.f);
+    }
+
+    EXPECT_EQ(game.currentLevelIndex(), 0u);
+    EXPECT_EQ(game.gameState(), protocol::GameState::Playing);
+
+    // Fast-forward until level 1 finishes (all waves spawn and enemies despawn out of bounds)
+    for (int tick = 0; tick < 3600; ++tick) {
+        game.update(0.1f);
+        if (game.currentLevelIndex() == 1u)
+            break;
+    }
+    EXPECT_EQ(game.currentLevelIndex(), 1u);
+
+    // Fast-forward level 2
+    for (int tick = 0; tick < 3600; ++tick) {
+        game.update(0.1f);
+        if (game.currentLevelIndex() == 2u)
+            break;
+    }
+    EXPECT_EQ(game.currentLevelIndex(), 2u);
+
+    // Fast-forward level 3 (Boss stage)
+    for (int tick = 0; tick < 3600; ++tick) {
+        game.update(0.1f);
+        if (game.gameState() == protocol::GameState::Finished)
+            break;
+    }
+    EXPECT_EQ(game.gameState(), protocol::GameState::Finished);
+}
+
+TEST(Game, InfiniteModeLoopsAndIncrementsLoopCount)
+{
+    Game game;
+    game.setGameMode(Game::GameMode::Infinite);
+    game.rules().intermissionDelay = 0.0f;
+    game.onPlayerJoined(0);
+
+    // Move player safely out of the horizontal line of enemy fire
+    for (int tick = 0; tick < 120; ++tick) {
+        game.onInput(0, protocol::InputFlag::Up);
+        game.update(1.f / 60.f);
+    }
+
+    EXPECT_EQ(game.infiniteLoopCount(), 1u);
+    EXPECT_EQ(game.currentLevelIndex(), 0u);
+
+    // Fast-forward all 3 levels
+    for (int level = 0; level < 3; ++level) {
+        for (int tick = 0; tick < 3600; ++tick) {
+            game.update(0.1f);
+            if (level < 2 && game.currentLevelIndex() == static_cast<std::size_t>(level + 1))
+                break;
+            if (level == 2 && game.infiniteLoopCount() == 2u)
+                break;
+        }
+    }
+
+    // Now in loop 2, back to stage 0, and game is still Playing!
+    EXPECT_EQ(game.infiniteLoopCount(), 2u);
+    EXPECT_EQ(game.currentLevelIndex(), 0u);
+    EXPECT_EQ(game.gameState(), protocol::GameState::Playing);
+}
+
+
