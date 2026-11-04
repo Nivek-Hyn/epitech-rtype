@@ -275,4 +275,50 @@ TEST(Game, InfiniteModeLoopsAndIncrementsLoopCount)
     EXPECT_EQ(game.gameState(), protocol::GameState::Playing);
 }
 
+TEST(Game, EnemyMultipleAttacksShootSimultaneously)
+{
+    engine::ecs::Registry registry;
+    auto enemy = registry.spawn();
+    registry.emplace<rtype::components::Position>(enemy, 500.f, 200.f);
+    registry.emplace<rtype::components::Kind>(enemy, protocol::EntityType::Enemy, 0);
+
+    std::vector<rtype::components::AttackEntry> attacks = {
+        {0.f, 0.5f, 400.f, 1, "straight", 0.f},
+        {0.f, 0.5f, 250.f, 0, "zigzag", 30.f}
+    };
+    registry.emplace<rtype::components::EnemyAttack>(enemy, rtype::components::EnemyAttack{attacks});
+
+    std::vector<engine::ecs::Entity> spawnedBullets;
+    updateEnemyShooting(registry, [&](protocol::EntityType type, std::uint8_t variant, float x, float y) {
+        auto bullet = registry.spawn();
+        registry.emplace<rtype::components::Kind>(bullet, type, variant);
+        registry.emplace<rtype::components::Position>(bullet, x, y);
+        registry.emplace<rtype::components::Velocity>(bullet, 0.f, 0.f);
+        spawnedBullets.push_back(bullet);
+        return bullet;
+    }, 0.6f);
+
+    ASSERT_EQ(spawnedBullets.size(), 2u);
+
+    // Bullet 1: straight, offset 0, variant 1
+    const auto *pos1 = registry.get<rtype::components::Position>(spawnedBullets[0]);
+    const auto *kind1 = registry.get<rtype::components::Kind>(spawnedBullets[0]);
+    ASSERT_NE(pos1, nullptr);
+    ASSERT_NE(kind1, nullptr);
+    EXPECT_FLOAT_EQ(pos1->y, 200.f);
+    EXPECT_EQ(kind1->variant, 1);
+
+    // Bullet 2: zigzag, offset +30, variant 0
+    const auto *pos2 = registry.get<rtype::components::Position>(spawnedBullets[1]);
+    const auto *kind2 = registry.get<rtype::components::Kind>(spawnedBullets[1]);
+    const auto *pattern2 = registry.get<rtype::components::MovementPattern>(spawnedBullets[1]);
+    ASSERT_NE(pos2, nullptr);
+    ASSERT_NE(kind2, nullptr);
+    ASSERT_NE(pattern2, nullptr);
+    EXPECT_FLOAT_EQ(pos2->y, 230.f);
+    EXPECT_EQ(kind2->variant, 0);
+    EXPECT_EQ(pattern2->type, "zigzag");
+}
+
+
 

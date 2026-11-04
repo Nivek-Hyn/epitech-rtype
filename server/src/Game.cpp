@@ -72,12 +72,26 @@ void Game::loadEntitiesConfig(const std::string &filepath)
                     def.speed = val.value("speed", 100.f);
                     def.pattern = val.value("pattern", "straight");
                     
-                    if (val.contains("attack")) {
+                    if (val.contains("attacks") && val["attacks"].is_array()) {
                         def.hasAttack = true;
-                        def.fireRate = val["attack"].value("fire_rate", 2.0f);
-                        def.bulletSpeed = val["attack"].value("bullet_speed", 350.f);
-                        def.bulletVariant = val["attack"].value<std::uint8_t>("bullet_variant", 0);
-                        def.bulletPattern = val["attack"].value("bullet_pattern", "straight");
+                        for (const auto &atkVal : val["attacks"]) {
+                            AttackDefinition atk;
+                            atk.fireRate = atkVal.value("fire_rate", 2.0f);
+                            atk.bulletSpeed = atkVal.value("bullet_speed", 350.f);
+                            atk.bulletVariant = atkVal.value<std::uint8_t>("bullet_variant", 0);
+                            atk.bulletPattern = atkVal.value("bullet_pattern", "straight");
+                            atk.offsetY = atkVal.value("offset_y", 0.f);
+                            def.attacks.push_back(atk);
+                        }
+                    } else if (val.contains("attack") && val["attack"].is_object()) {
+                        def.hasAttack = true;
+                        AttackDefinition atk;
+                        atk.fireRate = val["attack"].value("fire_rate", 2.0f);
+                        atk.bulletSpeed = val["attack"].value("bullet_speed", 350.f);
+                        atk.bulletVariant = val["attack"].value<std::uint8_t>("bullet_variant", 0);
+                        atk.bulletPattern = val["attack"].value("bullet_pattern", "straight");
+                        atk.offsetY = val["attack"].value("offset_y", 0.f);
+                        def.attacks.push_back(atk);
                     } else {
                         def.hasAttack = false;
                     }
@@ -396,10 +410,7 @@ void Game::spawnEnemies(float dt)
                 float frequency = enemyConfig.frequency > 0.f ? enemyConfig.frequency : 0.02f;
 
                 bool hasAttack = false;
-                float fireRate = 2.0f;
-                float bulletSpeed = 350.f;
-                std::uint8_t bulletVariant = 0;
-                std::string bulletPattern = "straight";
+                std::vector<AttackDefinition> attacks;
 
                 if (_entityDefinitions.find(enemyConfig.type) != _entityDefinitions.end()) {
                     const auto &def = _entityDefinitions[enemyConfig.type];
@@ -412,16 +423,11 @@ void Game::spawnEnemies(float dt)
                     }
                     patternType = def.pattern;
                     hasAttack = def.hasAttack;
-                    fireRate = def.fireRate;
-                    bulletSpeed = def.bulletSpeed;
-                    bulletVariant = def.bulletVariant;
-                    bulletPattern = def.bulletPattern;
+                    attacks = def.attacks;
                 }
 
                 const int finalHp = std::max(1, static_cast<int>(std::round(static_cast<float>(hp) * diffCfg.healthMultiplier * hpGrowth)));
                 const float finalSpeed = speed * diffCfg.speedMultiplier * speedGrowth;
-                const float finalFireRate = std::max(_rules.infinite.minFireRate, fireRate / (diffCfg.fireRateMultiplier * fireRateGrowth));
-                const float finalBulletSpeed = std::min(_rules.infinite.maxBulletSpeed, bulletSpeed * diffCfg.bulletSpeedMultiplier * bulletSpeedGrowth);
 
                 float spawnY = enemyConfig.spawn_y;
                 if (spawnY < 0.f) {
@@ -436,9 +442,15 @@ void Game::spawnEnemies(float dt)
                 _registry.emplace<rtype::components::MovementPattern>(
                     enemy, rtype::components::MovementPattern{patternType, amplitude, frequency});
 
-                if (hasAttack) {
+                if (hasAttack && !attacks.empty()) {
+                    std::vector<rtype::components::AttackEntry> attackEntries;
+                    for (const auto &atk : attacks) {
+                        const float finalFireRate = std::max(_rules.infinite.minFireRate, atk.fireRate / (diffCfg.fireRateMultiplier * fireRateGrowth));
+                        const float finalBulletSpeed = std::min(_rules.infinite.maxBulletSpeed, atk.bulletSpeed * diffCfg.bulletSpeedMultiplier * bulletSpeedGrowth);
+                        attackEntries.push_back(rtype::components::AttackEntry{0.f, finalFireRate, finalBulletSpeed, atk.bulletVariant, atk.bulletPattern, atk.offsetY});
+                    }
                     _registry.emplace<rtype::components::EnemyAttack>(
-                        enemy, rtype::components::EnemyAttack{0.f, finalFireRate, finalBulletSpeed, bulletVariant, bulletPattern});
+                        enemy, rtype::components::EnemyAttack{std::move(attackEntries)});
                 }
             }
             wave.isSpawned = true;

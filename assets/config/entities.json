@@ -26,12 +26,32 @@
       "health": 50,
       "speed": 40.0,
       "pattern": "straight",
-      "attack": {
-        "fire_rate": 0.8,
-        "bullet_speed": 500.0,
-        "bullet_variant": 1,
-        "bullet_pattern": "straight"
-      }
+      "attacks": [
+        {
+          "name": "canon_frontal",
+          "offset_y": 0.0,
+          "fire_rate": 0.8,
+          "bullet_speed": 480.0,
+          "bullet_variant": 1,
+          "bullet_pattern": "straight"
+        },
+        {
+          "name": "lance_missiles_haut",
+          "offset_y": -30.0,
+          "fire_rate": 2.0,
+          "bullet_speed": 280.0,
+          "bullet_variant": 0,
+          "bullet_pattern": "zigzag"
+        },
+        {
+          "name": "lance_missiles_bas",
+          "offset_y": 30.0,
+          "fire_rate": 2.0,
+          "bullet_speed": 280.0,
+          "bullet_variant": 0,
+          "bullet_pattern": "zigzag"
+        }
+      ]
     }
   }
 }

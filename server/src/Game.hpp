@@ -58,15 +58,20 @@ public:
         float intermissionDelay = 2.0f;
     };
 
+    struct AttackDefinition {
+        float fireRate = 2.0f;
+        float bulletSpeed = 350.f;
+        std::uint8_t bulletVariant = 0;
+        std::string bulletPattern = "straight";
+        float offsetY = 0.f;
+    };
+
     struct EnemyDefinition {
         int health = 1;
         float speed = 100.f;
         std::string pattern = "straight";
         bool hasAttack = false;
-        float fireRate = 2.0f;
-        float bulletSpeed = 350.f;
-        std::uint8_t bulletVariant = 0;
-        std::string bulletPattern = "straight";
+        std::vector<AttackDefinition> attacks;
     };
 
     Game();
