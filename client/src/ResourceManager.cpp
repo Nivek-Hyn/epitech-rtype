@@ -20,6 +20,10 @@ bool ResourceManager::loadDefaults()
         std::cerr << "[ResourceManager] Failed to load assets/r-typesheet1.gif\n";
         success = false;
     }
+    if (!loadTexture("enemy_bullet", "assets/r-typesheet3.gif")) {
+        std::cerr << "[ResourceManager] Failed to load assets/r-typesheet3.gif\n";
+        success = false;
+    }
 
     if (!loadFont("default", "assets/font.ttf")) {
         if (!loadFont("default", "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf") &&

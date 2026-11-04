@@ -7,6 +7,7 @@
 
 #include <SFML/Graphics.hpp>
 
+#include <array>
 #include <cstdlib>
 #include <exception>
 #include <iostream>
@@ -17,6 +18,12 @@
 enum class AppState {
     Menu,
     Playing
+};
+
+struct Explosion {
+    sf::Vector2f position;
+    float timer{0.f};
+    float maxDuration{0.35f};
 };
 
 int main(int argc, char **argv)
@@ -64,6 +71,10 @@ int main(int argc, char **argv)
     waitingText.setFillColor(sf::Color(255, 204, 0));
     waitingText.setPosition({600.f, 480.f});
 
+    sf::Text scoreText(resources.getFont("default"), "SCORE: 000000", 28);
+    scoreText.setFillColor(sf::Color(0, 230, 255));
+    scoreText.setPosition({50.f, 30.f});
+
     if (directConnect) {
         try {
             network.connect(host, port);
@@ -74,11 +85,14 @@ int main(int argc, char **argv)
     }
 
     std::vector<rtype::protocol::EntityState> entities;
+    std::vector<Explosion> explosions;
     bool reportedConnected = false;
     sf::Clock clock;
+    float totalTime = 0.f;
 
     while (window.isOpen()) {
         const float dt = clock.restart().asSeconds();
+        totalTime += dt;
         const auto &cfg = menu.getConfig();
         resources.setSfxVolume(cfg.sfxVolume);
         resources.setMusicVolume(cfg.musicVolume);
@@ -102,6 +116,7 @@ int main(int argc, char **argv)
                         appState = AppState::Menu;
                         reportedConnected = false;
                         entities.clear();
+                        explosions.clear();
                     }
                 }
             }
@@ -125,6 +140,13 @@ int main(int argc, char **argv)
             }
         } else if (appState == AppState::Playing) {
             starfield.update(dt);
+
+            for (auto &exp : explosions) {
+                exp.timer += dt;
+            }
+            std::erase_if(explosions, [](const Explosion &exp) {
+                return exp.timer >= exp.maxDuration;
+            });
 
             if (network.connected() && !reportedConnected) {
                 std::cout << "Connected to server!\n";
@@ -156,18 +178,41 @@ int main(int argc, char **argv)
 
             while (auto message = network.poll()) {
                 if (const auto *snapshot = std::get_if<rtype::protocol::Snapshot>(&*message)) {
+                    scoreText.setString("SCORE: " + std::to_string(snapshot->score));
+
                     if (!entities.empty()) {
-                        std::unordered_set<std::uint32_t> currentEnemies;
+                        std::unordered_set<std::uint32_t> currentIds;
                         for (const auto &ent : snapshot->entities) {
-                            if (ent.type == rtype::protocol::EntityType::Enemy)
-                                currentEnemies.insert(ent.netId);
+                            currentIds.insert(ent.netId);
                         }
+
+                        std::vector<sf::Vector2f> playersPos;
+                        for (const auto &ent : entities) {
+                            if (ent.type == rtype::protocol::EntityType::Player)
+                                playersPos.push_back({ent.x, ent.y});
+                        }
+
                         for (const auto &prev : entities) {
-                            if (prev.type == rtype::protocol::EntityType::Enemy &&
-                                !currentEnemies.contains(prev.netId) &&
-                                prev.x > 30.f && prev.x < rtype::WorldWidth + 100.f) {
-                                resources.playSound("explosion", 90.f);
-                                break;
+                            if (!currentIds.contains(prev.netId)) {
+                                if (prev.type == rtype::protocol::EntityType::Enemy &&
+                                    prev.x > 30.f && prev.x < rtype::WorldWidth + 100.f) {
+                                    resources.playSound("explosion", 90.f);
+                                    explosions.push_back({sf::Vector2f(prev.x, prev.y), 0.f, 0.35f});
+                                } else if (prev.type == rtype::protocol::EntityType::Player) {
+                                    resources.playSound("hit", 100.f);
+                                    resources.playSound("explosion", 100.f);
+                                    explosions.push_back({sf::Vector2f(prev.x, prev.y), 0.f, 0.45f});
+                                } else if (prev.type == rtype::protocol::EntityType::EnemyMissile) {
+                                    for (const auto &pPos : playersPos) {
+                                        float dx = prev.x - pPos.x;
+                                        float dy = prev.y - pPos.y;
+                                        if (dx * dx + dy * dy < 75.f * 75.f) {
+                                            resources.playSound("hit", 95.f);
+                                            explosions.push_back({sf::Vector2f(prev.x, prev.y), 0.f, 0.25f});
+                                            break;
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -199,11 +244,23 @@ int main(int argc, char **argv)
                         sprite.setScale({2.f, 2.f});
                         sprite.setPosition({entity.x, entity.y});
                         window.draw(sprite);
-                    } else if (entity.type == rtype::protocol::EntityType::PlayerMissile ||
-                               entity.type == rtype::protocol::EntityType::EnemyMissile) {
+                    } else if (entity.type == rtype::protocol::EntityType::PlayerMissile) {
                         sf::Sprite sprite(resources.getTexture("bullet"));
                         sprite.setTextureRect(sf::IntRect({248, 102}, {18, 12}));
                         sprite.setScale({2.f, 2.f});
+                        sprite.setColor(sf::Color(100, 220, 255));
+                        sprite.setPosition({entity.x, entity.y});
+                        window.draw(sprite);
+                    } else if (entity.type == rtype::protocol::EntityType::EnemyMissile) {
+                        sf::Sprite sprite(resources.getTexture("enemy_bullet"));
+                        const int animFrame = static_cast<int>(totalTime * 14.f) % 6;
+                        sprite.setTextureRect(sf::IntRect({animFrame * 17 + 1, 2}, {16, 13}));
+                        sprite.setOrigin({8.f, 6.5f});
+                        if (entity.variant == 1) {
+                            sprite.setScale({4.f, 4.f});
+                        } else {
+                            sprite.setScale({2.8f, 2.8f});
+                        }
                         sprite.setPosition({entity.x, entity.y});
                         window.draw(sprite);
                     } else if (entity.type == rtype::protocol::EntityType::Enemy) {
@@ -215,6 +272,28 @@ int main(int argc, char **argv)
                     }
                 }
             }
+
+            static const std::array<sf::IntRect, 6> explosionFrames = {
+                sf::IntRect({72, 296}, {32, 24}),
+                sf::IntRect({109, 296}, {32, 24}),
+                sf::IntRect({146, 296}, {32, 24}),
+                sf::IntRect({354, 296}, {32, 24}),
+                sf::IntRect({391, 296}, {32, 24}),
+                sf::IntRect({428, 296}, {32, 24})
+            };
+
+            for (const auto &exp : explosions) {
+                sf::Sprite expSprite(resources.getTexture("bullet"));
+                const float progress = exp.timer / exp.maxDuration;
+                const std::size_t frame = std::clamp(static_cast<std::size_t>(progress * 6.f), std::size_t{0}, std::size_t{5});
+                expSprite.setTextureRect(explosionFrames[frame]);
+                expSprite.setOrigin({16.f, 12.f});
+                expSprite.setScale({2.8f, 2.8f});
+                expSprite.setPosition({exp.position.x + 25.f, exp.position.y + 20.f});
+                window.draw(expSprite);
+            }
+
+            window.draw(scoreText);
         }
 
         window.display();
