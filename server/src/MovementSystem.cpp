@@ -42,6 +42,35 @@ void updateEnemyMovements(engine::ecs::Registry &registry, float dt)
                 vel.x = -100.f + std::sin(timeElapsed * freq) * amp;
                 vel.y = 0.f;
             }
+            else if (pattern.type == "orbital") {
+                // 6. Mouvement orbital de satellite (oscillation circulaire orbitale)
+                float amp = pattern.amplitude > 0.f ? pattern.amplitude : 120.f;
+                float freq = pattern.frequency > 0.f ? pattern.frequency : 2.0f;
+                vel.y = std::sin(timeElapsed * freq) * amp;
+                vel.x = -90.f + std::cos(timeElapsed * freq) * (amp * 0.4f);
+            }
+            else if (pattern.type == "gravity_dive") {
+                // 7. Plongée gravitationnelle martienne lourde
+                float amp = pattern.amplitude > 0.f ? pattern.amplitude : 160.f;
+                vel.y = amp;
+            }
+            else if (pattern.type == "parabolic") {
+                // 8. Saut / arc parabolique sous gravité martienne
+                float amp = pattern.amplitude > 0.f ? pattern.amplitude : 150.f;
+                float freq = pattern.frequency > 0.f ? pattern.frequency : 0.008f;
+                vel.y = std::sin(pos.x * freq) * amp;
+            }
+            else if (pattern.type == "vortex_spiral") {
+                // 9. Aspiration spirale du trou noir vers le centre de l'espace (y ~ 540)
+                float amp = pattern.amplitude > 0.f ? pattern.amplitude : 140.f;
+                float dy = 540.f - pos.y;
+                vel.y = std::sin(timeElapsed * 3.5f) * amp + (dy * 0.6f);
+            }
+            else if (pattern.type == "quantum_erratic") {
+                // 10. Distorsion quantique erratique imprévisible
+                float amp = pattern.amplitude > 0.f ? pattern.amplitude : 130.f;
+                vel.y = (std::sin(pos.x * 0.03f) + std::cos(timeElapsed * 4.0f)) * (amp * 0.6f);
+            }
         });
 }
 
