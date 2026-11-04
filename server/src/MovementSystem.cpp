@@ -16,7 +16,9 @@ void updateEnemyMovements(engine::ecs::Registry &registry, float dt)
             
             if (pattern.type == "sine_wave") {
                 // 1. Mouvement sinusoïdal classique (en vagues verticales)
-                vel.y = std::sin(pos.x * 0.02f) * 150.f;
+                float amp = pattern.amplitude > 0.f ? pattern.amplitude : 150.f;
+                float freq = pattern.frequency > 0.f ? pattern.frequency : 0.02f;
+                vel.y = std::sin(pos.x * freq) * amp;
             }
             else if (pattern.type == "straight") {
                 // 2. Tout droit (pas de mouvement vertical)
@@ -24,16 +26,20 @@ void updateEnemyMovements(engine::ecs::Registry &registry, float dt)
             }
             else if (pattern.type == "zigzag") {
                 // 3. Mouvement de va-et-vient plus brusque
-                vel.y = std::cos(pos.x * 0.05f) * 100.f;
+                float amp = pattern.amplitude > 0.f ? pattern.amplitude : 100.f;
+                float freq = pattern.frequency > 0.f ? pattern.frequency : 0.05f;
+                vel.y = std::cos(pos.x * freq) * amp;
             }
             else if (pattern.type == "dive") {
                 // 4. Plongée vers le bas en diagonale
-                vel.y = 80.f;
+                float amp = pattern.amplitude > 0.f ? pattern.amplitude : 80.f;
+                vel.y = amp;
             }
             else if (pattern.type == "back_and_forth") {
                 // 5. Avance et recule (modifie la vitesse horizontale X de manière oscillante)
-                // L'ennemi avance vers la gauche tout en faisant des mini-pauses ou en reculant un peu
-                vel.x = -100.f + std::sin(timeElapsed * 3.0f) * 50.f;
+                float amp = pattern.amplitude > 0.f ? pattern.amplitude : 50.f;
+                float freq = pattern.frequency > 0.f ? pattern.frequency : 3.0f;
+                vel.x = -100.f + std::sin(timeElapsed * freq) * amp;
                 vel.y = 0.f;
             }
         });

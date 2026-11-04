@@ -10,6 +10,7 @@ struct EnemySpawnConfig {
     float speed;
     float amplitude; // pour le sinusoidal
     float frequency; // pour le sinusoidal
+    int health = 0;  // 0 = utilise la valeur par defaut d'entities.json
 };
 
 struct WaveConfig {

@@ -4,26 +4,30 @@
   "waves": [
     {
       "wave_id": 1,
-      "delay_before_start": 2.0,
+      "delay_before_start": 3.0,
       "enemies": [
-        { "type": "sine_wave", "spawn_y": 150, "amplitude": 50, "frequency": 0.04 },
-        { "type": "sine_wave", "spawn_y": 450, "amplitude": 50, "frequency": 0.04 }
+        { "type": "tentacle_creature", "spawn_y": 200.0, "speed": 140.0 },
+        { "type": "standard_red", "spawn_y": 400.0, "speed": 140.0 },
+        { "type": "tentacle_creature", "spawn_y": 600.0, "speed": 140.0 }
       ]
     },
     {
       "wave_id": 2,
-      "delay_before_start": 8.0,
+      "delay_before_start": 12.0,
       "enemies": [
-        { "type": "patrol", "spawn_y": 200, "speed": 200 },
-        { "type": "patrol", "spawn_y": 300, "speed": 200 },
-        { "type": "patrol", "spawn_y": 400, "speed": 200 }
+        { "type": "standard_red", "spawn_y": 100.0, "speed": 150.0 },
+        { "type": "tentacle_creature", "spawn_y": 200.0, "speed": 140.0 },
+        { "type": "standard_red", "spawn_y": 300.0, "speed": 150.0 },
+        { "type": "tentacle_creature", "spawn_y": 400.0, "speed": 140.0 },
+        { "type": "standard_red", "spawn_y": 500.0, "speed": 150.0 },
+        { "type": "tentacle_creature", "spawn_y": 600.0, "speed": 140.0 }
       ]
     },
     {
       "wave_id": 3,
-      "delay_before_start": 14.0,
+      "delay_before_start": 25.0,
       "enemies": [
-        { "type": "boss", "spawn_y": 300, "hp": 500, "behavior": "stationary_turret" }
+        { "type": "boss_heavy", "spawn_y": 300.0, "speed": 40.0 }
       ]
     }
   ]
