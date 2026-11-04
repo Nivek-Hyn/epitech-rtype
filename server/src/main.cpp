@@ -5,8 +5,11 @@
 #include "engine/core/FixedTimestep.hpp"
 
 #include <atomic>
+#include <chrono>
 #include <csignal>
+#include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <exception>
 #include <iostream>
 #include <string>
@@ -23,16 +26,34 @@ void onSignal(int)
     g_running = false;
 }
 
+void printTraffic(const rtype::server::AsioNetworkServer &network)
+{
+    const auto stats = network.traffic();
+    const std::size_t clients = network.clientCount();
+    const double sentKb = stats.rates.sentBytesPerSecond / 1024.0;
+    const double receivedKb = stats.rates.receivedBytesPerSecond / 1024.0;
+    std::printf("[net] %zu client(s) | out %.1f KB/s (%.1f per client) | in %.1f KB/s | total out %.1f KB, in %.1f KB\n",
+                clients, sentKb, clients > 0 ? sentKb / static_cast<double>(clients) : 0.0, receivedKb,
+                static_cast<double>(stats.totals.bytesSent) / 1024.0,
+                static_cast<double>(stats.totals.bytesReceived) / 1024.0);
+    std::fflush(stdout);
+}
+
 } // namespace
 
 int main(int argc, char **argv)
 {
     std::uint16_t port = rtype::DefaultPort;
-    if (argc > 1) {
+    bool showTraffic = false;
+    for (int i = 1; i < argc; ++i) {
+        if (std::strcmp(argv[i], "--stats") == 0) {
+            showTraffic = true;
+            continue;
+        }
         try {
-            port = static_cast<std::uint16_t>(std::stoul(argv[1]));
+            port = static_cast<std::uint16_t>(std::stoul(argv[i]));
         } catch (const std::exception &) {
-            std::cerr << "Usage: " << argv[0] << " [port]\n";
+            std::cerr << "Usage: " << argv[0] << " [port] [--stats]\n";
             return 84;
         }
     }
@@ -51,7 +72,12 @@ int main(int argc, char **argv)
     std::cout << "r-type_server: listening on UDP port " << port << '\n';
 
     engine::core::FixedTimestep clock(rtype::TickRate);
+    auto nextReport = std::chrono::steady_clock::now() + std::chrono::seconds(2);
     while (g_running) {
+        if (showTraffic && std::chrono::steady_clock::now() >= nextReport) {
+            printTraffic(network);
+            nextReport += std::chrono::seconds(2);
+        }
         for (int i = clock.advance(); i > 0; --i) {
             while (auto event = network.poll()) {
                 std::visit(

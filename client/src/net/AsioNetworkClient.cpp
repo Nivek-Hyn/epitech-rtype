@@ -2,15 +2,24 @@
 
 #include "common/Constants.hpp"
 
+#include <algorithm>
 #include <exception>
 #include <iostream>
 #include <memory>
 #include <stdexcept>
+#include <type_traits>
 #include <utility>
+#include <variant>
 
 namespace rtype::client {
 
-AsioNetworkClient::AsioNetworkClient() : _socket(_io), _connectTimer(_io), _timeoutTimer(_io) {}
+namespace {
+
+constexpr double RttSmoothing = 0.2; // weight of the newest sample in the smoothed round-trip time
+
+} // namespace
+
+AsioNetworkClient::AsioNetworkClient() : _socket(_io), _connectTimer(_io), _housekeepingTimer(_io) {}
 
 AsioNetworkClient::~AsioNetworkClient()
 {
@@ -28,16 +37,28 @@ void AsioNetworkClient::connect(const std::string &host, std::uint16_t port)
         throw std::runtime_error("Could not resolve server host");
     _server = endpoints.begin()->endpoint();
 
+    while (_messages.tryPop()) {
+    } // nothing from a previous session
+
     _io.restart();
     _socket.open(Udp::v4());
-    _connected = false;
-    _connectionRejected = false;
+    _traffic.reset();
+    _rateMeter = engine::net::RateMeter{};
+    _loss.reset();
+    _sentRate = 0.0;
+    _receivedRate = 0.0;
+    _lossPercent = 0.0;
+    _rttMs = -1.0;
+    _connectAttempts = 0;
+    _state = ConnectionState::Connecting;
     _running = true;
     _lastReceive = Clock::now();
+    _lastPing = _lastReceive;
     receive();
+    ++_connectAttempts;
     sendDatagram(protocol::Connect{});
     scheduleConnectRetry();
-    scheduleTimeoutCheck();
+    scheduleHousekeeping();
     _thread = std::thread([this] { runIo(); });
 }
 
@@ -66,21 +87,27 @@ void AsioNetworkClient::disconnect()
             const auto bytes = protocol::encode({_nextSequence.fetch_add(1), protocol::Disconnect{}});
             asio::error_code ignored;
             _socket.send_to(asio::buffer(bytes), _server, 0, ignored);
+            _traffic.addSent(bytes.size());
         }
         _running = false;
-        _connected = false;
         _io.stop();
     });
     _thread.join();
     _connectTimer.cancel();
-    _timeoutTimer.cancel();
+    _housekeepingTimer.cancel();
     asio::error_code error;
     _socket.close(error);
+    _state = ConnectionState::Idle;
 }
 
 bool AsioNetworkClient::connected() const
 {
-    return _connected;
+    return _state == ConnectionState::Connected;
+}
+
+ConnectionState AsioNetworkClient::state() const
+{
+    return _state;
 }
 
 std::optional<protocol::Message> AsioNetworkClient::poll()
@@ -98,57 +125,119 @@ void AsioNetworkClient::send(const protocol::Message &message)
     });
 }
 
+NetworkStats AsioNetworkClient::stats() const
+{
+    NetworkStats result;
+    result.traffic.totals = _traffic.totals();
+    result.traffic.rates = {_sentRate, _receivedRate};
+    const double rtt = _rttMs;
+    if (rtt >= 0.0)
+        result.rttMs = rtt;
+    result.lossPercent = _lossPercent;
+    return result;
+}
+
 void AsioNetworkClient::receive()
 {
     _socket.async_receive_from(
         asio::buffer(_receiveBuffer), _sender, [this](const asio::error_code &error, std::size_t size) {
             if (!error && _sender == _server) {
-                if (const auto packet = protocol::decode(std::span(_receiveBuffer).first(size))) {
-                    _lastReceive = Clock::now();
-                    if (std::holds_alternative<protocol::ConnectAccepted>(packet->message)) {
-                        _connected = true;
-                        _connectionRejected = false;
-                    } else if (std::holds_alternative<protocol::ConnectRejected>(packet->message)) {
-                        _connected = false;
-                        _connectionRejected = true;
-                    }
-                    _messages.push(packet->message);
-                }
+                _traffic.addReceived(size);
+                if (const auto packet = protocol::decode(std::span(_receiveBuffer).first(size)))
+                    handlePacket(*packet, Clock::now());
             }
             if (_running)
                 receive();
         });
 }
 
+void AsioNetworkClient::handlePacket(const protocol::Packet &packet, Clock::time_point now)
+{
+    _lastReceive = now;
+    // Rejected, TimedOut and Lost are final: a late datagram must not bring a dead session back.
+    const bool connecting = _state == ConnectionState::Connecting;
+
+    if (std::holds_alternative<protocol::ConnectAccepted>(packet.message)) {
+        if (connecting)
+            _state = ConnectionState::Connected;
+    } else if (std::holds_alternative<protocol::ConnectRejected>(packet.message)) {
+        if (connecting)
+            _state = ConnectionState::Rejected;
+    } else if (const auto *snapshot = std::get_if<protocol::Snapshot>(&packet.message)) {
+        _loss.record(snapshot->tick);
+    } else if (const auto *pong = std::get_if<protocol::Pong>(&packet.message)) {
+        const double sample = static_cast<double>(static_cast<std::uint32_t>(nowMs() - pong->timestampMs));
+        const double previous = _rttMs;
+        _rttMs = previous < 0.0 ? sample : previous + RttSmoothing * (sample - previous);
+    }
+    _messages.push(packet.message);
+}
+
 void AsioNetworkClient::scheduleConnectRetry()
 {
-    _connectTimer.expires_after(std::chrono::milliseconds(500));
+    _connectTimer.expires_after(_options.connectRetryInterval);
     _connectTimer.async_wait([this](const asio::error_code &error) {
-        if (error || !_running || _connectionRejected)
+        if (error || !_running || _state != ConnectionState::Connecting)
             return;
-        if (!_connected)
-            sendDatagram(protocol::Connect{});
+        if (_connectAttempts >= _options.maxConnectAttempts) {
+            _state = ConnectionState::TimedOut;
+            return;
+        }
+        ++_connectAttempts;
+        sendDatagram(protocol::Connect{});
         scheduleConnectRetry();
     });
 }
 
-void AsioNetworkClient::scheduleTimeoutCheck()
+void AsioNetworkClient::scheduleHousekeeping()
 {
-    _timeoutTimer.expires_after(std::chrono::seconds(1));
-    _timeoutTimer.async_wait([this](const asio::error_code &error) {
+    // Often enough to notice a silent server quickly, but at most once per second in the game.
+    const auto interval = std::clamp(std::min({std::chrono::milliseconds(1000), _options.serverTimeout / 4,
+                                               _options.pingInterval}),
+                                     std::chrono::milliseconds(5), std::chrono::milliseconds(1000));
+    _housekeepingTimer.expires_after(interval);
+    _housekeepingTimer.async_wait([this](const asio::error_code &error) {
         if (error || !_running)
             return;
-        if (Clock::now() - _lastReceive > rtype::ClientTimeout)
-            _connected = false;
-        scheduleTimeoutCheck();
+        housekeep();
     });
+}
+
+// Once per tick of the housekeeping timer: bandwidth, loss, ping and silent-server detection.
+void AsioNetworkClient::housekeep()
+{
+    const auto now = Clock::now();
+    const auto rates = _rateMeter.sample(
+        _traffic.totals(), std::chrono::duration<double>(now.time_since_epoch()).count());
+    _sentRate = rates.sentBytesPerSecond;
+    _receivedRate = rates.receivedBytesPerSecond;
+    _lossPercent = _loss.lossPercent();
+
+    if (_state == ConnectionState::Connected) {
+        if (now - _lastReceive > _options.serverTimeout) {
+            _state = ConnectionState::Lost;
+            return;
+        }
+        if (now - _lastPing >= _options.pingInterval) {
+            _lastPing = now;
+            sendDatagram(protocol::Ping{nowMs()});
+        }
+    }
+    scheduleHousekeeping();
 }
 
 void AsioNetworkClient::sendDatagram(protocol::Message message)
 {
     auto bytes =
         std::make_shared<std::vector<std::uint8_t>>(protocol::encode({_nextSequence.fetch_add(1), std::move(message)}));
+    _traffic.addSent(bytes->size());
     _socket.async_send_to(asio::buffer(*bytes), _server, [bytes](const asio::error_code &, std::size_t) {});
+}
+
+std::uint32_t AsioNetworkClient::nowMs() const
+{
+    return static_cast<std::uint32_t>(
+        std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now().time_since_epoch()).count());
 }
 
 } // namespace rtype::client

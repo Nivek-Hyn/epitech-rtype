@@ -42,7 +42,7 @@ A malformed datagram must never crash the receiver or close the session.
 | `0x01` | Connect | — | Ask to join. Resent every 500 ms until ConnectAccepted or ConnectRejected. |
 | `0x02` | Input | `u8 flags` | Keys currently held. Sent every client tick (60/s); also acts as keep-alive. |
 | `0x03` | Disconnect | — | The client leaves. |
-| `0x04` | Ping | `u32 timestamp_ms` | Latency measurement; the server answers with Pong. |
+| `0x04` | Ping | `u32 timestamp_ms` | Latency measurement; the server answers with Pong. The client sends one every second while connected, which also keeps the session alive. |
 
 Input flags: `0x01` up, `0x02` down, `0x04` left, `0x08` right, `0x10` shoot.
 

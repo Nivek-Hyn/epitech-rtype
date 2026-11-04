@@ -8,6 +8,7 @@
 
 #include <SFML/Graphics.hpp>
 
+#include <cstdio>
 #include <cstdlib>
 #include <exception>
 #include <iostream>
@@ -74,9 +75,26 @@ int main(int argc, char **argv)
         }
     }
 
+    sf::Text statsText(resources.getFont("default"), "", 22);
+    statsText.setFillColor(sf::Color::White);
+    statsText.setOutlineColor(sf::Color::Black);
+    statsText.setOutlineThickness(2.f);
+    statsText.setPosition({20.f, 20.f});
+
     rtype::protocol::SnapshotAssembler world;
     bool reportedConnected = false;
+    bool showStats = false; // [F3]
+    std::string rejectionReason = "the server refused the connection";
     sf::Clock clock;
+
+    // Drops the session and goes back to the menu, which explains why.
+    const auto leaveToMenu = [&](const std::string &message) {
+        network.disconnect();
+        appState = AppState::Menu;
+        reportedConnected = false;
+        world.reset();
+        menu.setStatusMessage(message, sf::Color::Red);
+    };
 
     while (window.isOpen()) {
         const float dt = clock.restart().asSeconds();
@@ -98,6 +116,8 @@ int main(int argc, char **argv)
                 menu.handleEvent(*event, window);
             } else if (appState == AppState::Playing) {
                 if (const auto *key = event->getIf<sf::Event::KeyPressed>()) {
+                    if (key->code == sf::Keyboard::Key::F3)
+                        showStats = !showStats;
                     if (key->code == sf::Keyboard::Key::Escape) {
                         network.disconnect();
                         appState = AppState::Menu;
@@ -165,10 +185,10 @@ int main(int argc, char **argv)
                     world.reset(); // a new session: the server's ticks may start again from zero
                     newSession = true;
                 } else if (const auto *rejected = std::get_if<rtype::protocol::ConnectRejected>(&*message)) {
-                    const char *reason = rejected->reason == rtype::protocol::RejectReason::ServerFull
-                                             ? "server is full"
-                                             : "protocol version mismatch";
-                    std::cerr << "Connection rejected: " << reason << ".\n";
+                    rejectionReason = rejected->reason == rtype::protocol::RejectReason::ServerFull
+                                          ? "the server is full"
+                                          : "the protocol versions differ";
+                    std::cerr << "Connection rejected: " << rejectionReason << ".\n";
                 }
             }
 
@@ -186,6 +206,20 @@ int main(int argc, char **argv)
                         break;
                     }
                 }
+            }
+
+            switch (network.state()) {
+            case rtype::client::ConnectionState::Rejected:
+                leaveToMenu("Connection rejected: " + rejectionReason + ".");
+                break;
+            case rtype::client::ConnectionState::TimedOut:
+                leaveToMenu("Could not reach the server. Check the address and that the server is running.");
+                break;
+            case rtype::client::ConnectionState::Lost:
+                leaveToMenu("Connection to the server lost.");
+                break;
+            default:
+                break;
             }
         }
         resources.updateAudio();
@@ -225,6 +259,19 @@ int main(int argc, char **argv)
                         window.draw(sprite);
                     }
                 }
+            }
+
+            if (showStats) {
+                const auto stats = network.stats();
+                char rtt[24] = "-- ms";
+                if (stats.rttMs)
+                    std::snprintf(rtt, sizeof rtt, "%.0f ms", *stats.rttMs);
+                char line[160];
+                std::snprintf(line, sizeof line, "ping %s | down %.1f KB/s | up %.1f KB/s | loss %.1f%%  [F3]", rtt,
+                              stats.traffic.rates.receivedBytesPerSecond / 1024.0,
+                              stats.traffic.rates.sentBytesPerSecond / 1024.0, stats.lossPercent);
+                statsText.setString(line);
+                window.draw(statsText);
             }
         }
 

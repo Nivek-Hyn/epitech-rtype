@@ -86,8 +86,8 @@ The concrete classes own sockets, timers, packet sequences, and their network I/
 ## 3. Connection lifecycle
 
 1. The client resolves the configured host, opens an IPv4 UDP socket, and sends `Connect`.
-2. The client retries `Connect` every 500 ms while it has not received an answer. It stops retrying after an
-  explicit rejection.
+2. The client retries `Connect` every 500 ms while it has not received an answer. It stops after an explicit
+  rejection, or gives up (`ConnectionState::TimedOut`) after 10 unanswered attempts, about 5 seconds.
 3. The server identifies clients by their UDP endpoint (address and port). It reuses the existing player id for
    a repeated `Connect` from the same endpoint, otherwise assigns the first free id from 0 to 3.
 4. If all four slots are occupied, the server replies with `ConnectRejected(ServerFull)`. A newly accepted
@@ -97,8 +97,14 @@ The concrete classes own sockets, timers, packet sequences, and their network I/
    seconds, the server times it out. Either case removes its player entity and produces an entity-destruction
    event for the other clients.
 
-Clients send `Input` while connected. The server also responds to `Ping` with `Pong`; the graphical client does
-not currently send pings.
+Clients send `Input` while connected, and a `Ping` every second. The server answers each `Ping` with a `Pong`:
+the client measures the round-trip time from it, and the datagram also keeps the session alive when the player
+sends nothing else.
+
+The client exposes where the connection stands as a `ConnectionState`: `Connecting`, `Connected`, `Rejected`
+(`ConnectRejected` received), `TimedOut` (the server never answered) and `Lost` (a connected server went silent
+for five seconds). The last three are final: the graphical client shows the reason in the main menu and returns to
+it. Calling `disconnect()` makes the state `Idle`, after which `connect()` can be called again.
 
 ## 4. Per-tick data flow
 
@@ -191,6 +197,53 @@ server-owned player positions.
 
 These are follow-up improvements, not prerequisites for the current local multiplayer prototype.
 
+## 9. Measuring and degrading the network
+
+### Bandwidth, latency and loss
+
+Both sides count the datagrams and bytes they exchange (`engine::net::TrafficCounter`) and turn them into a
+bandwidth once per second (`engine::net::RateMeter`).
+
+| Where | How to read it | What it shows |
+|---|---|---|
+| Server | `./r-type_server 4242 --stats` prints a line every 2 seconds | clients, bytes per second out and in (and per client), totals since start |
+| Client | press **F3** in game, or call `INetworkClient::stats()` | smoothed ping, download and upload in KB/s, snapshot loss |
+
+The client measures:
+
+- **Ping** from its `Ping`/`Pong` exchange, smoothed so one late packet does not make the figure jump.
+- **Loss** as the share of server ticks whose snapshot never arrived. The server sends one snapshot per tick, so a
+  hole in the tick numbers is a lost packet (`engine::net::LossTracker`). A snapshot that arrives after a newer
+  one, and a duplicated one, do not count as received: they would not be displayed anyway.
+
+### Simulating a bad network
+
+[`scripts/netsim.py`](../scripts/netsim.py) is a UDP proxy that sits between the clients and the server and drops,
+delays and duplicates datagrams in both directions. It needs no privileges and runs on Linux and Windows. The
+jitter gives each datagram a random delay, which also reorders them.
+
+```sh
+./r-type_server 4242 --stats
+python3 scripts/netsim.py --listen 5000 --server 127.0.0.1:4242 --loss 10 --delay 80 --jitter 30 --dup 2
+./r-type_client 127.0.0.1 5000      # then press F3
+```
+
+Options: `--loss` and `--dup` in percent, `--delay` and `--jitter` in milliseconds, `--seed` to repeat a run.
+Each client gets its own socket towards the server, so several clients can connect through the proxy.
+
+### Example of a measurement
+
+A scripted client (60 inputs per second while holding the fire key, one ping per second) connected for 7 seconds
+to a local server. This is a single run on the loopback interface, not a benchmark of the graphical client.
+
+| Network | Loss measured | Ping | Download |
+|---|---|---|---|
+| Healthy | 0.0 % (420 of 420 ticks) | under 1 ms | 12.7 KB/s |
+| 20 % loss, 60 ms delay, 20 ms jitter, 3 % duplicates, each way | 20.9 % (302 of 382 ticks) | 139 ms (3 pongs) | 11.6 KB/s |
+
+These figures are the baseline for the improvements planned next (acknowledgements, delta snapshots,
+interpolation): measure again after each one.
+
 ---
 
 # Version française
@@ -277,8 +330,14 @@ classes concrètes gèrent les sockets, les timers, les numéros de séquence et
   pendant cinq secondes, le serveur le considère comme inactif. Dans les deux cas, son entité est supprimée et
   un événement de destruction est envoyé aux autres clients.
 
-Les clients envoient des messages `Input` une fois connectés. Le serveur répond également à `Ping` par `Pong`,
-mais le client graphique n’envoie pas actuellement de ping.
+Les clients envoient des messages `Input` une fois connectés, et un `Ping` par seconde. Le serveur répond à chaque
+`Ping` par un `Pong` : le client en déduit le temps d’aller-retour, et ce datagramme maintient aussi la session
+active quand le joueur n’envoie rien d’autre.
+
+Le client expose l’état de la connexion sous forme de `ConnectionState` : `Connecting`, `Connected`, `Rejected`
+(`ConnectRejected` reçu), `TimedOut` (le serveur n’a jamais répondu) et `Lost` (un serveur connecté s’est tu
+pendant cinq secondes). Les trois derniers sont définitifs : le client graphique affiche la raison dans le menu
+principal et y retourne. `disconnect()` remet l’état à `Idle`, et `connect()` peut alors être rappelé.
 
 ## 4. Déroulement d’un tick
 
@@ -375,3 +434,50 @@ des joueurs calculées par le serveur.
 
 Ces améliorations pourront être faites plus tard ; elles ne sont pas nécessaires au prototype multijoueur local
 actuel.
+
+## 9. Mesurer et dégrader le réseau
+
+### Bande passante, latence et pertes
+
+Chaque côté compte les datagrammes et les octets échangés (`engine::net::TrafficCounter`) et en tire un débit une
+fois par seconde (`engine::net::RateMeter`).
+
+| Où | Comment le lire | Ce que l’on voit |
+|---|---|---|
+| Serveur | `./r-type_server 4242 --stats` affiche une ligne toutes les 2 secondes | clients, octets par seconde envoyés et reçus (et par client), totaux depuis le démarrage |
+| Client | touche **F3** en jeu, ou `INetworkClient::stats()` | ping lissé, débit descendant et montant en Ko/s, pertes de snapshots |
+
+Le client mesure :
+
+- le **ping**, grâce à l’échange `Ping`/`Pong`, lissé pour qu’un paquet en retard ne fasse pas sauter la valeur ;
+- les **pertes**, c’est-à-dire la part des ticks du serveur dont le snapshot n’est jamais arrivé. Le serveur envoie
+  un snapshot par tick : un trou dans les numéros de tick est un paquet perdu (`engine::net::LossTracker`). Un
+  snapshot arrivé après un plus récent, ou dupliqué, n’est pas compté comme reçu : il ne serait pas affiché.
+
+### Simuler un mauvais réseau
+
+[`scripts/netsim.py`](../scripts/netsim.py) est un proxy UDP placé entre les clients et le serveur : il perd,
+retarde et duplique des datagrammes dans les deux sens. Il ne demande aucun privilège et fonctionne sous Linux et
+Windows. La gigue donne un délai aléatoire à chaque datagramme, ce qui les désordonne aussi.
+
+```sh
+./r-type_server 4242 --stats
+python3 scripts/netsim.py --listen 5000 --server 127.0.0.1:4242 --loss 10 --delay 80 --jitter 30 --dup 2
+./r-type_client 127.0.0.1 5000      # puis appuyer sur F3
+```
+
+Options : `--loss` et `--dup` en pourcentage, `--delay` et `--jitter` en millisecondes, `--seed` pour rejouer un
+essai. Chaque client a sa propre socket vers le serveur : plusieurs clients peuvent passer par le proxy.
+
+### Exemple de mesure
+
+Un client scripté (60 inputs par seconde en maintenant le tir, un ping par seconde) s’est connecté 7 secondes à un
+serveur local. C’est un seul essai sur l’interface locale, pas un benchmark du client graphique.
+
+| Réseau | Pertes mesurées | Ping | Débit descendant |
+|---|---|---|---|
+| Sain | 0,0 % (420 ticks sur 420) | moins de 1 ms | 12,7 Ko/s |
+| 20 % de perte, 60 ms de délai, 20 ms de gigue, 3 % de doublons, dans chaque sens | 20,9 % (302 ticks sur 382) | 139 ms (3 pongs) | 11,6 Ko/s |
+
+Ces valeurs servent de référence pour les améliorations prévues (acquittements, snapshots différentiels,
+interpolation) : il faudra mesurer à nouveau après chacune.

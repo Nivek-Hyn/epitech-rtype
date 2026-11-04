@@ -22,6 +22,10 @@ void AsioNetworkServer::start(std::uint16_t port)
         return;
 
     _io.restart();
+    _traffic.reset();
+    _rateMeter = engine::net::RateMeter{};
+    _sentRate = 0.0;
+    _receivedRate = 0.0;
     _socket.open(Udp::v4());
     _socket.bind(Udp::endpoint(Udp::v4(), port));
     receive();
@@ -74,6 +78,11 @@ void AsioNetworkServer::broadcast(const protocol::Message &message)
     });
 }
 
+engine::net::TrafficStats AsioNetworkServer::traffic() const
+{
+    return {_traffic.totals(), {_sentRate, _receivedRate}};
+}
+
 void AsioNetworkServer::receive()
 {
     _socket.async_receive_from(asio::buffer(_receiveBuffer), _sender,
@@ -92,6 +101,7 @@ void AsioNetworkServer::receive()
 
 void AsioNetworkServer::handleDatagram(std::size_t size)
 {
+    _traffic.addReceived(size);
     const auto packet = protocol::decode(std::span(_receiveBuffer).first(size));
     if (!packet)
         return;
@@ -108,6 +118,7 @@ void AsioNetworkServer::handleDatagram(std::size_t size)
         for (PlayerId candidate = 0; candidate < MaxPlayers; ++candidate) {
             if (!_clients[candidate].active) {
                 _clients[candidate] = Client{true, _sender, Clock::now()};
+                ++_clientCount;
                 _events.push(PlayerJoined{candidate});
                 sendToPlayer(candidate, protocol::ConnectAccepted{candidate});
                 return;
@@ -134,6 +145,7 @@ void AsioNetworkServer::scheduleTimeoutCheck()
     _timeoutTimer.async_wait([this](const asio::error_code &error) {
         if (error)
             return;
+        updateRates();
         const auto now = Clock::now();
         for (PlayerId player = 0; player < MaxPlayers; ++player) {
             if (_clients[player].active && now - _clients[player].lastSeen > rtype::ClientTimeout)
@@ -143,10 +155,19 @@ void AsioNetworkServer::scheduleTimeoutCheck()
     });
 }
 
+void AsioNetworkServer::updateRates()
+{
+    const auto rates = _rateMeter.sample(
+        _traffic.totals(), std::chrono::duration<double>(Clock::now().time_since_epoch()).count());
+    _sentRate = rates.sentBytesPerSecond;
+    _receivedRate = rates.receivedBytesPerSecond;
+}
+
 void AsioNetworkServer::sendTo(const Udp::endpoint &endpoint, protocol::Message message)
 {
     auto bytes =
         std::make_shared<std::vector<std::uint8_t>>(protocol::encode({_nextSequence.fetch_add(1), std::move(message)}));
+    _traffic.addSent(bytes->size());
     _socket.async_send_to(asio::buffer(*bytes), endpoint, [bytes](const asio::error_code &, std::size_t) {});
 }
 
@@ -176,6 +197,7 @@ void AsioNetworkServer::removeClient(PlayerId player, protocol::LeaveReason reas
     if (player >= MaxPlayers || !_clients[player].active)
         return;
     _clients[player].active = false;
+    --_clientCount;
     _events.push(PlayerDisconnected{player, reason});
     for (PlayerId other = 0; other < MaxPlayers; ++other)
         sendToPlayer(other, protocol::PlayerLeft{player, reason});
