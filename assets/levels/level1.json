@@ -1,16 +1,41 @@
 {
   "stage": 1,
-  "level_name": "Stage 1",
+  "level_name": "Stage 1 - Deep Space Perimeter",
   "waves": [
     {
       "wave_id": 1,
-      "delay_before_start": 2.0,
+      "delay_before_start": 3.0,
       "enemies": [
-        {
-          "type": "standard_red",
-          "spawn_y": 300.0,
-          "speed": 100.0
-        }
+        { "type": "standard_red", "spawn_y": 300.0, "speed": 120.0 }
+      ]
+    },
+    {
+      "wave_id": 2,
+      "delay_before_start": 9.0,
+      "enemies": [
+        { "type": "diver", "spawn_y": 120.0, "speed": 150.0 },
+        { "type": "standard_red", "spawn_y": 320.0, "speed": 120.0 },
+        { "type": "standard_red", "spawn_y": 480.0, "speed": 120.0 },
+        { "type": "diver", "spawn_y": 640.0, "speed": 150.0 }
+      ]
+    },
+    {
+      "wave_id": 3,
+      "delay_before_start": 18.0,
+      "enemies": [
+        { "type": "patrol", "spawn_y": 180.0, "speed": 130.0 },
+        { "type": "tentacle_creature", "spawn_y": 300.0, "speed": 80.0 },
+        { "type": "tentacle_creature", "spawn_y": 450.0, "speed": 80.0 },
+        { "type": "patrol", "spawn_y": 580.0, "speed": 130.0 }
+      ]
+    },
+    {
+      "wave_id": 4,
+      "delay_before_start": 28.0,
+      "enemies": [
+        { "type": "boss", "spawn_y": 360.0, "speed": 25.0 },
+        { "type": "boss_heavy", "spawn_y": 180.0, "speed": 35.0 },
+        { "type": "standard_red", "spawn_y": 540.0, "speed": 110.0 }
       ]
     }
   ]

@@ -28,19 +28,31 @@ void onSignal(int)
 int main(int argc, char **argv)
 {
     std::uint16_t port = rtype::DefaultPort;
+    std::string levelPath;
     if (argc > 1) {
         try {
             port = static_cast<std::uint16_t>(std::stoul(argv[1]));
         } catch (const std::exception &) {
-            std::cerr << "Usage: " << argv[0] << " [port]\n";
+            std::cerr << "Usage: " << argv[0] << " [port] [level_path]\n";
             return 84;
         }
+    }
+    if (argc > 2) {
+        levelPath = argv[2];
     }
 
     std::signal(SIGINT, onSignal);
     std::signal(SIGTERM, onSignal);
 
     rtype::server::Game game;
+    if (!levelPath.empty()) {
+        try {
+            game.loadLevel(levelPath);
+            std::cout << "r-type_server: Loaded level: " << levelPath << '\n';
+        } catch (const std::exception &e) {
+            std::cerr << "Warning: Could not load level " << levelPath << ": " << e.what() << '\n';
+        }
+    }
     rtype::server::AsioNetworkServer network;
     try {
         network.start(port);

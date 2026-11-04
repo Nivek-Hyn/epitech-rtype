@@ -79,6 +79,10 @@ int main(int argc, char **argv)
     scoreText.setFillColor(sf::Color(0, 230, 255));
     scoreText.setPosition({50.f, 30.f});
 
+    sf::Text waveHudText(resources.getFont("default"), "WAVE: 1", 28);
+    waveHudText.setFillColor(sf::Color(255, 204, 0));
+    waveHudText.setPosition({rtype::WorldWidth - 220.f, 30.f});
+
     if (directConnect) {
         try {
             network.connect(host, port);
@@ -93,6 +97,47 @@ int main(int argc, char **argv)
     bool reportedConnected = false;
     sf::Clock clock;
     float totalTime = 0.f;
+
+    float damageFlashTimer = 0.f;
+    constexpr float DamageFlashDuration = 0.45f;
+    float screenShakeTimer = 0.f;
+    float screenShakeIntensity = 0.f;
+
+    int currentWave = 1;
+    float waveDisplayTimer = 0.f;
+    constexpr float WaveDisplayDuration = 2.8f;
+    float waveCooldownTimer = 0.f;
+    bool waveStarted = false;
+    int lastEnemyCount = 0;
+
+    bool gameOver = false;
+    bool gameWon = false;
+    bool playerWasSpawned = false;
+    std::uint32_t lastScore = 0;
+    std::optional<std::uint8_t> localPlayerId;
+    float localPlayerTilt = 0.0f;
+    std::unordered_map<std::uint32_t, float> playerYHistory;
+    std::unordered_map<std::uint32_t, float> playerTiltMap;
+
+    auto resetGameVisualState = [&]() {
+        damageFlashTimer = 0.f;
+        screenShakeTimer = 0.f;
+        waveDisplayTimer = 0.f;
+        waveCooldownTimer = 0.f;
+        currentWave = 1;
+        waveStarted = false;
+        lastEnemyCount = 0;
+        gameOver = false;
+        gameWon = false;
+        playerWasSpawned = false;
+        localPlayerId.reset();
+        localPlayerTilt = 0.0f;
+        playerYHistory.clear();
+        playerTiltMap.clear();
+        entities.clear();
+        explosions.clear();
+        reportedConnected = false;
+    };
 
     while (window.isOpen()) {
         const float dt = clock.restart().asSeconds();
@@ -118,9 +163,7 @@ int main(int argc, char **argv)
                     if (key->code == sf::Keyboard::Key::Escape) {
                         network.disconnect();
                         appState = AppState::Menu;
-                        reportedConnected = false;
-                        entities.clear();
-                        explosions.clear();
+                        resetGameVisualState();
                     }
                 }
             }
@@ -145,6 +188,15 @@ int main(int argc, char **argv)
         } else if (appState == AppState::Playing) {
             starfield.update(dt);
 
+            if (damageFlashTimer > 0.f)
+                damageFlashTimer -= dt;
+            if (screenShakeTimer > 0.f)
+                screenShakeTimer -= dt;
+            if (waveDisplayTimer > 0.f)
+                waveDisplayTimer -= dt;
+            if (waveCooldownTimer > 0.f)
+                waveCooldownTimer -= dt;
+
             for (auto &exp : explosions) {
                 exp.timer += dt;
             }
@@ -158,31 +210,81 @@ int main(int argc, char **argv)
             }
 
             std::uint8_t inputFlags = 0;
-            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Z) || sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Up))
-                inputFlags |= rtype::protocol::InputFlag::Up;
-            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::S) || sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Down))
-                inputFlags |= rtype::protocol::InputFlag::Down;
-            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Q) || sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Left))
-                inputFlags |= rtype::protocol::InputFlag::Left;
-            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::D) || sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Right))
-                inputFlags |= rtype::protocol::InputFlag::Right;
-
-            static float shootCooldown = 0.f;
-            shootCooldown -= dt;
-            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Space)) {
-                inputFlags |= rtype::protocol::InputFlag::Shoot;
-                if (shootCooldown <= 0.f) {
-                    resources.playSound("shoot", 80.f);
-                    shootCooldown = 0.22f;
+            float targetTilt = 0.0f;
+            if (!gameOver) {
+                if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Z) || sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Up)) {
+                    inputFlags |= rtype::protocol::InputFlag::Up;
+                    targetTilt += 2.0f;
                 }
+                if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::S) || sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Down)) {
+                    inputFlags |= rtype::protocol::InputFlag::Down;
+                    targetTilt -= 2.0f;
+                }
+                if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Q) || sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Left))
+                    inputFlags |= rtype::protocol::InputFlag::Left;
+                if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::D) || sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Right))
+                    inputFlags |= rtype::protocol::InputFlag::Right;
+
+                static float shootCooldown = 0.f;
+                shootCooldown -= dt;
+                if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Space)) {
+                    inputFlags |= rtype::protocol::InputFlag::Shoot;
+                    if (shootCooldown <= 0.f) {
+                        resources.playSound("shoot", 80.f);
+                        shootCooldown = 0.22f;
+                    }
+                }
+
+                if (network.connected())
+                    network.send(rtype::protocol::Input{inputFlags});
             }
 
-            if (network.connected())
-                network.send(rtype::protocol::Input{inputFlags});
+            if (localPlayerTilt < targetTilt)
+                localPlayerTilt = std::min(targetTilt, localPlayerTilt + dt * 14.f);
+            else if (localPlayerTilt > targetTilt)
+                localPlayerTilt = std::max(targetTilt, localPlayerTilt - dt * 14.f);
 
             while (auto message = network.poll()) {
-                if (const auto *snapshot = std::get_if<rtype::protocol::Snapshot>(&*message)) {
+                if (const auto *accepted = std::get_if<rtype::protocol::ConnectAccepted>(&*message)) {
+                    localPlayerId = accepted->playerId;
+                } else if (const auto *snapshot = std::get_if<rtype::protocol::Snapshot>(&*message)) {
                     scoreText.setString("SCORE: " + std::to_string(snapshot->score));
+                    lastScore = snapshot->score;
+
+                    int enemyCount = 0;
+                    int playerCount = 0;
+                    for (const auto &ent : snapshot->entities) {
+                        if (ent.type == rtype::protocol::EntityType::Enemy)
+                            enemyCount++;
+                        else if (ent.type == rtype::protocol::EntityType::Player)
+                            playerCount++;
+                    }
+
+                    if (playerCount > 0) {
+                        playerWasSpawned = true;
+                    }
+                    if (playerWasSpawned && playerCount == 0 && !gameOver) {
+                        gameOver = true;
+                        gameWon = false;
+                    }
+                    if (snapshot->state == rtype::protocol::GameState::Finished) {
+                        gameOver = true;
+                        gameWon = true;
+                    }
+
+                    if (reportedConnected && !waveStarted) {
+                        waveStarted = true;
+                        currentWave = 1;
+                        waveDisplayTimer = WaveDisplayDuration;
+                        waveCooldownTimer = 6.0f;
+                    } else if (waveStarted) {
+                        if (waveCooldownTimer <= 0.f && lastEnemyCount == 0 && enemyCount > 0) {
+                            currentWave++;
+                            waveDisplayTimer = WaveDisplayDuration;
+                            waveCooldownTimer = 8.0f;
+                        }
+                    }
+                    lastEnemyCount = enemyCount;
 
                     if (!entities.empty()) {
                         std::unordered_set<std::uint32_t> currentIds;
@@ -206,6 +308,9 @@ int main(int argc, char **argv)
                                     resources.playSound("hit", 100.f);
                                     resources.playSound("explosion", 100.f);
                                     explosions.push_back({sf::Vector2f(prev.x, prev.y), 0.f, 0.45f});
+                                    damageFlashTimer = DamageFlashDuration;
+                                    screenShakeTimer = 0.35f;
+                                    screenShakeIntensity = 15.f;
                                 } else if (prev.type == rtype::protocol::EntityType::EnemyMissile) {
                                     for (const auto &pPos : playersPos) {
                                         float dx = prev.x - pPos.x;
@@ -213,7 +318,33 @@ int main(int argc, char **argv)
                                         if (dx * dx + dy * dy < 75.f * 75.f) {
                                             resources.playSound("hit", 95.f);
                                             explosions.push_back({sf::Vector2f(prev.x, prev.y), 0.f, 0.25f});
+                                            damageFlashTimer = std::max(damageFlashTimer, 0.25f);
+                                            screenShakeTimer = std::max(screenShakeTimer, 0.2f);
+                                            screenShakeIntensity = std::max(screenShakeIntensity, 8.f);
                                             break;
+                                        }
+                                    }
+                                } else if (prev.type == rtype::protocol::EntityType::PlayerMissile) {
+                                    for (const auto &ent : snapshot->entities) {
+                                        if (ent.type == rtype::protocol::EntityType::Enemy) {
+                                            float hitRadius = 65.f;
+                                            float offsetY = 0.f;
+                                            if (ent.variant == 6) {
+                                                hitRadius = 180.f;
+                                                offsetY = -60.f;
+                                            } else if (ent.variant == 5) {
+                                                hitRadius = 130.f;
+                                                offsetY = -20.f;
+                                            } else if (ent.variant == 4) {
+                                                hitRadius = 80.f;
+                                            }
+                                            float dx = prev.x - ent.x;
+                                            float dy = prev.y - (ent.y + offsetY);
+                                            if (dx * dx + dy * dy < hitRadius * hitRadius) {
+                                                resources.playSound("hit", 95.f);
+                                                explosions.push_back({sf::Vector2f(prev.x, prev.y), 0.f, 0.2f});
+                                                break;
+                                            }
                                         }
                                     }
                                 }
@@ -230,6 +361,15 @@ int main(int argc, char **argv)
 
         window.clear(sf::Color(10, 10, 25));
 
+        sf::View currentView(sf::FloatRect({0.f, 0.f}, {rtype::WorldWidth, rtype::WorldHeight}));
+        if (appState == AppState::Playing && screenShakeTimer > 0.f) {
+            const float shakeFactor = (screenShakeTimer / 0.35f) * screenShakeIntensity;
+            const float offsetX = (static_cast<float>(rand() % 200 - 100) / 100.f) * shakeFactor;
+            const float offsetY = (static_cast<float>(rand() % 200 - 100) / 100.f) * shakeFactor;
+            currentView.setCenter({rtype::WorldWidth / 2.f + offsetX, rtype::WorldHeight / 2.f + offsetY});
+        }
+        window.setView(currentView);
+
         if (appState == AppState::Menu) {
             menu.draw(window);
         } else if (appState == AppState::Playing) {
@@ -242,37 +382,160 @@ int main(int argc, char **argv)
             for (const auto &entity : entities) {
                 if (hasAssets) {
                     if (entity.type == rtype::protocol::EntityType::Player) {
+                        float tilt = 0.0f;
+                        if (localPlayerId.has_value() && entity.variant == *localPlayerId) {
+                            tilt = localPlayerTilt;
+                        } else {
+                            auto it = playerYHistory.find(entity.netId);
+                            float desiredTilt = 0.0f;
+                            if (it != playerYHistory.end()) {
+                                const float dy = entity.y - it->second;
+                                if (dy < -0.4f) desiredTilt = 2.0f;
+                                else if (dy > 0.4f) desiredTilt = -2.0f;
+                            }
+                            playerYHistory[entity.netId] = entity.y;
+                            float &curTilt = playerTiltMap[entity.netId];
+                            if (curTilt < desiredTilt) curTilt = std::min(desiredTilt, curTilt + dt * 14.f);
+                            else if (curTilt > desiredTilt) curTilt = std::max(desiredTilt, curTilt - dt * 14.f);
+                            tilt = curTilt;
+                        }
+
+                        int col = 2;
+                        if (tilt > 1.1f) col = 4;
+                        else if (tilt > 0.25f) col = 3;
+                        else if (tilt < -1.1f) col = 0;
+                        else if (tilt < -0.25f) col = 1;
+
                         sf::Sprite sprite(resources.getTexture("player"));
                         const int variant = static_cast<int>(entity.variant % 5);
-                        sprite.setTextureRect(sf::IntRect({0, variant * 17}, {33, 17}));
+                        sprite.setTextureRect(sf::IntRect({col * 33, variant * 17}, {33, 17}));
                         sprite.setScale({2.f, 2.f});
                         sprite.setPosition({entity.x, entity.y});
                         window.draw(sprite);
+
+                        const int flameCycle = static_cast<int>(totalTime * 24.f) % 3;
+                        sf::CircleShape thrusterGlow(flameCycle == 0 ? 3.5f : (flameCycle == 1 ? 5.2f : 4.2f));
+                        thrusterGlow.setFillColor(flameCycle == 1 ? sf::Color(100, 220, 255, 230) : sf::Color(0, 160, 255, 175));
+                        float thrusterY = entity.y + 13.f;
+                        if (col == 4 || col == 3) thrusterY = entity.y + 15.f;
+                        else if (col == 0 || col == 1) thrusterY = entity.y + 11.f;
+                        thrusterGlow.setPosition({entity.x - 5.f, thrusterY});
+                        window.draw(thrusterGlow);
                     } else if (entity.type == rtype::protocol::EntityType::PlayerMissile) {
                         sf::Sprite sprite(resources.getTexture("bullet"));
-                        sprite.setTextureRect(sf::IntRect({248, 102}, {18, 12}));
+                        const int bulletFrame = static_cast<int>(totalTime * 18.f) % 2;
+                        sprite.setTextureRect(bulletFrame == 0 ? sf::IntRect({249, 102}, {16, 12}) : sf::IntRect({266, 102}, {16, 12}));
                         sprite.setScale({2.f, 2.f});
-                        sprite.setColor(sf::Color(100, 220, 255));
+                        sprite.setColor(sf::Color(120, 230, 255));
                         sprite.setPosition({entity.x, entity.y});
                         window.draw(sprite);
                     } else if (entity.type == rtype::protocol::EntityType::EnemyMissile) {
-                        sf::Sprite sprite(resources.getTexture("enemy_bullet"));
-                        const int animFrame = static_cast<int>(totalTime * 14.f) % 6;
-                        sprite.setTextureRect(sf::IntRect({animFrame * 17 + 1, 2}, {16, 13}));
-                        sprite.setOrigin({8.f, 6.5f});
-                        if (entity.variant == 1) {
-                            sprite.setScale({4.f, 4.f});
+                        const float mTime = totalTime + static_cast<float>(entity.netId % 7) * 0.15f;
+                        if (entity.variant == 0) {
+                            sf::Sprite sprite(resources.getTexture("enemy_bullet"));
+                            const int animFrame = static_cast<int>(mTime * 12.f) % 4;
+                            sprite.setTextureRect(sf::IntRect({animFrame * 17, 1}, {16, 14}));
+                            sprite.setOrigin({8.f, 7.f});
+                            sprite.setScale({2.5f, 2.5f});
+                            sprite.setPosition({entity.x, entity.y});
+                            window.draw(sprite);
+                        } else if (entity.variant == 1) {
+                            sf::Sprite sprite(resources.getTexture("bullet"));
+                            sprite.setTextureRect(sf::IntRect({232, 103}, {16, 12}));
+                            sprite.setColor(sf::Color(255, 60, 60));
+                            sprite.setOrigin({8.f, 6.f});
+                            const float pulse = 1.0f + 0.15f * std::sin(mTime * 20.f);
+                            sprite.setScale({2.6f * pulse, 2.2f});
+                            sprite.setPosition({entity.x, entity.y});
+                            window.draw(sprite);
+                        } else if (entity.variant == 2) {
+                            sf::Sprite sprite(resources.getTexture("bullet"));
+                            sprite.setTextureRect(sf::IntRect({101, 3}, {32, 14}));
+                            sprite.setColor(sf::Color(210, 90, 255));
+                            sprite.setOrigin({16.f, 7.f});
+                            const float waveScale = 1.8f + 0.35f * std::sin(mTime * 18.f);
+                            sprite.setScale({2.0f, waveScale});
+                            sprite.setPosition({entity.x, entity.y});
+                            window.draw(sprite);
+                        } else if (entity.variant == 3) {
+                            sf::Sprite sprite(resources.getTexture("bullet"));
+                            sprite.setTextureRect(sf::IntRect({205, 24}, {27, 18}));
+                            sprite.setColor(sf::Color(80, 255, 80));
+                            sprite.setOrigin({13.f, 9.f});
+                            sprite.setRotation(sf::degrees(mTime * 360.f));
+                            sprite.setScale({2.0f, 2.0f});
+                            sprite.setPosition({entity.x, entity.y});
+                            window.draw(sprite);
                         } else {
-                            sprite.setScale({2.8f, 2.8f});
+                            sf::Sprite sprite(resources.getTexture("bullet"));
+                            sprite.setTextureRect(sf::IntRect({167, 22}, {32, 24}));
+                            sprite.setColor(sf::Color(255, 130, 20));
+                            sprite.setOrigin({16.f, 12.f});
+                            const float pulse = 1.0f + 0.12f * std::sin(mTime * 15.f);
+                            sprite.setScale({2.4f * pulse, 2.4f * pulse});
+                            sprite.setPosition({entity.x, entity.y});
+                            window.draw(sprite);
                         }
-                        sprite.setPosition({entity.x, entity.y});
-                        window.draw(sprite);
                     } else if (entity.type == rtype::protocol::EntityType::Enemy) {
-                        sf::Sprite sprite(resources.getTexture("enemy"));
-                        sprite.setTextureRect(sf::IntRect({0, 0}, {33, 36}));
-                        sprite.setScale({2.f, 2.f});
-                        sprite.setPosition({entity.x, entity.y});
-                        window.draw(sprite);
+                        const float entityTime = totalTime + static_cast<float>(entity.netId % 11) * 0.23f;
+                        const int animFrame = static_cast<int>(entityTime * 9.f);
+                        if (entity.variant == 0) {
+                            const auto &tex = resources.hasTexture("enemy_standard") ? resources.getTexture("enemy_standard") : resources.getTexture("enemy");
+                            sf::Sprite sprite(tex);
+                            const int frame = animFrame % 8;
+                            sprite.setTextureRect(sf::IntRect({frame * 33, 0}, {33, 36}));
+                            sprite.setScale({2.0f, 2.0f});
+                            sprite.setPosition({entity.x, entity.y});
+                            window.draw(sprite);
+                        } else if (entity.variant == 1) {
+                            const auto &tex = resources.hasTexture("enemy_patrol") ? resources.getTexture("enemy_patrol") : resources.getTexture("enemy");
+                            sf::Sprite sprite(tex);
+                            const int frame = (animFrame / 2) % 3;
+                            sprite.setTextureRect(sf::IntRect({frame * 34 + 1, 3}, {32, 28}));
+                            sprite.setScale({2.0f, 2.0f});
+                            sprite.setPosition({entity.x, entity.y});
+                            window.draw(sprite);
+                        } else if (entity.variant == 2) {
+                            const auto &tex = resources.hasTexture("enemy_sine") ? resources.getTexture("enemy_sine") : resources.getTexture("enemy");
+                            sf::Sprite sprite(tex);
+                            const int frame = animFrame % 8;
+                            sprite.setTextureRect(sf::IntRect({frame * 33 + 1, 3}, {32, 28}));
+                            sprite.setScale({2.0f, 2.0f});
+                            sprite.setPosition({entity.x, entity.y});
+                            window.draw(sprite);
+                        } else if (entity.variant == 3) {
+                            const auto &tex = resources.hasTexture("enemy_diver") ? resources.getTexture("enemy_diver") : resources.getTexture("enemy");
+                            sf::Sprite sprite(tex);
+                            const int frame = animFrame % 8;
+                            sprite.setTextureRect(sf::IntRect({frame * 33 + 4, 7}, {28, 23}));
+                            sprite.setScale({2.0f, 2.0f});
+                            sprite.setPosition({entity.x, entity.y});
+                            window.draw(sprite);
+                        } else if (entity.variant == 4) {
+                            const auto &tex = resources.hasTexture("enemy_tentacle") ? resources.getTexture("enemy_tentacle") : resources.getTexture("enemy");
+                            sf::Sprite sprite(tex);
+                            const int frame = animFrame % 8;
+                            sprite.setTextureRect(sf::IntRect({frame * 41 + 1, 1}, {40, 46}));
+                            sprite.setScale({1.8f, 1.8f});
+                            sprite.setPosition({entity.x, entity.y});
+                            window.draw(sprite);
+                        } else if (entity.variant == 5) {
+                            const auto &tex = resources.hasTexture("enemy_boss_heavy") ? resources.getTexture("enemy_boss_heavy") : resources.getTexture("enemy");
+                            sf::Sprite sprite(tex);
+                            const int frame = (animFrame / 3) % 5;
+                            sprite.setTextureRect(sf::IntRect({frame * 130 + 1, 99}, {128, 62}));
+                            sprite.setScale({1.8f, 1.8f});
+                            sprite.setPosition({entity.x, entity.y - 20.f});
+                            window.draw(sprite);
+                        } else {
+                            const auto &tex = resources.hasTexture("enemy_boss") ? resources.getTexture("enemy_boss") : resources.getTexture("enemy");
+                            sf::Sprite sprite(tex);
+                            const int frame = (animFrame / 4) % 2;
+                            sprite.setTextureRect(sf::IntRect({frame == 0 ? 3 : 191, 3}, {174, 142}));
+                            sprite.setScale({1.6f, 1.6f});
+                            sprite.setPosition({entity.x, entity.y - 60.f});
+                            window.draw(sprite);
+                        }
                     }
                 }
             }
@@ -298,6 +561,74 @@ int main(int argc, char **argv)
             }
 
             window.draw(scoreText);
+            waveHudText.setString("WAVE: " + std::to_string(currentWave));
+            window.draw(waveHudText);
+
+            if (damageFlashTimer > 0.f) {
+                sf::RectangleShape flash({rtype::WorldWidth, rtype::WorldHeight});
+                const float alphaRatio = std::clamp(damageFlashTimer / DamageFlashDuration, 0.f, 1.f);
+                flash.setFillColor(sf::Color(255, 0, 0, static_cast<std::uint8_t>(alphaRatio * 135.f)));
+                window.draw(flash);
+            }
+
+            if (waveDisplayTimer > 0.f) {
+                const float progress = waveDisplayTimer / WaveDisplayDuration;
+                float alpha = 1.f;
+                if (progress > 0.8f)
+                    alpha = (1.f - progress) / 0.2f;
+                else if (progress < 0.25f)
+                    alpha = progress / 0.25f;
+                alpha = std::clamp(alpha, 0.f, 1.f);
+
+                sf::RectangleShape banner({640.f, 100.f});
+                banner.setOrigin({320.f, 50.f});
+                banner.setPosition({rtype::WorldWidth / 2.f, 250.f});
+                banner.setFillColor(sf::Color(10, 15, 30, static_cast<std::uint8_t>(alpha * 220.f)));
+                banner.setOutlineThickness(2.f);
+                banner.setOutlineColor(sf::Color(255, 204, 0, static_cast<std::uint8_t>(alpha * 255.f)));
+                window.draw(banner);
+
+                sf::Text waveText(resources.getFont("default"), "--- WAVE " + std::to_string(currentWave) + " ---", 44);
+                waveText.setFillColor(sf::Color(255, 204, 0, static_cast<std::uint8_t>(alpha * 255.f)));
+                const auto wBounds = waveText.getLocalBounds();
+                waveText.setOrigin({wBounds.size.x / 2.f, wBounds.size.y / 2.f});
+                waveText.setPosition({rtype::WorldWidth / 2.f, 235.f});
+                window.draw(waveText);
+
+                sf::Text subWaveText(resources.getFont("default"), "INCOMING ENEMY SQUADRON", 18);
+                subWaveText.setFillColor(sf::Color(0, 230, 255, static_cast<std::uint8_t>(alpha * 240.f)));
+                const auto swBounds = subWaveText.getLocalBounds();
+                subWaveText.setOrigin({swBounds.size.x / 2.f, swBounds.size.y / 2.f});
+                subWaveText.setPosition({rtype::WorldWidth / 2.f, 275.f});
+                window.draw(subWaveText);
+            }
+
+            if (gameOver) {
+                sf::RectangleShape endOverlay({rtype::WorldWidth, rtype::WorldHeight});
+                endOverlay.setFillColor(sf::Color(5, 5, 15, 205));
+                window.draw(endOverlay);
+
+                sf::Text endTitle(resources.getFont("default"), gameWon ? "MISSION ACCOMPLISHED" : "GAME OVER", 64);
+                endTitle.setFillColor(gameWon ? sf::Color(0, 230, 255) : sf::Color(255, 50, 50));
+                const auto tBounds = endTitle.getLocalBounds();
+                endTitle.setOrigin({tBounds.size.x / 2.f, tBounds.size.y / 2.f});
+                endTitle.setPosition({rtype::WorldWidth / 2.f, 430.f});
+                window.draw(endTitle);
+
+                sf::Text finalScoreText(resources.getFont("default"), "FINAL SCORE: " + std::to_string(lastScore), 32);
+                finalScoreText.setFillColor(sf::Color(255, 204, 0));
+                const auto fsBounds = finalScoreText.getLocalBounds();
+                finalScoreText.setOrigin({fsBounds.size.x / 2.f, fsBounds.size.y / 2.f});
+                finalScoreText.setPosition({rtype::WorldWidth / 2.f, 520.f});
+                window.draw(finalScoreText);
+
+                sf::Text returnText(resources.getFont("default"), "Press [ESC] to Return to Menu", 22);
+                returnText.setFillColor(sf::Color(170, 185, 215));
+                const auto rBounds = returnText.getLocalBounds();
+                returnText.setOrigin({rBounds.size.x / 2.f, rBounds.size.y / 2.f});
+                returnText.setPosition({rtype::WorldWidth / 2.f, 600.f});
+                window.draw(returnText);
+            }
         }
 
         window.display();

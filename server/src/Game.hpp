@@ -36,6 +36,7 @@ public:
     std::uint32_t tick() const { return _tick; }
 
     struct EnemyDefinition {
+        std::uint8_t variant = 0;
         int health = 3;
         float speed = 100.f;
         std::string pattern = "straight";

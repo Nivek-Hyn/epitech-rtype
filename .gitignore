@@ -12,3 +12,4 @@ compile_commands.json
 site/
 docs/html/
 .venv/
+config.json

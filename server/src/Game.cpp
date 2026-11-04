@@ -51,6 +51,7 @@ Game::Game()
                     def.health = val.value("health", 3);
                     def.speed = val.value("speed", 100.f);
                     def.pattern = val.value("pattern", "straight");
+                    def.variant = val.value<std::uint8_t>("variant", 0);
                     
                     if (val.contains("attack")) {
                         def.hasAttack = true;
@@ -85,7 +86,6 @@ void Game::onPlayerJoined(PlayerId player)
 {
     if (player >= MaxPlayers || _players[player] != engine::ecs::NullEntity)
         return;
-    // we create a new entity in the ECS registry
     engine::ecs::Entity entity =
         spawnNetworked(protocol::EntityType::Player, static_cast<std::uint8_t>(player), 100.0f, 300.0f);
     _players[player] = entity;
@@ -114,19 +114,16 @@ void Game::onPlayerLeft(PlayerId player)
     _shootCooldowns[player] = 0.f;
 }
 
-// TODO(gameplay): turn the input flags into the ship's velocity, handle shooting.
 void Game::onInput(PlayerId player, std::uint8_t flags)
 {
     if (player >= MaxPlayers)
         return;
-    // we get the entity associated with the player
     engine::ecs::Entity entity = _players[player];
     if (entity == engine::ecs::NullEntity)
         return;
     float speed = 200.0f;
     float vx = 0.0f;
     float vy = 0.0f;
-    // we check the input flags and set the velocity accordingly
     if (flags & protocol::InputFlag::Up)
         vy -= speed;
     if (flags & protocol::InputFlag::Down)
@@ -135,7 +132,6 @@ void Game::onInput(PlayerId player, std::uint8_t flags)
         vx -= speed;
     if (flags & protocol::InputFlag::Right)
         vx += speed;
-    // on met a jour (ou ajout) la vitesse du joueur
     _registry.emplace<rtype::components::Velocity>(entity, vx, vy);
 
     if ((flags & protocol::InputFlag::Shoot) && _shootCooldowns[player] <= 0.f) {
@@ -180,7 +176,7 @@ void Game::update(float dt)
             const bool missileOut =
                 (kind.type == protocol::EntityType::PlayerMissile || kind.type == protocol::EntityType::EnemyMissile) &&
                 (position.x > WorldWidth || position.x < 0.f || position.y > WorldHeight || position.y < 0.f);
-            const bool enemyOut = kind.type == protocol::EntityType::Enemy && position.x < -EnemyWidth;
+            const bool enemyOut = kind.type == protocol::EntityType::Enemy && position.x < -320.f;
             if (missileOut || enemyOut)
                 expiredMissiles.emplace_back(entity, networkId.id);
         });
@@ -247,22 +243,25 @@ void Game::spawnEnemies(float dt)
                 float bulletSpeed = 350.f;
                 std::uint8_t bulletVariant = 0;
                 std::string bulletPattern = "straight";
+                std::uint8_t enemyVariant = 0;
 
                 if (_entityDefinitions.find(enemyConfig.type) != _entityDefinitions.end()) {
                     const auto &def = _entityDefinitions[enemyConfig.type];
                     hp = def.health;
-                    speed = def.speed;
+                    if (speed <= 0.f)
+                        speed = def.speed;
                     patternType = def.pattern;
                     hasAttack = def.hasAttack;
                     fireRate = def.fireRate;
                     bulletSpeed = def.bulletSpeed;
                     bulletVariant = def.bulletVariant;
                     bulletPattern = def.bulletPattern;
+                    enemyVariant = def.variant;
                 }
 
-                float randomizedY = disVertical(gen);
+                const float spawnY = (enemyConfig.spawn_y > 0.f) ? enemyConfig.spawn_y : disVertical(gen);
                 engine::ecs::Entity enemy =
-                    spawnNetworked(protocol::EntityType::Enemy, 0, WorldWidth + 100.0f, randomizedY);
+                    spawnNetworked(protocol::EntityType::Enemy, enemyVariant, WorldWidth, spawnY);
                 
                 _registry.emplace<rtype::components::Velocity>(enemy, -speed, 0.f);
                 _registry.emplace<rtype::components::Health>(enemy, hp);
@@ -286,8 +285,36 @@ void Game::handleCollisions()
 
     std::vector<std::pair<engine::ecs::Entity, engine::physics::Aabb>> enemies;
     _registry.each<Position, Kind>([&enemies](engine::ecs::Entity entity, const Position &position, const Kind &kind) {
-        if (kind.type == protocol::EntityType::Enemy)
-            enemies.push_back({entity, {position.x, position.y, EnemyWidth, EnemyHeight}});
+        if (kind.type != protocol::EntityType::Enemy)
+            return;
+        float w = EnemyWidth;
+        float h = EnemyHeight;
+        float offsetY = 0.f;
+        if (kind.variant == 0) {
+            w = 66.f;
+            h = 72.f;
+        } else if (kind.variant == 1) {
+            w = 64.f;
+            h = 56.f;
+        } else if (kind.variant == 2) {
+            w = 64.f;
+            h = 56.f;
+        } else if (kind.variant == 3) {
+            w = 56.f;
+            h = 46.f;
+        } else if (kind.variant == 4) {
+            w = 72.f;
+            h = 83.f;
+        } else if (kind.variant == 5) {
+            w = 200.f;
+            h = 200.f;
+            offsetY = -15.f;
+        } else if (kind.variant == 6) {
+            w = 280.f;
+            h = 222.f;
+            offsetY = -60.f;
+        }
+        enemies.push_back({entity, {position.x, position.y + offsetY, w, h}});
     });
 
     std::vector<bool> enemyHit(enemies.size(), false);
@@ -300,9 +327,8 @@ void Game::handleCollisions()
         for (std::size_t i = 0; i < enemies.size(); i++) {
             if (!enemyHit[i] && engine::physics::overlaps(missileBox, enemies[i].second)) {
                 enemyHit[i] = true;
-                destroyed.push_back(missile); // Le missile du joueur disparaît
+                destroyed.push_back(missile);
 
-                // Tâche #54 : Gestion des dégâts multiples sur l'ennemi
                 if (auto *health = _registry.get<rtype::components::Health>(enemies[i].first)) {
                     health->hp -= 1;
                     if (health->hp <= 0) {
@@ -313,7 +339,7 @@ void Game::handleCollisions()
                     destroyed.push_back(enemies[i].first);
                     _score += PointsPerEnemy;
                 }
-                return; // un missile détruit au plus un ennemi
+                return;
             }
         }
     });
@@ -330,12 +356,12 @@ void Game::handleCollisions()
         for (std::size_t i = 0; i < enemies.size(); i++) {
             if (!enemyHit[i] && engine::physics::overlaps(playerBox, enemies[i].second)) {
                 enemyHit[i] = true;
-                destroyed.push_back(playerEntity);     // Tue le joueur
-                destroyed.push_back(enemies[i].first); // Tue l'ennemi
+                destroyed.push_back(playerEntity);
+                destroyed.push_back(enemies[i].first);
             }
         }
     });
-    // Les missiles ennemis touchent le joueur
+
     _registry.each<Position, Kind>([&](engine::ecs::Entity missile, const Position &position, const Kind &kind) {
         if (kind.type != protocol::EntityType::EnemyMissile)
             return;
@@ -349,8 +375,8 @@ void Game::handleCollisions()
             const engine::physics::Aabb playerBox{playerPos.x, playerPos.y, PlayerWidth, PlayerHeight};
 
             if (engine::physics::overlaps(missileBox, playerBox)) {
-                destroyed.push_back(missile);       // Le missile ennemi disparaît
-                destroyed.push_back(playerEntity);   // Le joueur est touché et détruit
+                destroyed.push_back(missile);
+                destroyed.push_back(playerEntity);
             }
         });
     });

@@ -1,34 +1,86 @@
 {
   "enemies": {
     "standard_red": {
-      "health": 3,
-      "speed": 100.0,
-      "pattern": "sine_wave",
+      "variant": 0,
+      "health": 1,
+      "speed": 120.0,
+      "pattern": "straight",
       "attack": {
         "fire_rate": 2.0,
-        "bullet_speed": 350.0,
+        "bullet_speed": 320.0,
         "bullet_variant": 0,
+        "bullet_pattern": "straight"
+      }
+    },
+    "patrol": {
+      "variant": 1,
+      "health": 3,
+      "speed": 130.0,
+      "pattern": "back_and_forth",
+      "attack": {
+        "fire_rate": 1.8,
+        "bullet_speed": 320.0,
+        "bullet_variant": 1,
+        "bullet_pattern": "straight"
+      }
+    },
+    "sine_wave": {
+      "variant": 2,
+      "health": 4,
+      "speed": 120.0,
+      "pattern": "sine_wave",
+      "attack": {
+        "fire_rate": 1.8,
+        "bullet_speed": 340.0,
+        "bullet_variant": 2,
         "bullet_pattern": "zigzag"
       }
     },
-    "boss_heavy": {
-      "health": 50,
-      "speed": 40.0,
-      "pattern": "straight",
+    "diver": {
+      "variant": 3,
+      "health": 2,
+      "speed": 160.0,
+      "pattern": "dive",
       "attack": {
-        "fire_rate": 0.8,
-        "bullet_speed": 500.0,
-        "bullet_variant": 1
+        "fire_rate": 2.2,
+        "bullet_speed": 380.0,
+        "bullet_variant": 1,
+        "bullet_pattern": "straight"
       }
     },
     "tentacle_creature": {
-      "health": 8,
-      "speed": 60.0,
+      "variant": 4,
+      "health": 6,
+      "speed": 80.0,
       "pattern": "zigzag",
       "attack": {
         "fire_rate": 1.5,
         "bullet_speed": 300.0,
-        "bullet_variant": 0,
+        "bullet_variant": 3,
+        "bullet_pattern": "zigzag"
+      }
+    },
+    "boss_heavy": {
+      "variant": 5,
+      "health": 35,
+      "speed": 35.0,
+      "pattern": "straight",
+      "attack": {
+        "fire_rate": 0.8,
+        "bullet_speed": 450.0,
+        "bullet_variant": 4,
+        "bullet_pattern": "straight"
+      }
+    },
+    "boss": {
+      "variant": 6,
+      "health": 50,
+      "speed": 25.0,
+      "pattern": "straight",
+      "attack": {
+        "fire_rate": 0.7,
+        "bullet_speed": 480.0,
+        "bullet_variant": 4,
         "bullet_pattern": "zigzag"
       }
     }

@@ -6,9 +6,7 @@ namespace rtype::server {
 
 void updateEnemyShooting(engine::ecs::Registry &registry, const std::function<engine::ecs::Entity(protocol::EntityType, std::uint8_t, float, float)> &spawnFunc, float dt)
 {
-    //Détection des ennemis qui doivent tirer
     registry.each<rtype::components::Position, rtype::components::Kind, rtype::components::EnemyAttack>([&registry, &spawnFunc, dt](engine::ecs::Entity /*entity*/, const rtype::components::Position &pos, const rtype::components::Kind &kind, rtype::components::EnemyAttack &attack) {
-            
             if (kind.type != protocol::EntityType::Enemy)
                 return;
 
@@ -24,7 +22,6 @@ void updateEnemyShooting(engine::ecs::Registry &registry, const std::function<en
             }
         });
 
-    //Traitement des trajectoires spéciales des tirs ennemis (ex: shoot zigzag)
     registry.each<rtype::components::Position, rtype::components::Velocity, rtype::components::Kind, rtype::components::MovementPattern>([](engine::ecs::Entity /*entity*/, const rtype::components::Position &pos, rtype::components::Velocity &vel, const rtype::components::Kind &kind, const rtype::components::MovementPattern &pattern) {
             if (kind.type != protocol::EntityType::EnemyMissile)
                 return;
