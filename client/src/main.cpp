@@ -55,7 +55,6 @@ int main(int argc, char **argv)
     if (!hasAssets) {
         std::cerr << "Warning: Could not load some assets. Make sure to run from repository root.\n";
     }
-    resources.playMusic("assets/audio/music.wav", 50.f, true);
 
     if (!resources.hasFont("default")) {
         std::cerr << "Error: Default font could not be loaded.\n";
@@ -64,6 +63,11 @@ int main(int argc, char **argv)
 
     rtype::client::ui::Starfield starfield;
     rtype::client::ui::MainMenu menu(resources.getFont("default"), &resources);
+    const auto &initialConfig = menu.getConfig();
+    resources.setSfxVolume(initialConfig.sfxVolume);
+    resources.setMusicVolume(initialConfig.musicVolume);
+    resources.playMusic("assets/audio/music.wav", initialConfig.musicVolume, true);
+
     rtype::client::AsioNetworkClient network;
     AppState appState = AppState::Menu;
 
@@ -96,7 +100,7 @@ int main(int argc, char **argv)
         const auto &cfg = menu.getConfig();
         resources.setSfxVolume(cfg.sfxVolume);
         resources.setMusicVolume(cfg.musicVolume);
-        static float lastSfxVolume = 100.f;
+        static float lastSfxVolume = cfg.sfxVolume;
         if (std::abs(cfg.sfxVolume - lastSfxVolume) > 1.f) {
             resources.playSound("shoot", 80.f);
             lastSfxVolume = cfg.sfxVolume;
@@ -301,6 +305,8 @@ int main(int argc, char **argv)
 
     if (network.connected())
         network.disconnect();
+
+    menu.getConfig().saveToFile("config.json");
 
     return EXIT_SUCCESS;
 }

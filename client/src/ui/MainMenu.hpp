@@ -40,6 +40,9 @@ struct GameConfig {
 
     float sfxVolume{100.f};
     float musicVolume{100.f};
+
+    static GameConfig loadFromFile(const std::string &path = "config.json");
+    bool saveToFile(const std::string &path = "config.json") const;
 };
 
 class MainMenu {

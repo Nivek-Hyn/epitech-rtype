@@ -1,11 +1,81 @@
 #include "MainMenu.hpp"
 #include "ResourceManager.hpp"
 
+#include <nlohmann/json.hpp>
+#include <algorithm>
+#include <cmath>
+#include <fstream>
+#include <iostream>
+
 namespace rtype::client::ui {
+
+GameConfig GameConfig::loadFromFile(const std::string &path)
+{
+    GameConfig config;
+    std::ifstream file(path);
+    if (!file.is_open()) {
+        return config;
+    }
+
+    try {
+        nlohmann::json j;
+        file >> j;
+
+        if (j.contains("sfx_volume") && j["sfx_volume"].is_number()) {
+            config.sfxVolume = std::clamp(j["sfx_volume"].get<float>(), 0.f, 100.f);
+        } else if (j.contains("sfxVolume") && j["sfxVolume"].is_number()) {
+            config.sfxVolume = std::clamp(j["sfxVolume"].get<float>(), 0.f, 100.f);
+        }
+
+        if (j.contains("music_volume") && j["music_volume"].is_number()) {
+            config.musicVolume = std::clamp(j["music_volume"].get<float>(), 0.f, 100.f);
+        } else if (j.contains("musicVolume") && j["musicVolume"].is_number()) {
+            config.musicVolume = std::clamp(j["musicVolume"].get<float>(), 0.f, 100.f);
+        }
+
+        if (j.contains("join_ip") && j["join_ip"].is_string()) {
+            config.joinIp = j["join_ip"].get<std::string>();
+        }
+        if (j.contains("join_port") && j["join_port"].is_string()) {
+            config.joinPort = j["join_port"].get<std::string>();
+        }
+        if (j.contains("host_port") && j["host_port"].is_string()) {
+            config.hostPort = j["host_port"].get<std::string>();
+        }
+    } catch (const std::exception &e) {
+        std::cerr << "[Config] Warning: Error parsing " << path << ": " << e.what() << '\n';
+    }
+
+    return config;
+}
+
+bool GameConfig::saveToFile(const std::string &path) const
+{
+    try {
+        nlohmann::json j;
+        j["sfx_volume"] = sfxVolume;
+        j["music_volume"] = musicVolume;
+        j["host_port"] = hostPort;
+        j["join_ip"] = joinIp;
+        j["join_port"] = joinPort;
+
+        std::ofstream file(path);
+        if (!file.is_open()) {
+            std::cerr << "[Config] Warning: Unable to open " << path << " for writing\n";
+            return false;
+        }
+        file << j.dump(4) << '\n';
+        return true;
+    } catch (const std::exception &e) {
+        std::cerr << "[Config] Warning: Failed to save config to " << path << ": " << e.what() << '\n';
+        return false;
+    }
+}
 
 MainMenu::MainMenu(const sf::Font &font, ResourceManager *resources)
     : _font(font),
       _resources(resources),
+      _config(GameConfig::loadFromFile("config.json")),
       _titleText(font, "R - T Y P E", 80),
       _subtitleText(font, "A SPACE SHOOTER", 22),
       _screenTitleText(font, "", 36),
@@ -96,10 +166,17 @@ void MainMenu::initSettingsScreen()
     const float posX = 680.f;
     float startY = 380.f;
 
-    _sfxVolumeSelector = std::make_unique<OptionSelector>(_font, "SFX VOLUME", std::vector<std::string>{"MUTE", "25%", "50%", "75%", "100%"}, sf::Vector2f(posX, startY), 4);
+    const std::size_t sfxIdx = std::clamp(
+        static_cast<std::size_t>(std::round(_config.sfxVolume / 25.f)),
+        std::size_t{0}, std::size_t{4});
+    const std::size_t musicIdx = std::clamp(
+        static_cast<std::size_t>(std::round(_config.musicVolume / 25.f)),
+        std::size_t{0}, std::size_t{4});
+
+    _sfxVolumeSelector = std::make_unique<OptionSelector>(_font, "SFX VOLUME", std::vector<std::string>{"MUTE", "25%", "50%", "75%", "100%"}, sf::Vector2f(posX, startY), sfxIdx);
     startY += 80.f;
 
-    _musicVolumeSelector = std::make_unique<OptionSelector>(_font, "MUSIC VOLUME", std::vector<std::string>{"MUTE", "25%", "50%", "75%", "100%"}, sf::Vector2f(posX, startY), 4);
+    _musicVolumeSelector = std::make_unique<OptionSelector>(_font, "MUSIC VOLUME", std::vector<std::string>{"MUTE", "25%", "50%", "75%", "100%"}, sf::Vector2f(posX, startY), musicIdx);
     startY += 100.f;
 
     _controlsInfo.setString("CONTROLS:\n  Move: [Z][Q][S][D] or [Arrow Keys]\n  Shoot: [Space]");
@@ -285,21 +362,31 @@ void MainMenu::handleEvent(const sf::Event &event, const sf::RenderWindow &windo
         } else if (const auto *click = event.getIf<sf::Event::MouseButtonPressed>()) {
             if (click->button == sf::Mouse::Button::Left) {
                 const auto clickedPos = window.mapPixelToCoords(click->position);
-                if (_sfxVolumeSelector->handleMouseClick(clickedPos))
+                bool volumeChanged = false;
+                if (_sfxVolumeSelector->handleMouseClick(clickedPos)) {
                     playUiSound("click");
-                if (_musicVolumeSelector->handleMouseClick(clickedPos))
+                    _config.sfxVolume = static_cast<float>(_sfxVolumeSelector->getSelectedIndex()) * 25.f;
+                    volumeChanged = true;
+                }
+                if (_musicVolumeSelector->handleMouseClick(clickedPos)) {
                     playUiSound("click");
-                _config.sfxVolume = static_cast<float>(_sfxVolumeSelector->getSelectedIndex()) * 25.f;
-                _config.musicVolume = static_cast<float>(_musicVolumeSelector->getSelectedIndex()) * 25.f;
+                    _config.musicVolume = static_cast<float>(_musicVolumeSelector->getSelectedIndex()) * 25.f;
+                    volumeChanged = true;
+                }
+                if (volumeChanged) {
+                    _config.saveToFile("config.json");
+                }
 
                 if (_settingsButtons[0]->handleMouseClick(clickedPos)) {
                     playUiSound("click");
+                    _config.saveToFile("config.json");
                     _currentScreen = MenuScreen::Root;
                 }
             }
         } else if (const auto *key = event.getIf<sf::Event::KeyPressed>()) {
             if (key->code == sf::Keyboard::Key::Escape) {
                 playUiSound("click");
+                _config.saveToFile("config.json");
                 _currentScreen = MenuScreen::Root;
             } else if (key->code == sf::Keyboard::Key::Up || key->code == sf::Keyboard::Key::Z) {
                 _settingsSelectedIndex = (_settingsSelectedIndex + 2) % 3;
@@ -319,6 +406,7 @@ void MainMenu::handleEvent(const sf::Event &event, const sf::RenderWindow &windo
                     _musicVolumeSelector->previous();
                 _config.sfxVolume = static_cast<float>(_sfxVolumeSelector->getSelectedIndex()) * 25.f;
                 _config.musicVolume = static_cast<float>(_musicVolumeSelector->getSelectedIndex()) * 25.f;
+                _config.saveToFile("config.json");
             } else if (key->code == sf::Keyboard::Key::Right || key->code == sf::Keyboard::Key::D) {
                 playUiSound("click");
                 if (_settingsSelectedIndex == 0)
@@ -327,9 +415,11 @@ void MainMenu::handleEvent(const sf::Event &event, const sf::RenderWindow &windo
                     _musicVolumeSelector->next();
                 _config.sfxVolume = static_cast<float>(_sfxVolumeSelector->getSelectedIndex()) * 25.f;
                 _config.musicVolume = static_cast<float>(_musicVolumeSelector->getSelectedIndex()) * 25.f;
+                _config.saveToFile("config.json");
             } else if (key->code == sf::Keyboard::Key::Enter) {
                 if (_settingsSelectedIndex == 2) {
                     playUiSound("click");
+                    _config.saveToFile("config.json");
                     _currentScreen = MenuScreen::Root;
                 }
             }
