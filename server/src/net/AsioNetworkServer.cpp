@@ -107,31 +107,52 @@ void AsioNetworkServer::handleDatagram(std::size_t size)
         return;
 
     const auto player = findClient(_sender);
-    if (player)
-        _clients[*player].lastSeen = Clock::now();
 
     if (std::holds_alternative<protocol::Connect>(packet->message)) {
         if (player) {
+            // A client that connects again from the same address starts over: number its packets from scratch.
+            _clients[*player].lastSeen = Clock::now();
+            _clients[*player].incoming.reset();
+            _clients[*player].incoming.receive(packet->sequence);
             sendToPlayer(*player, protocol::ConnectAccepted{*player});
             return;
         }
         for (PlayerId candidate = 0; candidate < MaxPlayers; ++candidate) {
             if (!_clients[candidate].active) {
-                _clients[candidate] = Client{true, _sender, Clock::now()};
+                _clients[candidate] = Client{true, _sender, Clock::now(), 0, engine::net::SequenceWindow{}};
+                _clients[candidate].incoming.receive(packet->sequence);
                 ++_clientCount;
                 _events.push(PlayerJoined{candidate});
                 sendToPlayer(candidate, protocol::ConnectAccepted{candidate});
                 return;
             }
         }
-        sendTo(_sender, protocol::ConnectRejected{protocol::RejectReason::ServerFull});
+        sendTo(_sender, _nextSequence.fetch_add(1), protocol::ConnectRejected{protocol::RejectReason::ServerFull});
         return;
     }
 
     if (!player)
         return;
+    Client &client = _clients[*player];
+
+    // A copy of a packet already handled, or one far too old, must not act twice (a stale Disconnect or Ping would).
+    const auto verdict = client.incoming.receive(packet->sequence);
+    if (verdict == engine::net::SequenceVerdict::Duplicate) {
+        _traffic.addDuplicate();
+        return;
+    }
+    if (verdict == engine::net::SequenceVerdict::TooOld) {
+        _traffic.addOutdated();
+        return;
+    }
+    client.lastSeen = Clock::now();
+
     if (const auto *input = std::get_if<protocol::Input>(&packet->message)) {
-        _events.push(PlayerInput{*player, input->flags});
+        // An Input states which keys are held now: one that arrives after a newer one is already obsolete.
+        if (verdict == engine::net::SequenceVerdict::Late)
+            _traffic.addOutdated();
+        else
+            _events.push(PlayerInput{*player, input->flags});
     } else if (std::holds_alternative<protocol::Disconnect>(packet->message)) {
         removeClient(*player, protocol::LeaveReason::Disconnected);
     } else if (const auto *ping = std::get_if<protocol::Ping>(&packet->message)) {
@@ -163,10 +184,9 @@ void AsioNetworkServer::updateRates()
     _receivedRate = rates.receivedBytesPerSecond;
 }
 
-void AsioNetworkServer::sendTo(const Udp::endpoint &endpoint, protocol::Message message)
+void AsioNetworkServer::sendTo(const Udp::endpoint &endpoint, std::uint32_t sequence, protocol::Message message)
 {
-    auto bytes =
-        std::make_shared<std::vector<std::uint8_t>>(protocol::encode({_nextSequence.fetch_add(1), std::move(message)}));
+    auto bytes = std::make_shared<std::vector<std::uint8_t>>(protocol::encode({sequence, std::move(message)}));
     _traffic.addSent(bytes->size());
     _socket.async_send_to(asio::buffer(*bytes), endpoint, [bytes](const asio::error_code &, std::size_t) {});
 }
@@ -175,12 +195,14 @@ void AsioNetworkServer::sendToPlayer(PlayerId player, protocol::Message message)
 {
     if (player >= MaxPlayers || !_clients[player].active)
         return;
+    // Every packet to this client, including each part of a split snapshot, gets the client's next number.
+    Client &client = _clients[player];
     if (const auto *snapshot = std::get_if<protocol::Snapshot>(&message)) {
         for (auto &part : protocol::splitSnapshot(*snapshot))
-            sendTo(_clients[player].endpoint, std::move(part));
+            sendTo(client.endpoint, client.nextSequence++, std::move(part));
         return;
     }
-    sendTo(_clients[player].endpoint, std::move(message));
+    sendTo(client.endpoint, client.nextSequence++, std::move(message));
 }
 
 std::optional<PlayerId> AsioNetworkServer::findClient(const Udp::endpoint &endpoint) const

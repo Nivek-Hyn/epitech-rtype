@@ -32,10 +32,13 @@ void printTraffic(const rtype::server::AsioNetworkServer &network)
     const std::size_t clients = network.clientCount();
     const double sentKb = stats.rates.sentBytesPerSecond / 1024.0;
     const double receivedKb = stats.rates.receivedBytesPerSecond / 1024.0;
-    std::printf("[net] %zu client(s) | out %.1f KB/s (%.1f per client) | in %.1f KB/s | total out %.1f KB, in %.1f KB\n",
+    std::printf("[net] %zu client(s) | out %.1f KB/s (%.1f per client) | in %.1f KB/s | total out %.1f KB, in %.1f KB"
+                " | dropped: %llu duplicate, %llu outdated\n",
                 clients, sentKb, clients > 0 ? sentKb / static_cast<double>(clients) : 0.0, receivedKb,
                 static_cast<double>(stats.totals.bytesSent) / 1024.0,
-                static_cast<double>(stats.totals.bytesReceived) / 1024.0);
+                static_cast<double>(stats.totals.bytesReceived) / 1024.0,
+                static_cast<unsigned long long>(stats.totals.duplicatesDropped),
+                static_cast<unsigned long long>(stats.totals.outdatedDropped));
     std::fflush(stdout);
 }
 

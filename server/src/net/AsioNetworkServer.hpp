@@ -2,6 +2,7 @@
 
 #include "common/Constants.hpp"
 #include "engine/core/ThreadSafeQueue.hpp"
+#include "engine/net/SequenceWindow.hpp"
 #include "engine/net/TrafficStats.hpp"
 #include "net/INetworkServer.hpp"
 
@@ -36,6 +37,8 @@ private:
         bool active = false;
         Udp::endpoint endpoint;
         Clock::time_point lastSeen{};
+        std::uint32_t nextSequence = 0;        // numbers the packets sent to this client
+        engine::net::SequenceWindow incoming; // spots duplicated and reordered packets from this client
     };
 
     void runIo();
@@ -43,7 +46,7 @@ private:
     void handleDatagram(std::size_t size);
     void scheduleTimeoutCheck();
     void updateRates();
-    void sendTo(const Udp::endpoint &endpoint, protocol::Message message);
+    void sendTo(const Udp::endpoint &endpoint, std::uint32_t sequence, protocol::Message message);
     void sendToPlayer(PlayerId player, protocol::Message message);
     std::optional<PlayerId> findClient(const Udp::endpoint &endpoint) const;
     void removeClient(PlayerId player, protocol::LeaveReason reason);

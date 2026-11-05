@@ -17,7 +17,7 @@ the protocol specification; runtime gaps are listed in the [networking implement
 | 0 | u16 | magic | Always `0x5254` ("RT") |
 | 2 | u8 | version | Protocol version, currently `1` |
 | 3 | u8 | type | Message type (see §4) |
-| 4 | u32 | sequence | Incremented by the sender for each packet it sends |
+| 4 | u32 | sequence | Number of the packet for this peer, see §3.1 |
 | 8 | u16 | payload_size | Number of bytes after the header |
 
 ## 3. Validation
@@ -32,6 +32,28 @@ A receiver **silently drops** a datagram if any of these is true:
 - an `Input` packet sets any reserved flag bit (`0xE0`).
 
 A malformed datagram must never crash the receiver or close the session.
+
+### 3.1 Sequence numbers
+
+Each peer numbers the packets it sends **to each other peer separately**: the server keeps one counter per client,
+and a client has one counter towards the server. A counter starts at `0` for a new session, goes up by exactly `1`
+for every packet (each part of a split Snapshot is a packet), and wraps around at 2^32. A new session starts when a
+client sends `Connect`; a server answering a `ConnectRejected` to an unknown address uses any number.
+
+A receiver remembers the highest number it has seen from a peer and which of the 32 numbers before it arrived.
+From that it classifies every packet whose header is valid:
+
+| Verdict | Meaning | What the receiver does |
+|---|---|---|
+| Newest | higher than every number seen so far (numbers may be missing before it) | handles it |
+| Late | lower than the highest, never seen | handles it, except an `Input` or a `Snapshot`, which a newer one has already replaced |
+| Duplicate | already received | ignores it |
+| Too old | more than 31 numbers behind the highest | ignores it |
+
+A `Connect` always restarts the numbering of its sender: a client that starts again from the same address can number
+its packets from `0` again. Ignored packets are counted (`duplicatesDropped`, `outdatedDropped`) but never close the
+session. A client **must** increment its number for every packet: a client that always sends the same number has all
+its packets after the first treated as duplicates.
 
 ## 4. Messages
 
@@ -97,5 +119,6 @@ Since a snapshot is sent every tick, this information cannot be lost.
 
 The protocol defines the intended wire format and message set. The current runtime does not yet implement every
 specified behavior: it does not reject a version mismatch with `ConnectRejected` (a datagram with another
-version is silently dropped), and the server does not filter duplicated or out-of-order client packets. See the
+version is silently dropped), and message delivery is not guaranteed: only duplicates and reordering are
+detected, lost packets are not retransmitted. See the
 [networking implementation guide](networking.md) for the current behavior and limitations.

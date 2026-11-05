@@ -267,9 +267,12 @@ int main(int argc, char **argv)
                 if (stats.rttMs)
                     std::snprintf(rtt, sizeof rtt, "%.0f ms", *stats.rttMs);
                 char line[160];
-                std::snprintf(line, sizeof line, "ping %s | down %.1f KB/s | up %.1f KB/s | loss %.1f%%  [F3]", rtt,
+                const auto dropped = stats.traffic.totals.duplicatesDropped + stats.traffic.totals.outdatedDropped;
+                std::snprintf(line, sizeof line,
+                              "ping %s | down %.1f KB/s | up %.1f KB/s | loss %.1f%% | dropped %llu  [F3]", rtt,
                               stats.traffic.rates.receivedBytesPerSecond / 1024.0,
-                              stats.traffic.rates.sentBytesPerSecond / 1024.0, stats.lossPercent);
+                              stats.traffic.rates.sentBytesPerSecond / 1024.0, stats.lossPercent,
+                              static_cast<unsigned long long>(dropped));
                 statsText.setString(line);
                 window.draw(statsText);
             }

@@ -183,7 +183,9 @@ server-owned player positions.
 
 - UDP does not guarantee delivery or ordering. Snapshots are sent repeatedly, but one-off events are not
   acknowledged or retransmitted.
-- The sequence number is included in packets, but receivers do not yet filter duplicate or out-of-order packets.
+- Both sides number their packets per peer and ignore duplicated, out-of-order (`Input` and `Snapshot` only) and
+  too old packets with an `engine::net::SequenceWindow` of 32 numbers; see [protocol.md](protocol.md) §3.1. This
+  detects a loss but does not repair it: nothing is retransmitted yet.
 - Clients display the newest snapshot directly; interpolation, prediction, and reconciliation are not
   implemented.
 - When a player leaves or times out, the server broadcasts `EntityDestroyed` for its ship and sends `PlayerLeft`
@@ -193,7 +195,6 @@ server-owned player positions.
   packet of a tick is lost, that tick is displayed incomplete until the next one.
 - The protocol specification describes `VersionMismatch` rejection; it is not implemented: a datagram with
   another version is dropped without answer, so such a client retries `Connect` forever.
-- The server does not filter duplicated or out-of-order client packets.
 
 These are follow-up improvements, not prerequisites for the current local multiplayer prototype.
 
@@ -206,8 +207,8 @@ bandwidth once per second (`engine::net::RateMeter`).
 
 | Where | How to read it | What it shows |
 |---|---|---|
-| Server | `./r-type_server 4242 --stats` prints a line every 2 seconds | clients, bytes per second out and in (and per client), totals since start |
-| Client | press **F3** in game, or call `INetworkClient::stats()` | smoothed ping, download and upload in KB/s, snapshot loss |
+| Server | `./r-type_server 4242 --stats` prints a line every 2 seconds | clients, bytes per second out and in (and per client), totals since start, packets dropped as duplicate or outdated |
+| Client | press **F3** in game, or call `INetworkClient::stats()` | smoothed ping, download and upload in KB/s, snapshot loss, packets dropped |
 
 The client measures:
 
@@ -240,6 +241,10 @@ to a local server. This is a single run on the loopback interface, not a benchma
 |---|---|---|---|
 | Healthy | 0.0 % (420 of 420 ticks) | under 1 ms | 12.7 KB/s |
 | 20 % loss, 60 ms delay, 20 ms jitter, 3 % duplicates, each way | 20.9 % (302 of 382 ticks) | 139 ms (3 pongs) | 11.6 KB/s |
+
+Per-client sequence numbers (§8) were checked with the same bot through `netsim.py --dup 10 --delay 30
+--jitter 40` for 6 seconds: the server's `--stats` line ended with `dropped: 31 duplicate, 133 outdated`. The
+outdated ones are mostly `Input` packets that the jitter delivered after a newer one; the game played normally.
 
 These figures are the baseline for the improvements planned next (acknowledgements, delta snapshots,
 interpolation): measure again after each one.
@@ -419,8 +424,10 @@ des joueurs calculées par le serveur.
 
 - UDP ne garantit ni la livraison ni l’ordre des paquets. Les snapshots sont renvoyés régulièrement, mais les
   événements isolés ne sont ni acquittés ni retransmis.
-- Les paquets contiennent un numéro de séquence, mais le récepteur ne filtre pas encore les doublons ou les
-  paquets arrivés dans le désordre.
+- Chaque côté numérote ses paquets par interlocuteur et ignore les paquets dupliqués, arrivés dans le désordre
+  (`Input` et `Snapshot` seulement) ou trop anciens, grâce à une `engine::net::SequenceWindow` de 32 numéros ;
+  voir [protocol.md](protocol.md) §3.1. Cela détecte une perte mais ne la répare pas : rien n’est encore
+  retransmis.
 - Les clients affichent directement le snapshot le plus récent ; l’interpolation, la prédiction et la
   réconciliation ne sont pas implémentées.
 - Lorsqu’un joueur part ou expire, le serveur diffuse `EntityDestroyed` pour son vaisseau et envoie `PlayerLeft`
@@ -430,7 +437,6 @@ des joueurs calculées par le serveur.
   un paquet d’un tick est perdu, ce tick s’affiche incomplet jusqu’au suivant.
 - La spécification décrit le refus `VersionMismatch` ; il n’est pas implémenté : un datagramme d’une autre
   version est ignoré sans réponse, donc ce client réessaie `Connect` indéfiniment.
-- Le serveur ne filtre pas les paquets clients dupliqués ou arrivés dans le désordre.
 
 Ces améliorations pourront être faites plus tard ; elles ne sont pas nécessaires au prototype multijoueur local
 actuel.
@@ -444,8 +450,8 @@ fois par seconde (`engine::net::RateMeter`).
 
 | Où | Comment le lire | Ce que l’on voit |
 |---|---|---|
-| Serveur | `./r-type_server 4242 --stats` affiche une ligne toutes les 2 secondes | clients, octets par seconde envoyés et reçus (et par client), totaux depuis le démarrage |
-| Client | touche **F3** en jeu, ou `INetworkClient::stats()` | ping lissé, débit descendant et montant en Ko/s, pertes de snapshots |
+| Serveur | `./r-type_server 4242 --stats` affiche une ligne toutes les 2 secondes | clients, octets par seconde envoyés et reçus (et par client), totaux depuis le démarrage, paquets écartés (doublons, trop tard) |
+| Client | touche **F3** en jeu, ou `INetworkClient::stats()` | ping lissé, débit descendant et montant en Ko/s, pertes de snapshots, paquets écartés |
 
 Le client mesure :
 
@@ -478,6 +484,11 @@ serveur local. C’est un seul essai sur l’interface locale, pas un benchmark 
 |---|---|---|---|
 | Sain | 0,0 % (420 ticks sur 420) | moins de 1 ms | 12,7 Ko/s |
 | 20 % de perte, 60 ms de délai, 20 ms de gigue, 3 % de doublons, dans chaque sens | 20,9 % (302 ticks sur 382) | 139 ms (3 pongs) | 11,6 Ko/s |
+
+Les numéros de séquence par client (§8) ont été vérifiés avec le même bot via `netsim.py --dup 10 --delay 30
+--jitter 40` pendant 6 secondes : la ligne `--stats` du serveur se terminait par
+`dropped: 31 duplicate, 133 outdated`. Les paquets périmés sont surtout des `Input` que la gigue a livrés après un
+plus récent ; la partie s’est déroulée normalement.
 
 Ces valeurs servent de référence pour les améliorations prévues (acquittements, snapshots différentiels,
 interpolation) : il faudra mesurer à nouveau après chacune.

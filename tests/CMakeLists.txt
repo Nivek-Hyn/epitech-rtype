@@ -11,6 +11,7 @@ add_executable(rtype_tests
     test_thread_safe_queue.cpp
     test_network_client.cpp
     test_traffic_stats.cpp
+    test_sequence_window.cpp
     ${PROJECT_SOURCE_DIR}/client/src/net/AsioNetworkClient.cpp
 )
 target_include_directories(rtype_tests PRIVATE ${PROJECT_SOURCE_DIR}/client/src)

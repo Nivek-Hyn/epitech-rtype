@@ -3,6 +3,7 @@
 #include "common/Constants.hpp"
 #include "engine/core/ThreadSafeQueue.hpp"
 #include "engine/net/LossTracker.hpp"
+#include "engine/net/SequenceWindow.hpp"
 #include "engine/net/TrafficStats.hpp"
 #include "net/INetworkClient.hpp"
 
@@ -72,6 +73,7 @@ private:
     engine::net::TrafficCounter _traffic;
     engine::net::RateMeter _rateMeter;  // I/O thread only
     engine::net::LossTracker _loss;     // I/O thread only
+    engine::net::SequenceWindow _incoming; // I/O thread only: spots duplicated and reordered server packets
     std::atomic<double> _sentRate{0.0};
     std::atomic<double> _receivedRate{0.0};
     std::atomic<double> _lossPercent{0.0};

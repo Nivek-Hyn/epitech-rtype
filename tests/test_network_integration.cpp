@@ -149,3 +149,133 @@ TEST(NetworkIntegration, NotifiesRemainingClientsWhenAPlayerDisconnects)
     EXPECT_EQ(left->playerId, 0);
     EXPECT_EQ(left->reason, rtype::protocol::LeaveReason::Disconnected);
 }
+
+namespace {
+
+using rtype::protocol::Message;
+
+void sendFrom(Udp::socket &socket, std::uint16_t serverPort, std::uint32_t sequence, const Message &message)
+{
+    socket.send_to(asio::buffer(rtype::protocol::encode({sequence, message})),
+                   Udp::endpoint(asio::ip::address_v4::loopback(), serverPort));
+}
+
+// Waits until the server has read `count` datagrams, then a little more so that its events are queued.
+void waitForDatagrams(const rtype::server::AsioNetworkServer &server, std::uint64_t count)
+{
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+    while (server.traffic().totals.packetsReceived < count && std::chrono::steady_clock::now() < deadline)
+        std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+}
+
+std::vector<std::uint8_t> drainInputs(rtype::server::AsioNetworkServer &server)
+{
+    std::vector<std::uint8_t> inputs;
+    while (const auto event = server.poll()) {
+        if (const auto *input = std::get_if<rtype::server::PlayerInput>(&*event))
+            inputs.push_back(input->flags);
+    }
+    return inputs;
+}
+
+Udp::socket connectedClient(asio::io_context &io, std::uint16_t serverPort, std::uint32_t firstSequence)
+{
+    Udp::socket socket(io, Udp::endpoint(Udp::v4(), 0));
+    socket.non_blocking(true);
+    sendFrom(socket, serverPort, firstSequence, rtype::protocol::Connect{});
+    Udp::endpoint sender;
+    const auto accepted = receivePacket(socket, sender);
+    EXPECT_TRUE(accepted && std::holds_alternative<rtype::protocol::ConnectAccepted>(accepted->message));
+    return socket;
+}
+
+} // namespace
+
+TEST(NetworkIntegration, NumbersThePacketsOfEachClientSeparately)
+{
+    rtype::server::AsioNetworkServer server;
+    const std::uint16_t serverPort = findAvailablePort();
+    server.start(serverPort);
+
+    asio::io_context io;
+    Udp::socket first = connectedClient(io, serverPort, 1);
+    Udp::socket second = connectedClient(io, serverPort, 1);
+    for (std::uint32_t tick = 1; tick <= 3; ++tick) {
+        server.broadcast(rtype::protocol::Snapshot{tick, rtype::protocol::GameState::Playing, 0, {}});
+        std::this_thread::sleep_for(std::chrono::milliseconds(5));
+    }
+
+    for (Udp::socket *socket : {&first, &second}) {
+        Udp::endpoint sender;
+        for (std::uint32_t expected = 1; expected <= 3; ++expected) {
+            const auto packet = receivePacket(*socket, sender);
+            ASSERT_TRUE(packet);
+            // The ConnectAccepted was number 0 for this client, whatever the other clients received.
+            EXPECT_EQ(packet->sequence, expected);
+        }
+    }
+}
+
+TEST(NetworkIntegration, IgnoresDuplicatedStaleAndTooOldInputs)
+{
+    rtype::server::AsioNetworkServer server;
+    const std::uint16_t serverPort = findAvailablePort();
+    server.start(serverPort);
+
+    asio::io_context io;
+    Udp::socket client = connectedClient(io, serverPort, 1);
+    using rtype::protocol::Input;
+    namespace Flag = rtype::protocol::InputFlag;
+    sendFrom(client, serverPort, 10, Input{Flag::Up});
+    sendFrom(client, serverPort, 9, Input{Flag::Left});    // arrives after number 10: obsolete
+    sendFrom(client, serverPort, 10, Input{Flag::Up});     // a copy of the first
+    sendFrom(client, serverPort, 11, Input{Flag::Right});
+    sendFrom(client, serverPort, 60, Input{Flag::Down});
+    sendFrom(client, serverPort, 20, Input{Flag::Left});   // 40 numbers behind the highest: too old
+    waitForDatagrams(server, 7);
+
+    EXPECT_EQ(drainInputs(server), (std::vector<std::uint8_t>{Flag::Up, Flag::Right, Flag::Down}));
+    EXPECT_EQ(server.traffic().totals.duplicatesDropped, 1u);
+    EXPECT_EQ(server.traffic().totals.outdatedDropped, 2u);
+}
+
+TEST(NetworkIntegration, StillAnswersAPingThatArrivesOutOfOrder)
+{
+    rtype::server::AsioNetworkServer server;
+    const std::uint16_t serverPort = findAvailablePort();
+    server.start(serverPort);
+
+    asio::io_context io;
+    Udp::socket client = connectedClient(io, serverPort, 1);
+    sendFrom(client, serverPort, 10, rtype::protocol::Input{0});
+    sendFrom(client, serverPort, 8, rtype::protocol::Ping{77}); // late, but nothing newer replaces a Ping
+
+    Udp::endpoint sender;
+    const auto pong = receivePacket(client, sender);
+    ASSERT_TRUE(pong);
+    const auto *answer = std::get_if<rtype::protocol::Pong>(&pong->message);
+    ASSERT_NE(answer, nullptr);
+    EXPECT_EQ(answer->timestampMs, 77u);
+}
+
+TEST(NetworkIntegration, AClientThatConnectsAgainStartsANewSequence)
+{
+    rtype::server::AsioNetworkServer server;
+    const std::uint16_t serverPort = findAvailablePort();
+    server.start(serverPort);
+
+    asio::io_context io;
+    Udp::socket client = connectedClient(io, serverPort, 100);
+    sendFrom(client, serverPort, 105, rtype::protocol::Input{rtype::protocol::InputFlag::Up});
+
+    // The program restarts on the same address and numbers its packets from 1 again.
+    sendFrom(client, serverPort, 1, rtype::protocol::Connect{});
+    Udp::endpoint sender;
+    ASSERT_TRUE(receivePacket(client, sender));
+    sendFrom(client, serverPort, 2, rtype::protocol::Input{rtype::protocol::InputFlag::Down});
+    waitForDatagrams(server, 4);
+
+    EXPECT_EQ(drainInputs(server),
+              (std::vector<std::uint8_t>{rtype::protocol::InputFlag::Up, rtype::protocol::InputFlag::Down}));
+}

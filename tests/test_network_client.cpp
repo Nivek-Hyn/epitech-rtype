@@ -187,3 +187,50 @@ TEST(NetworkClient, CanConnectAgainAfterAFailure)
     client.connect("127.0.0.1", port);
     EXPECT_TRUE(waitUntil([&] { return client.connected(); }));
 }
+
+TEST(NetworkClient, IgnoresDuplicatedAndStaleServerPackets)
+{
+    asio::io_context io;
+    const std::uint16_t port = findAvailablePort();
+    Udp::socket fakeServer(io, Udp::endpoint(Udp::v4(), port));
+    fakeServer.non_blocking(true);
+
+    AsioNetworkClient client;
+    client.setOptions(fastOptions());
+    client.connect("127.0.0.1", port);
+
+    Udp::endpoint clientEndpoint;
+    std::array<std::uint8_t, rtype::protocol::MaxPacketSize> buffer{};
+    ASSERT_TRUE(waitUntil([&] {
+        asio::error_code error;
+        fakeServer.receive_from(asio::buffer(buffer), clientEndpoint, 0, error);
+        return !error;
+    })) << "the client never sent Connect";
+
+    const auto sendNumbered = [&](std::uint32_t sequence, const rtype::protocol::Message &message) {
+        fakeServer.send_to(asio::buffer(rtype::protocol::encode({sequence, message})), clientEndpoint);
+    };
+    sendNumbered(0, rtype::protocol::ConnectAccepted{0});
+    sendNumbered(3, snapshotOfTick(5));
+    sendNumbered(3, snapshotOfTick(5)); // a copy of the previous packet
+    sendNumbered(2, snapshotOfTick(4)); // arrives after number 3: a snapshot from the past
+    sendNumbered(1, rtype::protocol::EntityDestroyed{7, rtype::protocol::DestroyReason::Killed}); // late, still useful
+    ASSERT_TRUE(waitUntil([&] { return client.stats().traffic.totals.packetsReceived >= 5; }));
+
+    int accepted = 0;
+    int snapshots = 0;
+    int destroyed = 0;
+    while (const auto message = client.poll()) {
+        accepted += std::holds_alternative<rtype::protocol::ConnectAccepted>(*message);
+        if (const auto *snapshot = std::get_if<rtype::protocol::Snapshot>(&*message)) {
+            ++snapshots;
+            EXPECT_EQ(snapshot->tick, 5u);
+        }
+        destroyed += std::holds_alternative<rtype::protocol::EntityDestroyed>(*message);
+    }
+    EXPECT_EQ(accepted, 1);
+    EXPECT_EQ(snapshots, 1);
+    EXPECT_EQ(destroyed, 1);
+    EXPECT_EQ(client.stats().traffic.totals.duplicatesDropped, 1u);
+    EXPECT_EQ(client.stats().traffic.totals.outdatedDropped, 1u);
+}

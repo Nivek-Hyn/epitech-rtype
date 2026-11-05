@@ -45,6 +45,7 @@ void AsioNetworkClient::connect(const std::string &host, std::uint16_t port)
     _traffic.reset();
     _rateMeter = engine::net::RateMeter{};
     _loss.reset();
+    _incoming.reset();
     _sentRate = 0.0;
     _receivedRate = 0.0;
     _lossPercent = 0.0;
@@ -153,7 +154,18 @@ void AsioNetworkClient::receive()
 
 void AsioNetworkClient::handlePacket(const protocol::Packet &packet, Clock::time_point now)
 {
-    _lastReceive = now;
+    _lastReceive = now; // even a copy proves that the server is alive
+
+    // A copy of a packet already handled, or one far too old, is ignored.
+    const auto verdict = _incoming.receive(packet.sequence);
+    if (verdict == engine::net::SequenceVerdict::Duplicate) {
+        _traffic.addDuplicate();
+        return;
+    }
+    if (verdict == engine::net::SequenceVerdict::TooOld) {
+        _traffic.addOutdated();
+        return;
+    }
     // Rejected, TimedOut and Lost are final: a late datagram must not bring a dead session back.
     const bool connecting = _state == ConnectionState::Connecting;
 
@@ -164,6 +176,11 @@ void AsioNetworkClient::handlePacket(const protocol::Packet &packet, Clock::time
         if (connecting)
             _state = ConnectionState::Rejected;
     } else if (const auto *snapshot = std::get_if<protocol::Snapshot>(&packet.message)) {
+        // A snapshot is the whole game at one tick: one that arrives after a newer one would only go back in time.
+        if (verdict == engine::net::SequenceVerdict::Late) {
+            _traffic.addOutdated();
+            return;
+        }
         _loss.record(snapshot->tick);
     } else if (const auto *pong = std::get_if<protocol::Pong>(&packet.message)) {
         const double sample = static_cast<double>(static_cast<std::uint32_t>(nowMs() - pong->timestampMs));
