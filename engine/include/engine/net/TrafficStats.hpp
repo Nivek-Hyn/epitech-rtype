@@ -14,6 +14,7 @@ struct TrafficTotals {
     std::uint64_t packetsReceived = 0;
     std::uint64_t duplicatesDropped = 0; ///< Received twice: the second copy was ignored.
     std::uint64_t outdatedDropped = 0;   ///< Arrived after a newer packet that made it useless, or far too late.
+    std::uint64_t retransmissions = 0;   ///< Reliable messages sent again because no acknowledgement came.
 };
 
 /// @brief Bandwidth measured between two samples, in bytes per second.
@@ -45,12 +46,14 @@ public:
 
     void addDuplicate() { _duplicatesDropped.fetch_add(1, std::memory_order_relaxed); }
     void addOutdated() { _outdatedDropped.fetch_add(1, std::memory_order_relaxed); }
+    void addRetransmissions(std::size_t count) { _retransmissions.fetch_add(count, std::memory_order_relaxed); }
 
     TrafficTotals totals() const
     {
         return {_bytesSent.load(std::memory_order_relaxed),        _bytesReceived.load(std::memory_order_relaxed),
                 _packetsSent.load(std::memory_order_relaxed),      _packetsReceived.load(std::memory_order_relaxed),
-                _duplicatesDropped.load(std::memory_order_relaxed), _outdatedDropped.load(std::memory_order_relaxed)};
+                _duplicatesDropped.load(std::memory_order_relaxed), _outdatedDropped.load(std::memory_order_relaxed),
+                _retransmissions.load(std::memory_order_relaxed)};
     }
 
     void reset()
@@ -61,6 +64,7 @@ public:
         _packetsReceived = 0;
         _duplicatesDropped = 0;
         _outdatedDropped = 0;
+        _retransmissions = 0;
     }
 
 private:
@@ -70,6 +74,7 @@ private:
     std::atomic<std::uint64_t> _packetsReceived{0};
     std::atomic<std::uint64_t> _duplicatesDropped{0};
     std::atomic<std::uint64_t> _outdatedDropped{0};
+    std::atomic<std::uint64_t> _retransmissions{0};
 };
 
 /// @brief Turns successive totals into a bandwidth.

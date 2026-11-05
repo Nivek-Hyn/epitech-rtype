@@ -47,6 +47,10 @@ public:
     // Thread-safe.
     virtual void send(const protocol::Message &message) = 0;
 
+    // Thread-safe. For a message that must arrive: it is numbered, acknowledged by the server and sent again until
+    // it is. disconnect() uses it for Disconnect and waits (briefly) for the acknowledgement.
+    virtual void sendReliable(const protocol::Message &message) = 0;
+
     // Thread-safe. Bandwidth, latency and loss since connect().
     virtual NetworkStats stats() const = 0;
 };

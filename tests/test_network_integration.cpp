@@ -179,6 +179,14 @@ std::vector<std::uint8_t> drainInputs(rtype::server::AsioNetworkServer &server)
     return inputs;
 }
 
+bool waitUntilClientCount(const rtype::server::AsioNetworkServer &server, std::size_t count)
+{
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+    while (server.clientCount() != count && std::chrono::steady_clock::now() < deadline)
+        std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    return server.clientCount() == count;
+}
+
 Udp::socket connectedClient(asio::io_context &io, std::uint16_t serverPort, std::uint32_t firstSequence)
 {
     Udp::socket socket(io, Udp::endpoint(Udp::v4(), 0));
@@ -278,4 +286,141 @@ TEST(NetworkIntegration, AClientThatConnectsAgainStartsANewSequence)
 
     EXPECT_EQ(drainInputs(server),
               (std::vector<std::uint8_t>{rtype::protocol::InputFlag::Up, rtype::protocol::InputFlag::Down}));
+}
+
+namespace {
+
+// Reads datagrams until `limit` has passed, or `count` of them were collected.
+std::vector<rtype::protocol::Packet> collectPackets(Udp::socket &socket, std::chrono::milliseconds limit,
+                                                    std::size_t count = 100)
+{
+    std::vector<rtype::protocol::Packet> packets;
+    std::array<std::uint8_t, rtype::protocol::MaxPacketSize> buffer{};
+    const auto deadline = std::chrono::steady_clock::now() + limit;
+    Udp::endpoint sender;
+    while (std::chrono::steady_clock::now() < deadline && packets.size() < count) {
+        asio::error_code error;
+        const std::size_t size = socket.receive_from(asio::buffer(buffer), sender, 0, error);
+        if (error) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(2));
+            continue;
+        }
+        if (const auto packet = rtype::protocol::decode(std::span(buffer).first(size)))
+            packets.push_back(*packet);
+    }
+    return packets;
+}
+
+void sendAck(Udp::socket &socket, std::uint16_t serverPort, std::uint32_t sequence, std::uint32_t reliableId)
+{
+    sendFrom(socket, serverPort, sequence, rtype::protocol::Ack{reliableId});
+}
+
+} // namespace
+
+TEST(NetworkIntegration, RepeatsAReliableMessageUntilItIsAcknowledged)
+{
+    rtype::server::AsioNetworkServer server;
+    const std::uint16_t serverPort = findAvailablePort();
+    server.start(serverPort);
+
+    asio::io_context io;
+    Udp::socket client = connectedClient(io, serverPort, 1);
+    server.broadcastReliable(rtype::protocol::EntityDestroyed{42, rtype::protocol::DestroyReason::Killed});
+
+    // The client stays silent: the same message comes again, in a new packet.
+    const auto copies = collectPackets(client, std::chrono::milliseconds(700));
+    ASSERT_GE(copies.size(), 2u);
+    for (const auto &copy : copies) {
+        ASSERT_TRUE(copy.reliableId);
+        EXPECT_EQ(*copy.reliableId, *copies[0].reliableId);
+        const auto *destroyed = std::get_if<rtype::protocol::EntityDestroyed>(&copy.message);
+        ASSERT_NE(destroyed, nullptr);
+        EXPECT_EQ(destroyed->netId, 42u);
+    }
+    EXPECT_NE(copies[1].sequence, copies[0].sequence) << "each copy is a packet of its own";
+    EXPECT_GE(server.traffic().totals.retransmissions, 1u);
+
+    // Once acknowledged, it is not sent again.
+    sendAck(client, serverPort, 2, *copies[0].reliableId);
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    collectPackets(client, std::chrono::milliseconds(20)); // copies already on their way
+    EXPECT_TRUE(collectPackets(client, std::chrono::milliseconds(700)).empty());
+}
+
+TEST(NetworkIntegration, AcknowledgesAReliableDisconnectEvenWhenItIsRepeated)
+{
+    rtype::server::AsioNetworkServer server;
+    const std::uint16_t serverPort = findAvailablePort();
+    server.start(serverPort);
+
+    asio::io_context io;
+    Udp::socket client = connectedClient(io, serverPort, 1);
+    ASSERT_TRUE(waitUntilClientCount(server, 1));
+
+    const rtype::protocol::Packet disconnect{2, rtype::protocol::Disconnect{}, 0u};
+    client.send_to(asio::buffer(rtype::protocol::encode(disconnect)),
+                   Udp::endpoint(asio::ip::address_v4::loopback(), serverPort));
+    auto answers = collectPackets(client, std::chrono::milliseconds(1000), 1);
+    ASSERT_EQ(answers.size(), 1u);
+    const auto *ack = std::get_if<rtype::protocol::Ack>(&answers[0].message);
+    ASSERT_NE(ack, nullptr);
+    EXPECT_EQ(ack->reliableId, 0u);
+    EXPECT_TRUE(waitUntilClientCount(server, 0));
+
+    // The Ack was lost: the client repeats its Disconnect. The server forgot it, but must still answer.
+    client.send_to(asio::buffer(rtype::protocol::encode({3, rtype::protocol::Disconnect{}, 0u})),
+                   Udp::endpoint(asio::ip::address_v4::loopback(), serverPort));
+    answers = collectPackets(client, std::chrono::milliseconds(1000), 1);
+    ASSERT_EQ(answers.size(), 1u);
+    EXPECT_TRUE(std::holds_alternative<rtype::protocol::Ack>(answers[0].message));
+}
+
+TEST(NetworkIntegration, TellsTheOtherClientsReliablyThatAPlayerLeft)
+{
+    rtype::server::AsioNetworkServer server;
+    const std::uint16_t serverPort = findAvailablePort();
+    server.start(serverPort);
+
+    asio::io_context io;
+    Udp::socket leaving = connectedClient(io, serverPort, 1);
+    Udp::socket staying = connectedClient(io, serverPort, 1);
+    sendFrom(leaving, serverPort, 2, rtype::protocol::Disconnect{});
+
+    const auto notices = collectPackets(staying, std::chrono::milliseconds(700));
+    ASSERT_GE(notices.size(), 2u) << "PlayerLeft must be repeated until acknowledged";
+    for (const auto &notice : notices) {
+        ASSERT_TRUE(notice.reliableId);
+        const auto *left = std::get_if<rtype::protocol::PlayerLeft>(&notice.message);
+        ASSERT_NE(left, nullptr);
+        EXPECT_EQ(left->playerId, 0);
+    }
+    sendAck(staying, serverPort, 2, *notices[0].reliableId);
+    collectPackets(staying, std::chrono::milliseconds(100));
+    EXPECT_TRUE(collectPackets(staying, std::chrono::milliseconds(700)).empty());
+}
+
+TEST(NetworkIntegration, TheGameSeesAReliableInputOnlyOnce)
+{
+    rtype::server::AsioNetworkServer server;
+    const std::uint16_t serverPort = findAvailablePort();
+    server.start(serverPort);
+
+    asio::io_context io;
+    Udp::socket client = connectedClient(io, serverPort, 1);
+    const auto send = [&](std::uint32_t sequence) {
+        client.send_to(asio::buffer(rtype::protocol::encode(
+                           {sequence, rtype::protocol::Input{rtype::protocol::InputFlag::Up}, 7u})),
+                       Udp::endpoint(asio::ip::address_v4::loopback(), serverPort));
+    };
+    send(2);
+    send(3); // the same reliable message again, as the server's Ack never came
+    waitForDatagrams(server, 3);
+
+    EXPECT_EQ(drainInputs(server), (std::vector<std::uint8_t>{rtype::protocol::InputFlag::Up}));
+    const auto acks = collectPackets(client, std::chrono::milliseconds(200));
+    int ackCount = 0;
+    for (const auto &packet : acks)
+        ackCount += std::holds_alternative<rtype::protocol::Ack>(packet.message);
+    EXPECT_EQ(ackCount, 2) << "every copy is acknowledged, in case the previous Ack was lost";
 }

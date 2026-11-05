@@ -1,4 +1,4 @@
-# R-Type Network Protocol — version 1
+# R-Type Network Protocol — version 2
 
 This document describes every message exchanged between `r-type_client` and `r-type_server`.
 It should be enough to write a new client. The reference implementation is `common/src/Protocol.cpp`. This is
@@ -15,8 +15,8 @@ the protocol specification; runtime gaps are listed in the [networking implement
 | Offset | Size | Field | Description |
 |---|---|---|---|
 | 0 | u16 | magic | Always `0x5254` ("RT") |
-| 2 | u8 | version | Protocol version, currently `1` |
-| 3 | u8 | type | Message type (see §4) |
+| 2 | u8 | version | Protocol version, currently `2` |
+| 3 | u8 | type | Message type (see §4); bit `0x40` set means a reliable message (§3.2) |
 | 4 | u32 | sequence | Number of the packet for this peer, see §3.1 |
 | 8 | u16 | payload_size | Number of bytes after the header |
 
@@ -55,6 +55,34 @@ its packets from `0` again. Ignored packets are counted (`duplicatesDropped`, `o
 session. A client **must** increment its number for every packet: a client that always sends the same number has all
 its packets after the first treated as duplicates.
 
+### 3.2 Reliable messages
+
+UDP may lose a datagram. A message that must arrive (a player left, an entity died, the client disconnects) is sent
+as a **reliable** message; everything else (`Input`, `Snapshot`, `Ping`...) is sent without any guarantee, because
+a newer one soon replaces it.
+
+- **Sending.** The sender gives the message a **reliable number**: a `u32` counter per peer, starting at `0` and
+  going up by `1` for each reliable message. It sets bit `0x40` of the `type` byte and puts the number in the first
+  4 bytes of the payload, before the usual payload of the type (`payload_size` counts them). Example:
+  `EntityDestroyed` (type `0x84`) is sent with `type = 0xC4` and a 9-byte payload (number, `net_id`, `reason`).
+- **Acknowledging.** The receiver answers every reliable packet with an `Ack` (type `0x05`, payload: the `u32`
+  reliable number). An `Ack` is never itself reliable, and a packet with `type = 0x45` is invalid.
+- **Repeating.** Until the `Ack` arrives, the sender sends the same message again, **in a new packet** with the next
+  sequence number. The wait before the first repeat is 200 ms, then it follows the measured round-trip time (the
+  smoothed time between a first send and its `Ack`, plus a margin, between 50 ms and 1 s), and it doubles after
+  each unanswered repeat (up to 8 times that, and never above 1 s). After 12 sends the sender gives up.
+- **Receiving.** A receiver remembers the last 32 reliable numbers of each peer, as for sequence numbers (§3.1).
+  A message whose number is new is handled; one it already handled is **not handled again**, but it is
+  acknowledged again, because the previous `Ack` may be the datagram that was lost. Reliable messages are not
+  ordered: two of them can be handled in the other order than they were sent.
+- **Limit.** A sender has at most 32 reliable messages in flight, counted from the oldest one not yet
+  acknowledged; the next ones wait. This is what lets the receiver tell a repeat from a new message.
+- **New session.** `Connect` restarts the reliable numbers of both sides, like the sequence numbers (§3.1).
+
+The messages sent reliably are `EntityDestroyed` and `PlayerLeft` (server to client) and `Disconnect` (client to
+server). A server that receives a repeated reliable packet from an address it no longer knows (a client that was
+removed after its `Disconnect`) still answers `Ack`, so that the sender stops repeating it.
+
 ## 4. Messages
 
 ### 4.1 Client → server
@@ -63,7 +91,8 @@ its packets after the first treated as duplicates.
 |---|---|---|---|
 | `0x01` | Connect | — | Ask to join. Resent every 500 ms until ConnectAccepted or ConnectRejected. |
 | `0x02` | Input | `u8 flags` | Keys currently held. Sent every client tick (60/s); also acts as keep-alive. |
-| `0x03` | Disconnect | — | The client leaves. |
+| `0x03` | Disconnect | — | The client leaves. Sent reliably: the client waits up to 500 ms for the `Ack`. |
+| `0x05` | Ack | `u32 reliable_number` | Confirms a reliable message. Sent by either side, never reliable (§3.2). |
 | `0x04` | Ping | `u32 timestamp_ms` | Latency measurement; the server answers with Pong. The client sends one every second while connected, which also keeps the session alive. |
 
 Input flags: `0x01` up, `0x02` down, `0x04` left, `0x08` right, `0x10` shoot.
@@ -75,8 +104,8 @@ Input flags: `0x01` up, `0x02` down, `0x04` left, `0x08` right, `0x10` shoot.
 | `0x81` | ConnectAccepted | `u8 player_id` | `player_id` in 0–3. |
 | `0x82` | ConnectRejected | `u8 reason` | `1` server full, `2` version mismatch. |
 | `0x83` | Snapshot | see below | Game state, score and entities at a server tick. |
-| `0x84` | EntityDestroyed | `u32 net_id`, `u8 reason` | `1` killed, `2` out of bounds. |
-| `0x85` | PlayerLeft | `u8 player_id`, `u8 reason` | `1` disconnected, `2` timed out. |
+| `0x84` | EntityDestroyed | `u32 net_id`, `u8 reason` | `1` killed, `2` out of bounds. Sent reliably. |
+| `0x85` | PlayerLeft | `u8 player_id`, `u8 reason` | `1` disconnected, `2` timed out. Sent reliably. |
 | `0x86` | Pong | `u32 timestamp_ms` | Same value as the Ping. |
 
 #### Snapshot payload
@@ -119,6 +148,6 @@ Since a snapshot is sent every tick, this information cannot be lost.
 
 The protocol defines the intended wire format and message set. The current runtime does not yet implement every
 specified behavior: it does not reject a version mismatch with `ConnectRejected` (a datagram with another
-version is silently dropped), and message delivery is not guaranteed: only duplicates and reordering are
-detected, lost packets are not retransmitted. See the
+version is silently dropped), and it sends reliably only the three messages listed in §3.2: `Connect` is
+repeated by the client until it gets an answer, which is a separate mechanism. See the
 [networking implementation guide](networking.md) for the current behavior and limitations.

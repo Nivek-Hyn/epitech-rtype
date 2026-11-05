@@ -5,9 +5,11 @@
 #include <asio.hpp>
 #include <gtest/gtest.h>
 
+#include <array>
 #include <chrono>
 #include <cstdint>
 #include <functional>
+#include <optional>
 #include <thread>
 #include <vector>
 
@@ -233,4 +235,142 @@ TEST(NetworkClient, IgnoresDuplicatedAndStaleServerPackets)
     EXPECT_EQ(destroyed, 1);
     EXPECT_EQ(client.stats().traffic.totals.duplicatesDropped, 1u);
     EXPECT_EQ(client.stats().traffic.totals.outdatedDropped, 1u);
+}
+
+namespace {
+
+// A server we control: it answers the client's Connect with ConnectAccepted, then lets the test decide the rest.
+struct FakeServer {
+    asio::io_context io;
+    std::uint16_t port = findAvailablePort();
+    Udp::socket socket{io, Udp::endpoint(Udp::v4(), port)};
+    Udp::endpoint client;
+    std::uint32_t nextSequence = 0;
+
+    FakeServer() { socket.non_blocking(true); }
+
+    // Packets received within `limit` (or until `count` of them arrived), decoded.
+    std::vector<rtype::protocol::Packet> receive(std::chrono::milliseconds limit, std::size_t count = 1000)
+    {
+        std::vector<rtype::protocol::Packet> packets;
+        std::array<std::uint8_t, rtype::protocol::MaxPacketSize> buffer{};
+        const auto deadline = std::chrono::steady_clock::now() + limit;
+        while (std::chrono::steady_clock::now() < deadline && packets.size() < count) {
+            asio::error_code error;
+            const std::size_t size = socket.receive_from(asio::buffer(buffer), client, 0, error);
+            if (error) {
+                std::this_thread::sleep_for(2ms);
+                continue;
+            }
+            if (const auto packet = rtype::protocol::decode(std::span(buffer).first(size)))
+                packets.push_back(*packet);
+        }
+        return packets;
+    }
+
+    void send(const rtype::protocol::Message &message, std::optional<std::uint32_t> reliableId = std::nullopt)
+    {
+        socket.send_to(asio::buffer(rtype::protocol::encode({nextSequence++, message, reliableId})), client);
+    }
+
+    // Waits for the client's first datagram (its Connect), then accepts it.
+    bool accept()
+    {
+        if (receive(1000ms, 1).empty())
+            return false;
+        send(rtype::protocol::ConnectAccepted{0});
+        return true;
+    }
+};
+
+int countAcks(const std::vector<rtype::protocol::Packet> &packets, std::uint32_t reliableId)
+{
+    int count = 0;
+    for (const auto &packet : packets) {
+        if (const auto *ack = std::get_if<rtype::protocol::Ack>(&packet.message))
+            count += ack->reliableId == reliableId;
+    }
+    return count;
+}
+
+} // namespace
+
+TEST(NetworkClient, AcknowledgesReliableMessagesAndHandsThemToTheGameOnce)
+{
+    FakeServer server;
+    AsioNetworkClient client;
+    client.setOptions(fastOptions());
+    client.connect("127.0.0.1", server.port);
+    ASSERT_TRUE(server.accept());
+
+    const rtype::protocol::Message destroyed = rtype::protocol::EntityDestroyed{7, rtype::protocol::DestroyReason::Killed};
+    server.send(destroyed, 4u);
+    server.send(destroyed, 4u); // the server sent it again because it never saw our Ack
+
+    const auto answers = server.receive(400ms);
+    EXPECT_EQ(countAcks(answers, 4), 2) << "a copy must be acknowledged too: the first Ack may have been lost";
+
+    int delivered = 0;
+    while (const auto message = client.poll()) {
+        if (const auto *event = std::get_if<rtype::protocol::EntityDestroyed>(&*message)) {
+            ++delivered;
+            EXPECT_EQ(event->netId, 7u);
+        }
+        EXPECT_FALSE(std::holds_alternative<rtype::protocol::Ack>(*message)) << "Ack is internal to the transport";
+    }
+    EXPECT_EQ(delivered, 1);
+}
+
+TEST(NetworkClient, DisconnectWaitsForTheServerToAcknowledgeIt)
+{
+    FakeServer server;
+    AsioNetworkClient client;
+    auto options = fastOptions();
+    options.closeTimeout = 3000ms;
+    client.setOptions(options);
+    client.connect("127.0.0.1", server.port);
+    ASSERT_TRUE(server.accept());
+    ASSERT_TRUE(waitUntil([&] { return client.connected(); }));
+
+    const auto started = std::chrono::steady_clock::now();
+    std::thread closing([&] { client.disconnect(); });
+    bool sawDisconnect = false;
+    const auto deadline = started + 2s;
+    while (!sawDisconnect && std::chrono::steady_clock::now() < deadline) {
+        for (const auto &packet : server.receive(20ms)) {
+            if (std::holds_alternative<rtype::protocol::Disconnect>(packet.message) && packet.reliableId) {
+                sawDisconnect = true;
+                server.send(rtype::protocol::Ack{*packet.reliableId});
+            }
+        }
+    }
+    closing.join();
+
+    EXPECT_TRUE(sawDisconnect);
+    EXPECT_LT(std::chrono::steady_clock::now() - started, 1500ms) << "it must not wait for the whole close timeout";
+    EXPECT_EQ(client.state(), ConnectionState::Idle);
+}
+
+TEST(NetworkClient, DisconnectRepeatsItselfThenGivesUpWhenNobodyAcknowledges)
+{
+    FakeServer server;
+    AsioNetworkClient client;
+    auto options = fastOptions();
+    options.closeTimeout = 450ms;
+    client.setOptions(options);
+    client.connect("127.0.0.1", server.port);
+    ASSERT_TRUE(server.accept());
+    ASSERT_TRUE(waitUntil([&] { return client.connected(); }));
+
+    const auto started = std::chrono::steady_clock::now();
+    std::thread closing([&] { client.disconnect(); });
+    int disconnects = 0;
+    while (std::chrono::steady_clock::now() < started + 800ms) {
+        for (const auto &packet : server.receive(20ms))
+            disconnects += std::holds_alternative<rtype::protocol::Disconnect>(packet.message) && packet.reliableId;
+    }
+    closing.join();
+
+    EXPECT_GE(disconnects, 2) << "the Disconnect is sent again while no Ack comes";
+    EXPECT_EQ(client.state(), ConnectionState::Idle);
 }

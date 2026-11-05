@@ -9,7 +9,7 @@
 
 namespace rtype::server {
 
-AsioNetworkServer::AsioNetworkServer() : _socket(_io), _timeoutTimer(_io) {}
+AsioNetworkServer::AsioNetworkServer() : _socket(_io), _timeoutTimer(_io), _reliableTimer(_io) {}
 
 AsioNetworkServer::~AsioNetworkServer()
 {
@@ -30,6 +30,7 @@ void AsioNetworkServer::start(std::uint16_t port)
     _socket.bind(Udp::endpoint(Udp::v4(), port));
     receive();
     scheduleTimeoutCheck();
+    scheduleReliableTick();
     _thread = std::thread([this] { runIo(); });
 }
 
@@ -56,6 +57,7 @@ void AsioNetworkServer::stop()
     _io.stop();
     _thread.join();
     _timeoutTimer.cancel();
+    _reliableTimer.cancel();
     asio::error_code error;
     _socket.close(error);
 }
@@ -68,6 +70,19 @@ std::optional<NetworkEvent> AsioNetworkServer::poll()
 void AsioNetworkServer::send(PlayerId player, const protocol::Message &message)
 {
     asio::post(_io, [this, player, message] { sendToPlayer(player, message); });
+}
+
+void AsioNetworkServer::sendReliable(PlayerId player, const protocol::Message &message)
+{
+    asio::post(_io, [this, player, message] { sendReliableToPlayer(player, message); });
+}
+
+void AsioNetworkServer::broadcastReliable(const protocol::Message &message)
+{
+    asio::post(_io, [this, message] {
+        for (PlayerId player = 0; player < MaxPlayers; ++player)
+            sendReliableToPlayer(player, message);
+    });
 }
 
 void AsioNetworkServer::broadcast(const protocol::Message &message)
@@ -114,12 +129,17 @@ void AsioNetworkServer::handleDatagram(std::size_t size)
             _clients[*player].lastSeen = Clock::now();
             _clients[*player].incoming.reset();
             _clients[*player].incoming.receive(packet->sequence);
+            _clients[*player].incomingReliable.reset();
+            _clients[*player].reliable = engine::net::ReliableQueue<protocol::Message>{}; // events of the old session
             sendToPlayer(*player, protocol::ConnectAccepted{*player});
             return;
         }
         for (PlayerId candidate = 0; candidate < MaxPlayers; ++candidate) {
             if (!_clients[candidate].active) {
-                _clients[candidate] = Client{true, _sender, Clock::now(), 0, engine::net::SequenceWindow{}};
+                _clients[candidate] = Client{};
+                _clients[candidate].active = true;
+                _clients[candidate].endpoint = _sender;
+                _clients[candidate].lastSeen = Clock::now();
                 _clients[candidate].incoming.receive(packet->sequence);
                 ++_clientCount;
                 _events.push(PlayerJoined{candidate});
@@ -131,8 +151,12 @@ void AsioNetworkServer::handleDatagram(std::size_t size)
         return;
     }
 
-    if (!player)
+    if (!player) {
+        // The sender may have been removed after its Disconnect and keep repeating it: tell it to stop.
+        if (packet->reliableId)
+            sendTo(_sender, _nextSequence.fetch_add(1), protocol::Ack{*packet->reliableId});
         return;
+    }
     Client &client = _clients[*player];
 
     // A copy of a packet already handled, or one far too old, must not act twice (a stale Disconnect or Ping would).
@@ -146,6 +170,21 @@ void AsioNetworkServer::handleDatagram(std::size_t size)
         return;
     }
     client.lastSeen = Clock::now();
+
+    if (const auto *ack = std::get_if<protocol::Ack>(&packet->message)) {
+        client.reliable.acknowledge(ack->reliableId, Clock::now());
+        return;
+    }
+    if (packet->reliableId) {
+        // Always answer, even to a copy: the previous Ack may be the datagram that was lost.
+        sendTo(client.endpoint, client.nextSequence++, protocol::Ack{*packet->reliableId});
+        const auto reliableVerdict = client.incomingReliable.receive(*packet->reliableId);
+        if (reliableVerdict == engine::net::SequenceVerdict::Duplicate ||
+            reliableVerdict == engine::net::SequenceVerdict::TooOld) {
+            _traffic.addDuplicate();
+            return;
+        }
+    }
 
     if (const auto *input = std::get_if<protocol::Input>(&packet->message)) {
         // An Input states which keys are held now: one that arrives after a newer one is already obsolete.
@@ -176,6 +215,38 @@ void AsioNetworkServer::scheduleTimeoutCheck()
     });
 }
 
+void AsioNetworkServer::scheduleReliableTick()
+{
+    _reliableTimer.expires_after(std::chrono::milliseconds(50));
+    _reliableTimer.async_wait([this](const asio::error_code &error) {
+        if (error)
+            return;
+        for (PlayerId player = 0; player < MaxPlayers; ++player)
+            resendReliable(player);
+        scheduleReliableTick();
+    });
+}
+
+void AsioNetworkServer::sendReliableToPlayer(PlayerId player, protocol::Message message)
+{
+    if (player >= MaxPlayers || !_clients[player].active)
+        return;
+    _clients[player].reliable.push(std::move(message));
+    resendReliable(player); // sends it right away; later copies come from the timer
+}
+
+void AsioNetworkServer::resendReliable(PlayerId player)
+{
+    Client &client = _clients[player];
+    if (!client.active)
+        return;
+    const auto retransmissions = client.reliable.resendDue(
+        Clock::now(), [this, &client](std::uint32_t id, const protocol::Message &message) {
+            sendTo(client.endpoint, client.nextSequence++, message, id);
+        });
+    _traffic.addRetransmissions(retransmissions);
+}
+
 void AsioNetworkServer::updateRates()
 {
     const auto rates = _rateMeter.sample(
@@ -184,9 +255,11 @@ void AsioNetworkServer::updateRates()
     _receivedRate = rates.receivedBytesPerSecond;
 }
 
-void AsioNetworkServer::sendTo(const Udp::endpoint &endpoint, std::uint32_t sequence, protocol::Message message)
+void AsioNetworkServer::sendTo(const Udp::endpoint &endpoint, std::uint32_t sequence, protocol::Message message,
+                               std::optional<std::uint32_t> reliableId)
 {
-    auto bytes = std::make_shared<std::vector<std::uint8_t>>(protocol::encode({sequence, std::move(message)}));
+    auto bytes =
+        std::make_shared<std::vector<std::uint8_t>>(protocol::encode({sequence, std::move(message), reliableId}));
     _traffic.addSent(bytes->size());
     _socket.async_send_to(asio::buffer(*bytes), endpoint, [bytes](const asio::error_code &, std::size_t) {});
 }
@@ -219,10 +292,11 @@ void AsioNetworkServer::removeClient(PlayerId player, protocol::LeaveReason reas
     if (player >= MaxPlayers || !_clients[player].active)
         return;
     _clients[player].active = false;
+    _clients[player].reliable = engine::net::ReliableQueue<protocol::Message>{};
     --_clientCount;
     _events.push(PlayerDisconnected{player, reason});
     for (PlayerId other = 0; other < MaxPlayers; ++other)
-        sendToPlayer(other, protocol::PlayerLeft{player, reason});
+        sendReliableToPlayer(other, protocol::PlayerLeft{player, reason});
 }
 
 } // namespace rtype::server

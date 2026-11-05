@@ -33,12 +33,13 @@ void printTraffic(const rtype::server::AsioNetworkServer &network)
     const double sentKb = stats.rates.sentBytesPerSecond / 1024.0;
     const double receivedKb = stats.rates.receivedBytesPerSecond / 1024.0;
     std::printf("[net] %zu client(s) | out %.1f KB/s (%.1f per client) | in %.1f KB/s | total out %.1f KB, in %.1f KB"
-                " | dropped: %llu duplicate, %llu outdated\n",
+                " | dropped: %llu duplicate, %llu outdated | resent: %llu\n",
                 clients, sentKb, clients > 0 ? sentKb / static_cast<double>(clients) : 0.0, receivedKb,
                 static_cast<double>(stats.totals.bytesSent) / 1024.0,
                 static_cast<double>(stats.totals.bytesReceived) / 1024.0,
                 static_cast<unsigned long long>(stats.totals.duplicatesDropped),
-                static_cast<unsigned long long>(stats.totals.outdatedDropped));
+                static_cast<unsigned long long>(stats.totals.outdatedDropped),
+                static_cast<unsigned long long>(stats.totals.retransmissions));
     std::fflush(stdout);
 }
 
@@ -140,7 +141,7 @@ int main(int argc, char **argv)
             game.update(clock.step());
             network.broadcast(game.snapshot());
             for (const auto &message : game.takeEvents())
-                network.broadcast(message);
+                network.broadcastReliable(message);
         }
         std::this_thread::sleep_for(clock.untilNextTick());
     }

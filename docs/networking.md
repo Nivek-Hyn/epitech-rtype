@@ -181,15 +181,14 @@ server-owned player positions.
 
 ## 8. Current limitations
 
-- UDP does not guarantee delivery or ordering. Snapshots are sent repeatedly, but one-off events are not
-  acknowledged or retransmitted.
+- UDP does not guarantee delivery or ordering. Snapshots are sent repeatedly; the one-off messages that matter
+  (`EntityDestroyed`, `PlayerLeft`, `Disconnect`) are reliable, see section 10.
 - Both sides number their packets per peer and ignore duplicated, out-of-order (`Input` and `Snapshot` only) and
-  too old packets with an `engine::net::SequenceWindow` of 32 numbers; see [protocol.md](protocol.md) §3.1. This
-  detects a loss but does not repair it: nothing is retransmitted yet.
+  too old packets with an `engine::net::SequenceWindow` of 32 numbers; see [protocol.md](protocol.md) §3.1.
 - Clients display the newest snapshot directly; interpolation, prediction, and reconciliation are not
   implemented.
 - When a player leaves or times out, the server broadcasts `EntityDestroyed` for its ship and sends `PlayerLeft`
-  to the remaining clients. Neither message is acknowledged or retransmitted.
+  to the remaining clients, both reliably. Reliable messages are not ordered between themselves.
 - The protocol limit is 84 entities per snapshot. The server splits larger snapshots into several packets with
   the same tick, and the client merges them with `SnapshotAssembler`, ignoring older ticks and duplicates. If a
   packet of a tick is lost, that tick is displayed incomplete until the next one.
@@ -422,16 +421,15 @@ des joueurs calculées par le serveur.
 
 ## 8. Limites actuelles
 
-- UDP ne garantit ni la livraison ni l’ordre des paquets. Les snapshots sont renvoyés régulièrement, mais les
-  événements isolés ne sont ni acquittés ni retransmis.
+- UDP ne garantit ni la livraison ni l’ordre des paquets. Les snapshots sont renvoyés régulièrement ; les messages
+  ponctuels qui comptent (`EntityDestroyed`, `PlayerLeft`, `Disconnect`) sont fiables, voir la section 10.
 - Chaque côté numérote ses paquets par interlocuteur et ignore les paquets dupliqués, arrivés dans le désordre
   (`Input` et `Snapshot` seulement) ou trop anciens, grâce à une `engine::net::SequenceWindow` de 32 numéros ;
-  voir [protocol.md](protocol.md) §3.1. Cela détecte une perte mais ne la répare pas : rien n’est encore
-  retransmis.
+  voir [protocol.md](protocol.md) §3.1.
 - Les clients affichent directement le snapshot le plus récent ; l’interpolation, la prédiction et la
   réconciliation ne sont pas implémentées.
 - Lorsqu’un joueur part ou expire, le serveur diffuse `EntityDestroyed` pour son vaisseau et envoie `PlayerLeft`
-  aux clients restants. Aucun de ces messages n’est acquitté ni retransmis.
+  aux clients restants, tous deux de façon fiable. Les messages fiables ne sont pas ordonnés entre eux.
 - Un snapshot est limité à 84 entités. Le serveur découpe les snapshots plus grands en plusieurs paquets de même
   tick, et le client les fusionne avec `SnapshotAssembler` en ignorant les ticks plus anciens et les doublons. Si
   un paquet d’un tick est perdu, ce tick s’affiche incomplet jusqu’au suivant.
@@ -492,3 +490,41 @@ plus récent ; la partie s’est déroulée normalement.
 
 Ces valeurs servent de référence pour les améliorations prévues (acquittements, snapshots différentiels,
 interpolation) : il faudra mesurer à nouveau après chacune.
+
+## 10. Messages fiables
+
+La plus grande partie du trafic n’est volontairement **pas** fiable : un `Input` ou un `Snapshot` est remplacé 16 ms
+plus tard, le renvoyer gaspillerait de la bande passante. Quelques messages ne peuvent pas être remplacés, ils sont
+donc envoyés de façon fiable : `EntityDestroyed`, `PlayerLeft` (serveur vers client) et `Disconnect` (client vers
+serveur).
+
+Fonctionnement (le détail des octets est dans [protocol.md](protocol.md) §3.2) :
+
+1. L’émetteur numérote le message et le garde dans une `engine::net::ReliableQueue` propre à cet interlocuteur.
+2. Le récepteur répond par un petit `Ack` portant le numéro, pour la première copie et pour chaque répétition.
+3. Tant que l’`Ack` n’est pas arrivé, un timer (toutes les 50 ms) renvoie le message. Le délai s’adapte au temps
+   d’aller-retour mesuré et double à chaque répétition ; après 12 envois le message est abandonné, l’interlocuteur est
+   sans doute parti.
+4. Un message déjà traité ne l’est pas deux fois : le récepteur retient les 32 derniers numéros.
+
+Où cela se trouve : `ReliableQueue.hpp` (moteur, sans socket, testé avec une horloge simulée), `AsioNetworkServer`
+(une file par client, `sendReliable`/`broadcastReliable`) et `AsioNetworkClient` (`sendReliable`). La boucle du
+serveur envoie les événements du jeu avec `broadcastReliable`. Quand le joueur ferme la fenêtre, `disconnect()`
+envoie un `Disconnect` fiable et attend jusqu’à 500 ms l’`Ack`, si bien que le serveur retire le vaisseau tout de
+suite et pas après son délai de 5 secondes. `--stats` et F3 affichent le nombre de messages **renvoyés**.
+
+### Exemple de mesure
+
+Le même client scripté que dans la section 9 a maintenu le tir 10 secondes, puis a continué d’acquitter 6 secondes
+sans tirer. Chaque `EntityDestroyed` du serveur est un message fiable ; le tableau compte les numéros fiables reçus
+par le client, par rapport au plus haut numéro vu.
+
+| Réseau | Messages fiables reçus | Manquants à la fin | Répétitions ignorées par le client | Renvoyés par le serveur |
+|---|---|---|---|---|
+| Sain | 39 sur 39 | 0 | 0 | 0 |
+| 30 % de perte dans chaque sens, 40 ms de délai, 20 ms de gigue (graine 5) | 48 sur 48 | 0 | 22 | 54 |
+| 30 % de perte dans chaque sens (graine 9) | 50 sur 50 | 0 | 19 | 43 |
+| 50 % de perte dans chaque sens (graine 2) | 47 sur 48 | 1 | 45 | 120 |
+
+À 50 % de perte, un message était encore en route à la fin de l’essai : comme le délai double à chaque répétition,
+un message met plusieurs secondes à passer à ce taux de perte. Ce sont des essais uniques, pas un benchmark.

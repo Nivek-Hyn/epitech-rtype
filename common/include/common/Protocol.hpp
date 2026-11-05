@@ -1,6 +1,6 @@
 #pragma once
 
-// Binary protocol v1 between r-type_client and r-type_server, over UDP.
+// Binary protocol v2 between r-type_client and r-type_server, over UDP.
 // The reference description is docs/protocol.md: keep both in sync, and bump Version on any breaking change.
 
 #include <cstddef>
@@ -13,7 +13,7 @@
 namespace rtype::protocol {
 
 inline constexpr std::uint16_t Magic = 0x5254; // "RT"
-inline constexpr std::uint8_t Version = 1;
+inline constexpr std::uint8_t Version = 2;
 inline constexpr std::size_t HeaderSize = 10;
 // Stay under the usual Internet MTU so datagrams are never fragmented.
 inline constexpr std::size_t MaxPacketSize = 1200;
@@ -24,6 +24,7 @@ enum class MessageType : std::uint8_t {
     Input = 0x02,
     Disconnect = 0x03,
     Ping = 0x04,
+    Ack = 0x05, // both directions: the receiver of a reliable message sends it back
     // server -> client
     ConnectAccepted = 0x81,
     ConnectRejected = 0x82,
@@ -32,6 +33,10 @@ enum class MessageType : std::uint8_t {
     PlayerLeft = 0x85,
     Pong = 0x86,
 };
+
+// Set in the type byte of a packet that must be delivered: its payload then starts with a u32 reliable number, and the
+// receiver answers with an Ack carrying that number (the sender repeats the packet until it gets it).
+inline constexpr std::uint8_t ReliableFlag = 0x40;
 
 enum class EntityType : std::uint8_t {
     Player = 1,
@@ -62,6 +67,11 @@ struct Input {
 struct Disconnect {};
 struct Ping {
     std::uint32_t timestampMs = 0;
+};
+
+// Acknowledges the reliable message that had this number. Itself never reliable.
+struct Ack {
+    std::uint32_t reliableId = 0;
 };
 
 // ---- server -> client ----
@@ -105,12 +115,13 @@ struct Pong {
     std::uint32_t timestampMs = 0;
 };
 
-using Message = std::variant<Connect, Input, Disconnect, Ping, ConnectAccepted, ConnectRejected, Snapshot,
+using Message = std::variant<Connect, Input, Disconnect, Ping, Ack, ConnectAccepted, ConnectRejected, Snapshot,
                              EntityDestroyed, PlayerLeft, Pong>;
 
 struct Packet {
-    std::uint32_t sequence = 0; // incremented by the sender for each packet
+    std::uint32_t sequence = 0; // incremented by the sender for each packet it sends to this peer
     Message message;
+    std::optional<std::uint32_t> reliableId; // set for a message the receiver must acknowledge
 };
 
 std::vector<std::uint8_t> encode(const Packet &packet);

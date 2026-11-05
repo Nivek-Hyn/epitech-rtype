@@ -190,3 +190,57 @@ TEST(SnapshotAssembler, ResetAcceptsTicksThatStartAgain)
     EXPECT_TRUE(assembler.add(makeSnapshot(1, 7, 2)));
     EXPECT_EQ(assembler.entities().size(), 2u);
 }
+
+TEST(Protocol, AckRoundTripsAndCarriesTheReliableNumber)
+{
+    const auto packet = decode(encode({3, Ack{0x01020304}}));
+    ASSERT_TRUE(packet);
+    EXPECT_FALSE(packet->reliableId);
+    ASSERT_TRUE(std::holds_alternative<Ack>(packet->message));
+    EXPECT_EQ(std::get<Ack>(packet->message).reliableId, 0x01020304u);
+}
+
+TEST(Protocol, ReliableMessageSetsTheFlagAndPrefixesItsNumber)
+{
+    const auto bytes = encode({9, EntityDestroyed{77, DestroyReason::Killed}, 5u});
+    ASSERT_EQ(bytes.size(), HeaderSize + 4 + 5);
+    EXPECT_EQ(bytes[3], static_cast<std::uint8_t>(MessageType::EntityDestroyed) | ReliableFlag);
+    EXPECT_EQ(bytes[HeaderSize + 3], 5); // the reliable number comes first, big-endian
+
+    const auto packet = decode(bytes);
+    ASSERT_TRUE(packet);
+    ASSERT_TRUE(packet->reliableId);
+    EXPECT_EQ(*packet->reliableId, 5u);
+    const auto &destroyed = std::get<EntityDestroyed>(packet->message);
+    EXPECT_EQ(destroyed.netId, 77u);
+    EXPECT_EQ(destroyed.reason, DestroyReason::Killed);
+}
+
+TEST(Protocol, AnyMessageWithoutPayloadCanBeReliable)
+{
+    const auto packet = decode(encode({1, Disconnect{}, 0u}));
+    ASSERT_TRUE(packet);
+    EXPECT_TRUE(std::holds_alternative<Disconnect>(packet->message));
+    ASSERT_TRUE(packet->reliableId);
+    EXPECT_EQ(*packet->reliableId, 0u);
+}
+
+TEST(Protocol, RejectsAnAckThatClaimsToBeReliable)
+{
+    auto bytes = encode({1, Ack{4}, 2u}); // an Ack is never itself acknowledged
+    EXPECT_FALSE(decode(bytes));
+}
+
+TEST(Protocol, RejectsAReliablePacketTooShortToHoldItsNumber)
+{
+    auto bytes = encode({1, Disconnect{}});
+    bytes[3] |= ReliableFlag; // flag set, but the 4-byte number is missing
+    EXPECT_FALSE(decode(bytes));
+}
+
+TEST(Protocol, RejectsAnotherProtocolVersion)
+{
+    auto bytes = encode({1, Connect{}});
+    bytes[2] = Version - 1;
+    EXPECT_FALSE(decode(bytes));
+}

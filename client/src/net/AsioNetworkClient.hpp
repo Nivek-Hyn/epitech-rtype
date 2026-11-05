@@ -3,6 +3,7 @@
 #include "common/Constants.hpp"
 #include "engine/core/ThreadSafeQueue.hpp"
 #include "engine/net/LossTracker.hpp"
+#include "engine/net/ReliableQueue.hpp"
 #include "engine/net/SequenceWindow.hpp"
 #include "engine/net/TrafficStats.hpp"
 #include "net/INetworkClient.hpp"
@@ -25,6 +26,7 @@ public:
         int maxConnectAttempts = rtype::MaxConnectAttempts;
         std::chrono::milliseconds serverTimeout = std::chrono::duration_cast<std::chrono::milliseconds>(rtype::ClientTimeout);
         std::chrono::milliseconds pingInterval = std::chrono::duration_cast<std::chrono::milliseconds>(rtype::PingInterval);
+        std::chrono::milliseconds closeTimeout{500}; ///< How long disconnect() waits for the Disconnect to be acknowledged.
     };
 
     AsioNetworkClient();
@@ -39,6 +41,7 @@ public:
     ConnectionState state() const override;
     std::optional<protocol::Message> poll() override;
     void send(const protocol::Message &message) override;
+    void sendReliable(const protocol::Message &message) override;
     NetworkStats stats() const override;
 
 private:
@@ -50,8 +53,12 @@ private:
     void handlePacket(const protocol::Packet &packet, Clock::time_point now);
     void scheduleConnectRetry();
     void scheduleHousekeeping();
+    void scheduleReliableTick();
+    void flushReliable();
+    void beginClose();
+    void finishClose();
     void housekeep();
-    void sendDatagram(protocol::Message message);
+    void sendDatagram(protocol::Message message, std::optional<std::uint32_t> reliableId = std::nullopt);
     std::uint32_t nowMs() const;
 
     asio::io_context _io;
@@ -60,6 +67,7 @@ private:
     Udp::endpoint _sender;
     asio::steady_timer _connectTimer;
     asio::steady_timer _housekeepingTimer;
+    asio::steady_timer _reliableTimer;
     std::array<std::uint8_t, protocol::MaxPacketSize> _receiveBuffer{};
     engine::core::ThreadSafeQueue<protocol::Message> _messages;
     Options _options;
@@ -74,6 +82,10 @@ private:
     engine::net::RateMeter _rateMeter;  // I/O thread only
     engine::net::LossTracker _loss;     // I/O thread only
     engine::net::SequenceWindow _incoming; // I/O thread only: spots duplicated and reordered server packets
+    engine::net::ReliableQueue<protocol::Message> _reliable; // I/O thread only: messages awaiting the server's Ack
+    engine::net::SequenceWindow _incomingReliable;           // I/O thread only: reliable numbers already received
+    bool _closing = false;                                   // I/O thread only: waiting for the Disconnect's Ack
+    Clock::time_point _closeDeadline{};
     std::atomic<double> _sentRate{0.0};
     std::atomic<double> _receivedRate{0.0};
     std::atomic<double> _lossPercent{0.0};

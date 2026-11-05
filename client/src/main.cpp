@@ -269,10 +269,11 @@ int main(int argc, char **argv)
                 char line[160];
                 const auto dropped = stats.traffic.totals.duplicatesDropped + stats.traffic.totals.outdatedDropped;
                 std::snprintf(line, sizeof line,
-                              "ping %s | down %.1f KB/s | up %.1f KB/s | loss %.1f%% | dropped %llu  [F3]", rtt,
+                              "ping %s | down %.1f KB/s | up %.1f KB/s | loss %.1f%% | dropped %llu | resent %llu  [F3]", rtt,
                               stats.traffic.rates.receivedBytesPerSecond / 1024.0,
                               stats.traffic.rates.sentBytesPerSecond / 1024.0, stats.lossPercent,
-                              static_cast<unsigned long long>(dropped));
+                              static_cast<unsigned long long>(dropped),
+                              static_cast<unsigned long long>(stats.traffic.totals.retransmissions));
                 statsText.setString(line);
                 window.draw(statsText);
             }
