@@ -1,29 +1,32 @@
 {
   "stage": 3,
-  "level_name": "Niveau 3 - Vaisseau Mère Bydo (Boss)",
+  "level_name": "Monde 1-3 : Porte-Orbital Aegis",
   "waves": [
     {
       "wave_id": 1,
-      "delay_before_start": 2.0,
+      "delay_before_start": 3.0,
       "enemies": [
-        { "type": "sine_wave", "spawn_y": 150, "amplitude": 50, "frequency": 0.04 },
-        { "type": "sine_wave", "spawn_y": 450, "amplitude": 50, "frequency": 0.04 }
+        { "type": "satellite_scout", "spawn_y": 130.0, "speed": 122.0 },
+        { "type": "orbital_probe", "spawn_y": 260.0, "speed": 100.0 },
+        { "type": "satellite_scout", "spawn_y": 390.0, "speed": 122.0 },
+        { "type": "orbital_probe", "spawn_y": 520.0, "speed": 100.0 }
       ]
     },
     {
       "wave_id": 2,
-      "delay_before_start": 8.0,
+      "delay_before_start": 12.5,
       "enemies": [
-        { "type": "patrol", "spawn_y": 200, "speed": 200 },
-        { "type": "patrol", "spawn_y": 300, "speed": 200 },
-        { "type": "patrol", "spawn_y": 400, "speed": 200 }
+        { "type": "solar_relay", "spawn_y": 170.0, "speed": 68.0 },
+        { "type": "satellite_scout", "spawn_y": 260.0, "speed": 124.0 },
+        { "type": "satellite_scout", "spawn_y": 380.0, "speed": 124.0 },
+        { "type": "solar_relay", "spawn_y": 500.0, "speed": 68.0 }
       ]
     },
     {
       "wave_id": 3,
-      "delay_before_start": 14.0,
+      "delay_before_start": 25.0,
       "enemies": [
-        { "type": "boss", "spawn_y": 300, "hp": 500, "behavior": "stationary_turret" }
+        { "type": "boss_orbital_carrier", "spawn_y": 320.0, "speed": 30.0 }
       ]
     }
   ]

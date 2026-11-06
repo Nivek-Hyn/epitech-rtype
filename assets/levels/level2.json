@@ -1,30 +1,44 @@
 {
   "stage": 2,
-  "level_name": "Niveau 2 - Flotte ennemie en approche",
+  "level_name": "Monde 1-2 : Anneaux Solaires",
   "waves": [
     {
       "wave_id": 1,
       "delay_before_start": 2.0,
       "enemies": [
-        { "type": "patrol", "spawn_y": 150, "speed": 150 },
-        { "type": "patrol", "spawn_y": 450, "speed": 150 }
+        { "type": "orbital_probe", "spawn_y": 160.0, "speed": 96.0 },
+        { "type": "orbital_probe", "spawn_y": 480.0, "speed": 96.0 }
       ]
     },
     {
       "wave_id": 2,
-      "delay_before_start": 8.0,
+      "delay_before_start": 9.5,
       "enemies": [
-        { "type": "sine_wave", "spawn_y": 250, "amplitude": 60, "frequency": 0.04 },
-        { "type": "sine_wave", "spawn_y": 350, "amplitude": 60, "frequency": 0.04 }
+        { "type": "satellite_scout", "spawn_y": 100.0, "speed": 118.0 },
+        { "type": "solar_relay", "spawn_y": 250.0, "speed": 64.0 },
+        { "type": "satellite_scout", "spawn_y": 400.0, "speed": 118.0 },
+        { "type": "solar_relay", "spawn_y": 550.0, "speed": 64.0 }
       ]
     },
     {
       "wave_id": 3,
-      "delay_before_start": 15.0,
+      "delay_before_start": 19.0,
       "enemies": [
-        { "type": "patrol", "spawn_y": 100, "speed": 180 },
-        { "type": "sine_wave", "spawn_y": 300, "amplitude": 80, "frequency": 0.05 },
-        { "type": "patrol", "spawn_y": 500, "speed": 180 }
+        { "type": "orbital_probe", "spawn_y": 120.0, "speed": 98.0 },
+        { "type": "satellite_scout", "spawn_y": 220.0, "speed": 120.0 },
+        { "type": "solar_relay", "spawn_y": 320.0, "speed": 66.0 },
+        { "type": "satellite_scout", "spawn_y": 420.0, "speed": 120.0 },
+        { "type": "orbital_probe", "spawn_y": 520.0, "speed": 98.0 }
+      ]
+    },
+    {
+      "wave_id": 4,
+      "delay_before_start": 30.0,
+      "enemies": [
+        { "type": "satellite_scout", "spawn_y": 140.0, "speed": 122.0 },
+        { "type": "satellite_scout", "spawn_y": 260.0, "speed": 122.0 },
+        { "type": "orbital_probe", "spawn_y": 380.0, "speed": 100.0 },
+        { "type": "satellite_scout", "spawn_y": 500.0, "speed": 122.0 }
       ]
     }
   ]
