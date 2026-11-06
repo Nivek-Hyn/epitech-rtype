@@ -1,6 +1,6 @@
 {
   "stage": 2,
-  "level_name": "Niveau 2 - Flotte ennemie en approche",
+  "level_name": "Monde 1-2 : Anneaux Solaires",
   "waves": [
     {
       "wave_id": 1,
@@ -12,7 +12,7 @@
     },
     {
       "wave_id": 2,
-      "delay_before_start": 10.0,
+      "delay_before_start": 9.5,
       "enemies": [
         { "type": "satellite_scout", "spawn_y": 150.0, "speed": 118.0 },
         { "type": "solar_relay", "spawn_y": 375.0, "speed": 64.0 },
@@ -22,7 +22,7 @@
     },
     {
       "wave_id": 3,
-      "delay_before_start": 22.0,
+      "delay_before_start": 19.0,
       "enemies": [
         { "type": "orbital_probe", "spawn_y": 180.0, "speed": 98.0 },
         { "type": "satellite_scout", "spawn_y": 330.0, "speed": 120.0 },

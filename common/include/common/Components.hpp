@@ -38,16 +38,42 @@ struct Health {
 };
 
 struct MovementPattern {
-    std::string type = "straight"; // straight, sine_wave, zigzag, dive, etc.
-    float amplitude = 0.f; // 0: default of the pattern
-    float frequency = 0.f; // 0: default of the pattern
-    float baseSpeed = 100.f; // horizontal speed used by the patterns that drive vel.x
-    float holdX = 0.f; // boss only: where it stops (0: keeps moving)
-    float age = 0.f; // seconds since spawn
-    float heldTravel = 0.f; // distance it would have travelled while stopped
-    bool ejected = false; // black_hole_orbit: thrown out by the black hole
-    float bounceSpeed = 0.f; // martian_bounce: set once, so that every jump has the same height
+    std::string type = "straight";
+    float amplitude = 0.f;
+    float frequency = 0.f;
+    float baseSpeed = 100.f;
+    float holdX = 0.f;
+    float age = 0.f;
+    float heldTravel = 0.f;
+    bool ejected = false;
+    float bounceSpeed = 0.f;
 };
+
+// Area of an enemy that can be hit, relative to its position. Matches the size of its sprite.
+struct EnemyHitbox {
+    float width = 66.f;
+    float height = 72.f;
+    float offsetY = 0.f;
+};
+
+inline EnemyHitbox enemyHitbox(std::uint8_t variant)
+{
+    switch (variant) {
+    case 1:
+    case 2:
+        return {64.f, 56.f, 0.f};
+    case 3:
+        return {56.f, 46.f, 0.f};
+    case 4:
+        return {72.f, 83.f, 0.f};
+    case 5:
+        return {200.f, 200.f, -15.f};
+    case 6:
+        return {280.f, 222.f, -60.f};
+    default:
+        return {};
+    }
+}
 
 // Game rules specific to an enemy type.
 struct EnemyTraits {

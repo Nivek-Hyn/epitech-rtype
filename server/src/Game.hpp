@@ -58,7 +58,7 @@ public:
         float intermissionDelay = 2.0f;
         int playerLives = 3;
         float respawnDelay = 2.0f;
-        float invulnerability = 2.0f; // seconds without damage after a respawn
+        float invulnerability = 2.0f;
     };
 
     struct AttackDefinition {
@@ -74,11 +74,11 @@ public:
         int health = 1;
         float speed = 100.f;
         std::string pattern = "straight";
-        float amplitude = 0.f; // 0: default of the movement pattern
-        float frequency = 0.f; // 0: default of the movement pattern
+        float amplitude = 0.f;
+        float frequency = 0.f;
         std::uint32_t score = 100;
         bool isBoss = false;
-        float holdX = 0.f; // boss only: where it stops and fights (0: keeps moving)
+        float holdX = 0.f;
         bool hasAttack = false;
         std::vector<AttackDefinition> attacks;
     };
