@@ -1,6 +1,6 @@
 {
   "stage": 1,
-  "level_name": "Monde 1-1 : Ceinture Orbitale",
+  "level_name": "Stage 1 - Initiation",
   "waves": [
     {
       "wave_id": 1,
@@ -13,7 +13,7 @@
     },
     {
       "wave_id": 2,
-      "delay_before_start": 8.5,
+      "delay_before_start": 8.0,
       "enemies": [
         { "type": "orbital_probe", "spawn_y": 195.0, "speed": 92.0 },
         { "type": "satellite_scout", "spawn_y": 375.0, "speed": 112.0 },
@@ -23,7 +23,7 @@
     },
     {
       "wave_id": 3,
-      "delay_before_start": 18.5,
+      "delay_before_start": 18.0,
       "enemies": [
         { "type": "solar_relay", "spawn_y": 450.0, "speed": 62.0 },
         { "type": "satellite_scout", "spawn_y": 180.0, "speed": 114.0 },

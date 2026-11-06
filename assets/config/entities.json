@@ -1,6 +1,7 @@
 {
   "enemies": {
     "standard_red": {
+      "variant": 0,
       "health": 1,
       "speed": 100.0,
       "pattern": "straight",
@@ -11,14 +12,51 @@
         "bullet_pattern": "straight"
       }
     },
+    "patrol": {
+      "variant": 1,
+      "health": 3,
+      "speed": 130.0,
+      "pattern": "back_and_forth",
+      "attack": {
+        "fire_rate": 1.8,
+        "bullet_speed": 320.0,
+        "bullet_variant": 1,
+        "bullet_pattern": "straight"
+      }
+    },
+    "sine_wave": {
+      "variant": 2,
+      "health": 4,
+      "speed": 120.0,
+      "pattern": "sine_wave",
+      "attack": {
+        "fire_rate": 1.8,
+        "bullet_speed": 340.0,
+        "bullet_variant": 2,
+        "bullet_pattern": "zigzag"
+      }
+    },
+    "diver": {
+      "variant": 3,
+      "health": 2,
+      "speed": 160.0,
+      "pattern": "dive",
+      "attack": {
+        "fire_rate": 2.2,
+        "bullet_speed": 380.0,
+        "bullet_variant": 1,
+        "bullet_pattern": "straight"
+      }
+    },
     "tentacle_creature": {
+      "variant": 4,
       "health": 8,
       "speed": 60.0,
       "pattern": "zigzag",
       "attack": {
         "fire_rate": 1.5,
         "bullet_speed": 300.0,
-        "bullet_variant": 0,
+        "bullet_variant": 3,
         "bullet_pattern": "zigzag"
       }
     },
@@ -56,7 +94,20 @@
         }
       ]
     },
+    "boss": {
+      "variant": 6,
+      "health": 50,
+      "speed": 25.0,
+      "pattern": "straight",
+      "attack": {
+        "fire_rate": 0.7,
+        "bullet_speed": 480.0,
+        "bullet_variant": 4,
+        "bullet_pattern": "zigzag"
+      }
+    },
     "satellite_scout": {
+      "variant": 1,
       "health": 2,
       "speed": 110.0,
       "pattern": "orbital",
@@ -64,10 +115,11 @@
         "fire_rate": 2.2,
         "bullet_speed": 320.0,
         "bullet_variant": 0,
-        "bullet_pattern": "zigzag"
+        "bullet_pattern": "straight"
       }
     },
     "orbital_probe": {
+      "variant": 2,
       "health": 4,
       "speed": 90.0,
       "pattern": "sine_wave",
@@ -79,6 +131,7 @@
       }
     },
     "solar_relay": {
+      "variant": 3,
       "health": 8,
       "speed": 60.0,
       "pattern": "back_and_forth",
@@ -136,6 +189,7 @@
       ]
     },
     "martian_hopper": {
+      "variant": 1,
       "health": 3,
       "speed": 120.0,
       "pattern": "martian_bounce",
@@ -147,6 +201,7 @@
       }
     },
     "gravity_diver": {
+      "variant": 3,
       "health": 2,
       "speed": 150.0,
       "pattern": "gravity_dive",
@@ -158,6 +213,7 @@
       }
     },
     "dust_striker": {
+      "variant": 0,
       "health": 5,
       "speed": 130.0,
       "pattern": "straight",
@@ -204,6 +260,7 @@
       ]
     },
     "quantum_shifter": {
+      "variant": 2,
       "health": 4,
       "speed": 140.0,
       "pattern": "gravity_pull",
@@ -215,6 +272,7 @@
       }
     },
     "vortex_drone": {
+      "variant": 4,
       "health": 6,
       "speed": 100.0,
       "pattern": "black_hole_orbit",
@@ -226,6 +284,7 @@
       }
     },
     "singularity_fragment": {
+      "variant": 4,
       "health": 12,
       "speed": 50.0,
       "pattern": "back_and_forth",

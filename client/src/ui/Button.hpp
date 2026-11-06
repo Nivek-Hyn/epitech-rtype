@@ -20,6 +20,7 @@ public:
     void draw(sf::RenderWindow &window) const;
 
     const std::string &getLabel() const;
+    void setLabel(const std::string &label);
 
 private:
     void updateVisuals();

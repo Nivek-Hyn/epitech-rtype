@@ -234,6 +234,7 @@ TEST(Game, DifficultySettingsChangeGameModeAndDifficulty)
 TEST(Game, CampaignProgressionAdvancesLevelsAndFinishes)
 {
     Game game;
+    game.loadCampaign({"assets/levels/level1.json", "assets/levels/level2.json", "assets/levels/level3.json"});
     game.setGameMode(Game::GameMode::Campaign);
     game.loadEntitiesConfig(TestEntities);
     game.loadCampaign({OneGrunt, OneGrunt, OneGrunt});
@@ -277,6 +278,7 @@ TEST(Game, CampaignProgressionAdvancesLevelsAndFinishes)
 TEST(Game, InfiniteModeLoopsAndIncrementsLoopCount)
 {
     Game game;
+    game.loadCampaign({"assets/levels/level1.json", "assets/levels/level2.json", "assets/levels/level3.json"});
     game.setGameMode(Game::GameMode::Infinite);
     game.loadEntitiesConfig(TestEntities);
     game.loadCampaign({OneGrunt, OneGrunt, OneGrunt});

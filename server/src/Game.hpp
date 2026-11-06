@@ -70,6 +70,7 @@ public:
     };
 
     struct EnemyDefinition {
+        std::uint8_t variant = 0;
         int health = 1;
         float speed = 100.f;
         std::string pattern = "straight";
