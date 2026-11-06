@@ -55,6 +55,22 @@ installed package rather than the engine's source tree. Run the complete check f
 cmake -P engine/cmake/CheckPackage.cmake
 ```
 
+## A second game: Brick Rush
+
+`games/brickrush/` (a brick breaker) proves that the engine is not tied to R-Type. It links only the engine modules, nlohmann/json
+and SFML for its window; it never includes `common/`.
+
+| Engine part | How Brick Rush uses it |
+|---|---|
+| Registry | Paddle, ball and bricks are entities with Brick Rush's own components (`Box`, `Ball`, `Brick`...). |
+| Prefabs | `assets/bricks.json` describes every entity by its components; a level is a grid of prefab names. |
+| Movement system | `movement<Position, Velocity>` moves the paddle and the ball. |
+| AABB | The ball bounces on the walls, the paddle and the bricks (`src/Collisions.cpp`). |
+| Event bus | Collisions enqueue `BrickHit` and `BallLost`; bricks break and lives drop at `dispatch`. |
+| Fixed timestep | The window loop simulates 60 steps per second, like the R-Type server. |
+
+The rules (`brickrush_core`) have no window, so `tests/test_brickrush.cpp` tests them directly.
+
 ## 1. Entity-Component-System
 
 ### Concepts

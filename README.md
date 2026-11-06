@@ -64,7 +64,15 @@ cmake -P engine/cmake/CheckPackage.cmake
 ```
 
 See [engine/README.md](engine/README.md) and the [extension guide](docs/how-to.md).
-The separate playable second game remains its own delivery task; it is not part of this prototype's launch commands.
+
+## Other programs built with the engine
+
+The same build also produces, at the repository root (run them from there):
+
+| Program | What it is | Controls |
+|---|---|---|
+| `./brickrush` | A second, unrelated game: a brick breaker. It uses the engine only, not `common/` or the R-Type assets. Bricks, paddle and ball are prefabs of `games/brickrush/assets/bricks.json`; each level is a grid of bricks. | Left/Right or Q/D to move, Space to launch, R to restart |
+| `./r-type_level_editor assets/levels/level1.json` | R-Type level editor with a preview played by the engine | See the [how-to guides](docs/how-to.md#edit-a-level-with-the-level-editor) |
 
 ## Project and documentation
 
