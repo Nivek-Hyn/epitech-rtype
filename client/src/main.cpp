@@ -212,22 +212,22 @@ int main(int argc, char **argv)
             std::uint8_t inputFlags = 0;
             float targetTilt = 0.0f;
             if (!gameOver) {
-                if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Z) || sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Up)) {
+                if (sf::Keyboard::isKeyPressed(cfg.keyUp) || sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Up)) {
                     inputFlags |= rtype::protocol::InputFlag::Up;
                     targetTilt += 2.0f;
                 }
-                if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::S) || sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Down)) {
+                if (sf::Keyboard::isKeyPressed(cfg.keyDown) || sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Down)) {
                     inputFlags |= rtype::protocol::InputFlag::Down;
                     targetTilt -= 2.0f;
                 }
-                if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Q) || sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Left))
+                if (sf::Keyboard::isKeyPressed(cfg.keyLeft) || sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Left))
                     inputFlags |= rtype::protocol::InputFlag::Left;
-                if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::D) || sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Right))
+                if (sf::Keyboard::isKeyPressed(cfg.keyRight) || sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Right))
                     inputFlags |= rtype::protocol::InputFlag::Right;
 
                 static float shootCooldown = 0.f;
                 shootCooldown -= dt;
-                if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Space)) {
+                if (sf::Keyboard::isKeyPressed(cfg.keyShoot)) {
                     inputFlags |= rtype::protocol::InputFlag::Shoot;
                     if (shootCooldown <= 0.f) {
                         resources.playSound("shoot", 80.f);

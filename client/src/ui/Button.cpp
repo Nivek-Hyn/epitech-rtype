@@ -77,4 +77,11 @@ const std::string &Button::getLabel() const
     return _label;
 }
 
+void Button::setLabel(const std::string &label)
+{
+    _label = label;
+    _text.setString(label);
+    updateVisuals();
+}
+
 }

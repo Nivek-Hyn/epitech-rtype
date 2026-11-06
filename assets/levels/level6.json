@@ -1,0 +1,33 @@
+{
+  "stage": 6,
+  "level_name": "Monde 2-3 : Foreuse de l'Ares Prime",
+  "waves": [
+    {
+      "wave_id": 1,
+      "delay_before_start": 2.0,
+      "enemies": [
+        { "type": "dust_striker", "spawn_y": 140.0, "speed": 136.0 },
+        { "type": "gravity_diver", "spawn_y": 280.0, "speed": 158.0 },
+        { "type": "dust_striker", "spawn_y": 420.0, "speed": 136.0 },
+        { "type": "gravity_diver", "spawn_y": 560.0, "speed": 158.0 }
+      ]
+    },
+    {
+      "wave_id": 2,
+      "delay_before_start": 11.0,
+      "enemies": [
+        { "type": "martian_hopper", "spawn_y": 530.0, "speed": 134.0 },
+        { "type": "martian_hopper", "spawn_y": 370.0, "speed": 134.0 },
+        { "type": "martian_hopper", "spawn_y": 210.0, "speed": 134.0 },
+        { "type": "martian_hopper", "spawn_y": 90.0, "speed": 134.0 }
+      ]
+    },
+    {
+      "wave_id": 3,
+      "delay_before_start": 21.0,
+      "enemies": [
+        { "type": "boss_mars_excavator", "spawn_y": 320.0, "speed": 35.0 }
+      ]
+    }
+  ]
+}

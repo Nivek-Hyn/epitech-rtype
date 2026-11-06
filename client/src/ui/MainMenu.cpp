@@ -1,76 +1,11 @@
 #include "MainMenu.hpp"
 #include "ResourceManager.hpp"
 
-#include <nlohmann/json.hpp>
 #include <algorithm>
 #include <cmath>
-#include <fstream>
 #include <iostream>
 
 namespace rtype::client::ui {
-
-GameConfig GameConfig::loadFromFile(const std::string &path)
-{
-    GameConfig config;
-    std::ifstream file(path);
-    if (!file.is_open()) {
-        return config;
-    }
-
-    try {
-        nlohmann::json j;
-        file >> j;
-
-        if (j.contains("sfx_volume") && j["sfx_volume"].is_number()) {
-            config.sfxVolume = std::clamp(j["sfx_volume"].get<float>(), 0.f, 100.f);
-        } else if (j.contains("sfxVolume") && j["sfxVolume"].is_number()) {
-            config.sfxVolume = std::clamp(j["sfxVolume"].get<float>(), 0.f, 100.f);
-        }
-
-        if (j.contains("music_volume") && j["music_volume"].is_number()) {
-            config.musicVolume = std::clamp(j["music_volume"].get<float>(), 0.f, 100.f);
-        } else if (j.contains("musicVolume") && j["musicVolume"].is_number()) {
-            config.musicVolume = std::clamp(j["musicVolume"].get<float>(), 0.f, 100.f);
-        }
-
-        if (j.contains("join_ip") && j["join_ip"].is_string()) {
-            config.joinIp = j["join_ip"].get<std::string>();
-        }
-        if (j.contains("join_port") && j["join_port"].is_string()) {
-            config.joinPort = j["join_port"].get<std::string>();
-        }
-        if (j.contains("host_port") && j["host_port"].is_string()) {
-            config.hostPort = j["host_port"].get<std::string>();
-        }
-    } catch (const std::exception &e) {
-        std::cerr << "[Config] Warning: Error parsing " << path << ": " << e.what() << '\n';
-    }
-
-    return config;
-}
-
-bool GameConfig::saveToFile(const std::string &path) const
-{
-    try {
-        nlohmann::json j;
-        j["sfx_volume"] = sfxVolume;
-        j["music_volume"] = musicVolume;
-        j["host_port"] = hostPort;
-        j["join_ip"] = joinIp;
-        j["join_port"] = joinPort;
-
-        std::ofstream file(path);
-        if (!file.is_open()) {
-            std::cerr << "[Config] Warning: Unable to open " << path << " for writing\n";
-            return false;
-        }
-        file << j.dump(4) << '\n';
-        return true;
-    } catch (const std::exception &e) {
-        std::cerr << "[Config] Warning: Failed to save config to " << path << ": " << e.what() << '\n';
-        return false;
-    }
-}
 
 MainMenu::MainMenu(const sf::Font &font, ResourceManager *resources)
     : _font(font),
@@ -80,7 +15,7 @@ MainMenu::MainMenu(const sf::Font &font, ResourceManager *resources)
       _subtitleText(font, "A SPACE SHOOTER", 22),
       _screenTitleText(font, "", 36),
       _statusText(font, "", 22),
-      _controlsInfo(font, "", 22)
+      _controlsTitleText(font, "--- CONTROLS RECONFIGURATION ---", 22)
 {
     _titleText.setFillColor(sf::Color(255, 204, 0));
     _titleText.setLetterSpacing(1.5f);
@@ -164,7 +99,7 @@ void MainMenu::initJoinScreen()
 void MainMenu::initSettingsScreen()
 {
     const float posX = 680.f;
-    float startY = 380.f;
+    float startY = 295.f;
 
     const std::size_t sfxIdx = std::clamp(
         static_cast<std::size_t>(std::round(_config.sfxVolume / 25.f)),
@@ -174,18 +109,69 @@ void MainMenu::initSettingsScreen()
         std::size_t{0}, std::size_t{4});
 
     _sfxVolumeSelector = std::make_unique<OptionSelector>(_font, "SFX VOLUME", std::vector<std::string>{"MUTE", "25%", "50%", "75%", "100%"}, sf::Vector2f(posX, startY), sfxIdx);
-    startY += 80.f;
+    startY += 70.f;
 
     _musicVolumeSelector = std::make_unique<OptionSelector>(_font, "MUSIC VOLUME", std::vector<std::string>{"MUTE", "25%", "50%", "75%", "100%"}, sf::Vector2f(posX, startY), musicIdx);
-    startY += 100.f;
+    startY += 85.f;
 
-    _controlsInfo.setString("CONTROLS:\n  Move: [Z][Q][S][D] or [Arrow Keys]\n  Shoot: [Space]");
-    _controlsInfo.setFillColor(sf::Color(170, 185, 215));
-    _controlsInfo.setPosition({posX + 40.f, startY});
+    _controlsTitleText.setString("--- CONTROLS RECONFIGURATION ---");
+    _controlsTitleText.setCharacterSize(22);
+    _controlsTitleText.setFillColor(sf::Color(0, 220, 255));
+    const auto b = _controlsTitleText.getLocalBounds();
+    _controlsTitleText.setPosition({960.f - (b.size.x / 2.f), startY});
 
-    startY += 130.f;
-    auto backBtn = std::make_unique<Button>(_font, "BACK", sf::Vector2f(830.f, startY), sf::Vector2f(260.f, 55.f));
+    const float colLeftX = 650.f;
+    const float colRightX = 970.f;
+    const float btnWidth = 300.f;
+    const float btnHeight = 44.f;
+    const float keysStartY = startY + 40.f;
+    const float rowSpacing = 54.f;
+
+    _keyButtons.clear();
+    _presetButtons.clear();
+    _settingsButtons.clear();
+
+    // Row 1: UP and DOWN
+    _keyButtons.push_back(std::make_unique<Button>(_font, "", sf::Vector2f(colLeftX, keysStartY), sf::Vector2f(btnWidth, btnHeight)));
+    _keyButtons.push_back(std::make_unique<Button>(_font, "", sf::Vector2f(colRightX, keysStartY), sf::Vector2f(btnWidth, btnHeight)));
+
+    // Row 2: LEFT and RIGHT
+    _keyButtons.push_back(std::make_unique<Button>(_font, "", sf::Vector2f(colLeftX, keysStartY + rowSpacing), sf::Vector2f(btnWidth, btnHeight)));
+    _keyButtons.push_back(std::make_unique<Button>(_font, "", sf::Vector2f(colRightX, keysStartY + rowSpacing), sf::Vector2f(btnWidth, btnHeight)));
+
+    // Row 3: SHOOT centered
+    _keyButtons.push_back(std::make_unique<Button>(_font, "", sf::Vector2f(810.f, keysStartY + rowSpacing * 2.f), sf::Vector2f(btnWidth, btnHeight)));
+
+    // Presets row placed clearly lower down
+    const float presetsY = keysStartY + rowSpacing * 3.f + 18.f;
+    const float presetBtnWidth = 210.f;
+    const float presetBtnHeight = 42.f;
+
+    _presetButtons.push_back(std::make_unique<Button>(_font, "PRESET AZERTY", sf::Vector2f(620.f, presetsY), sf::Vector2f(presetBtnWidth, presetBtnHeight)));
+    _presetButtons.push_back(std::make_unique<Button>(_font, "PRESET QWERTY", sf::Vector2f(855.f, presetsY), sf::Vector2f(presetBtnWidth, presetBtnHeight)));
+    _presetButtons.push_back(std::make_unique<Button>(_font, "RESET DEFAULTS", sf::Vector2f(1090.f, presetsY), sf::Vector2f(presetBtnWidth, presetBtnHeight)));
+
+    // Back button
+    auto backBtn = std::make_unique<Button>(_font, "BACK", sf::Vector2f(835.f, presetsY + 68.f), sf::Vector2f(250.f, 48.f));
     _settingsButtons.push_back(std::move(backBtn));
+
+    updateKeyButtonLabels();
+}
+
+void MainMenu::updateKeyButtonLabels()
+{
+    if (_keyButtons.size() < 5) return;
+
+    const std::vector<std::string> actionNames = {"MOVE UP", "MOVE DOWN", "MOVE LEFT", "MOVE RIGHT", "SHOOT"};
+    const std::vector<sf::Keyboard::Key> keys = {_config.keyUp, _config.keyDown, _config.keyLeft, _config.keyRight, _config.keyShoot};
+
+    for (std::size_t i = 0; i < 5; ++i) {
+        if (_rebindingAction == static_cast<int>(i)) {
+            _keyButtons[i]->setLabel(actionNames[i] + ": <PRESS KEY>");
+        } else {
+            _keyButtons[i]->setLabel(actionNames[i] + ": [" + GameConfig::keyToString(keys[i]) + "]");
+        }
+    }
 }
 
 void MainMenu::setStatusMessage(const std::string &message, sf::Color color)
@@ -356,12 +342,39 @@ void MainMenu::handleEvent(const sf::Event &event, const sf::RenderWindow &windo
         if (event.is<sf::Event::MouseMoved>()) {
             _sfxVolumeSelector->handleMouseMove(mousePos);
             _musicVolumeSelector->handleMouseMove(mousePos);
+            for (auto &btn : _keyButtons) {
+                btn->handleMouseMove(mousePos);
+            }
+            for (auto &btn : _presetButtons) {
+                btn->handleMouseMove(mousePos);
+            }
             for (auto &btn : _settingsButtons) {
                 btn->handleMouseMove(mousePos);
             }
         } else if (const auto *click = event.getIf<sf::Event::MouseButtonPressed>()) {
             if (click->button == sf::Mouse::Button::Left) {
                 const auto clickedPos = window.mapPixelToCoords(click->position);
+
+                if (_rebindingAction != -1) {
+                    bool rebindAnother = false;
+                    for (std::size_t i = 0; i < _keyButtons.size(); ++i) {
+                        if (_keyButtons[i]->handleMouseClick(clickedPos)) {
+                            playUiSound("click");
+                            _rebindingAction = static_cast<int>(i);
+                            updateKeyButtonLabels();
+                            setStatusMessage("Press key for action or Escape to cancel", sf::Color::Yellow);
+                            rebindAnother = true;
+                            break;
+                        }
+                    }
+                    if (!rebindAnother) {
+                        _rebindingAction = -1;
+                        updateKeyButtonLabels();
+                        setStatusMessage("Rebinding cancelled", sf::Color::White);
+                    }
+                    return;
+                }
+
                 bool volumeChanged = false;
                 if (_sfxVolumeSelector->handleMouseClick(clickedPos)) {
                     playUiSound("click");
@@ -377,51 +390,88 @@ void MainMenu::handleEvent(const sf::Event &event, const sf::RenderWindow &windo
                     _config.saveToFile("config.json");
                 }
 
-                if (_settingsButtons[0]->handleMouseClick(clickedPos)) {
+                for (std::size_t i = 0; i < _keyButtons.size(); ++i) {
+                    if (_keyButtons[i]->handleMouseClick(clickedPos)) {
+                        playUiSound("click");
+                        _rebindingAction = static_cast<int>(i);
+                        updateKeyButtonLabels();
+                        setStatusMessage("Press any key to assign, or Escape to cancel", sf::Color::Yellow);
+                        return;
+                    }
+                }
+
+                if (_presetButtons.size() >= 3) {
+                    if (_presetButtons[0]->handleMouseClick(clickedPos)) {
+                        playUiSound("click");
+                        _config.applyAzerty();
+                        _config.saveToFile("config.json");
+                        updateKeyButtonLabels();
+                        setStatusMessage("AZERTY profile applied (Z, Q, S, D, Space)", sf::Color::Green);
+                        return;
+                    }
+                    if (_presetButtons[1]->handleMouseClick(clickedPos)) {
+                        playUiSound("click");
+                        _config.applyQwerty();
+                        _config.saveToFile("config.json");
+                        updateKeyButtonLabels();
+                        setStatusMessage("QWERTY profile applied (W, A, S, D, Space)", sf::Color::Green);
+                        return;
+                    }
+                    if (_presetButtons[2]->handleMouseClick(clickedPos)) {
+                        playUiSound("click");
+                        _config.resetToDefaults();
+                        _config.saveToFile("config.json");
+                        updateKeyButtonLabels();
+                        setStatusMessage("Controls reset to defaults", sf::Color::Green);
+                        return;
+                    }
+                }
+
+                if (!_settingsButtons.empty() && _settingsButtons[0]->handleMouseClick(clickedPos)) {
                     playUiSound("click");
                     _config.saveToFile("config.json");
                     _currentScreen = MenuScreen::Root;
                 }
             }
         } else if (const auto *key = event.getIf<sf::Event::KeyPressed>()) {
+            if (_rebindingAction != -1) {
+                if (key->code == sf::Keyboard::Key::Escape) {
+                    playUiSound("click");
+                    _rebindingAction = -1;
+                    updateKeyButtonLabels();
+                    setStatusMessage("Rebinding cancelled", sf::Color::White);
+                } else {
+                    const std::vector<std::string> names = {"Up", "Down", "Left", "Right", "Shoot"};
+                    std::string actionName = (_rebindingAction >= 0 && _rebindingAction < static_cast<int>(names.size())) ? names[_rebindingAction] : "";
+                    std::string conflict = _config.getConflictAction(key->code, actionName);
+
+                    if (!conflict.empty()) {
+                        playUiSound("hit");
+                        setStatusMessage("Conflict: [" + GameConfig::keyToString(key->code) + "] is already used for " + conflict + "!", sf::Color(255, 80, 80));
+                    } else if (key->code == sf::Keyboard::Key::Unknown) {
+                        playUiSound("hit");
+                        setStatusMessage("Unsupported key pressed!", sf::Color(255, 80, 80));
+                    } else {
+                        if (_rebindingAction == 0) _config.keyUp = key->code;
+                        else if (_rebindingAction == 1) _config.keyDown = key->code;
+                        else if (_rebindingAction == 2) _config.keyLeft = key->code;
+                        else if (_rebindingAction == 3) _config.keyRight = key->code;
+                        else if (_rebindingAction == 4) _config.keyShoot = key->code;
+
+                        playUiSound("click");
+                        _rebindingAction = -1;
+                        _config.saveToFile("config.json");
+                        updateKeyButtonLabels();
+                        setStatusMessage("Action " + actionName + " bound to [" + GameConfig::keyToString(key->code) + "]", sf::Color::Green);
+                    }
+                }
+                return;
+            }
+
             if (key->code == sf::Keyboard::Key::Escape) {
                 playUiSound("click");
                 _config.saveToFile("config.json");
                 _currentScreen = MenuScreen::Root;
-            } else if (key->code == sf::Keyboard::Key::Up || key->code == sf::Keyboard::Key::Z) {
-                _settingsSelectedIndex = (_settingsSelectedIndex + 2) % 3;
-                _sfxVolumeSelector->setSelected(_settingsSelectedIndex == 0);
-                _musicVolumeSelector->setSelected(_settingsSelectedIndex == 1);
-                _settingsButtons[0]->setSelected(_settingsSelectedIndex == 2);
-            } else if (key->code == sf::Keyboard::Key::Down || key->code == sf::Keyboard::Key::S) {
-                _settingsSelectedIndex = (_settingsSelectedIndex + 1) % 3;
-                _sfxVolumeSelector->setSelected(_settingsSelectedIndex == 0);
-                _musicVolumeSelector->setSelected(_settingsSelectedIndex == 1);
-                _settingsButtons[0]->setSelected(_settingsSelectedIndex == 2);
-            } else if (key->code == sf::Keyboard::Key::Left || key->code == sf::Keyboard::Key::Q) {
-                playUiSound("click");
-                if (_settingsSelectedIndex == 0)
-                    _sfxVolumeSelector->previous();
-                else if (_settingsSelectedIndex == 1)
-                    _musicVolumeSelector->previous();
-                _config.sfxVolume = static_cast<float>(_sfxVolumeSelector->getSelectedIndex()) * 25.f;
-                _config.musicVolume = static_cast<float>(_musicVolumeSelector->getSelectedIndex()) * 25.f;
-                _config.saveToFile("config.json");
-            } else if (key->code == sf::Keyboard::Key::Right || key->code == sf::Keyboard::Key::D) {
-                playUiSound("click");
-                if (_settingsSelectedIndex == 0)
-                    _sfxVolumeSelector->next();
-                else if (_settingsSelectedIndex == 1)
-                    _musicVolumeSelector->next();
-                _config.sfxVolume = static_cast<float>(_sfxVolumeSelector->getSelectedIndex()) * 25.f;
-                _config.musicVolume = static_cast<float>(_musicVolumeSelector->getSelectedIndex()) * 25.f;
-                _config.saveToFile("config.json");
-            } else if (key->code == sf::Keyboard::Key::Enter) {
-                if (_settingsSelectedIndex == 2) {
-                    playUiSound("click");
-                    _config.saveToFile("config.json");
-                    _currentScreen = MenuScreen::Root;
-                }
             }
         }
     }
@@ -499,12 +549,19 @@ void MainMenu::draw(sf::RenderWindow &window)
     } else if (_currentScreen == MenuScreen::Settings) {
         _screenTitleText.setString("--- SETTINGS ---");
         const auto b = _screenTitleText.getLocalBounds();
-        _screenTitleText.setPosition({960.f - (b.size.x / 2.f), 300.f});
+        _screenTitleText.setPosition({960.f - (b.size.x / 2.f), 215.f});
         window.draw(_screenTitleText);
 
         _sfxVolumeSelector->draw(window);
         _musicVolumeSelector->draw(window);
-        window.draw(_controlsInfo);
+        window.draw(_controlsTitleText);
+
+        for (const auto &btn : _keyButtons) {
+            btn->draw(window);
+        }
+        for (const auto &btn : _presetButtons) {
+            btn->draw(window);
+        }
         for (const auto &btn : _settingsButtons) {
             btn->draw(window);
         }

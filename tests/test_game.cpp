@@ -175,3 +175,152 @@ TEST(Game, EnemyZigzagShootingAppliesMovementPattern)
     EXPECT_NE(vel->y, 0.f);
 }
 
+TEST(Game, GameRulesLoadedCorrectlyForGameDesigner)
+{
+    Game game;
+    const auto &rules = game.rules();
+    EXPECT_GE(rules.campaignLevels.size(), 3u);
+    EXPECT_GT(rules.infinite.maxBulletSpeed, 0.f);
+    EXPECT_GT(rules.infinite.healthGrowthPerLoop, 0.f);
+    EXPECT_GT(rules.infinite.scoreMultiplierPerLoop, 0.f);
+    EXPECT_EQ(rules.difficulties.at(Game::Difficulty::Normal).healthMultiplier, 1.0f);
+    EXPECT_LT(rules.difficulties.at(Game::Difficulty::Easy).healthMultiplier, 1.0f);
+    EXPECT_GT(rules.difficulties.at(Game::Difficulty::Hard).healthMultiplier, 1.0f);
+}
+
+TEST(Game, DifficultySettingsChangeGameModeAndDifficulty)
+{
+    Game game;
+    EXPECT_EQ(game.gameMode(), Game::GameMode::Campaign);
+    EXPECT_EQ(game.difficulty(), Game::Difficulty::Normal);
+
+    game.setGameMode(Game::GameMode::Infinite);
+    EXPECT_EQ(game.gameMode(), Game::GameMode::Infinite);
+
+    game.setDifficulty(Game::Difficulty::Hard);
+    EXPECT_EQ(game.difficulty(), Game::Difficulty::Hard);
+}
+
+TEST(Game, CampaignProgressionAdvancesLevelsAndFinishes)
+{
+    Game game;
+    game.loadCampaign({"assets/levels/level1.json", "assets/levels/level2.json", "assets/levels/level3.json"});
+    game.setGameMode(Game::GameMode::Campaign);
+    game.rules().intermissionDelay = 0.0f;
+    game.onPlayerJoined(0);
+
+    // Move player safely out of the horizontal line of enemy fire
+    for (int tick = 0; tick < 120; ++tick) {
+        game.onInput(0, protocol::InputFlag::Up);
+        game.update(1.f / 60.f);
+    }
+
+    EXPECT_EQ(game.currentLevelIndex(), 0u);
+    EXPECT_EQ(game.gameState(), protocol::GameState::Playing);
+
+    // Fast-forward until level 1 finishes (all waves spawn and enemies despawn out of bounds)
+    for (int tick = 0; tick < 3600; ++tick) {
+        game.update(0.1f);
+        if (game.currentLevelIndex() == 1u)
+            break;
+    }
+    EXPECT_EQ(game.currentLevelIndex(), 1u);
+
+    // Fast-forward level 2
+    for (int tick = 0; tick < 3600; ++tick) {
+        game.update(0.1f);
+        if (game.currentLevelIndex() == 2u)
+            break;
+    }
+    EXPECT_EQ(game.currentLevelIndex(), 2u);
+
+    // Fast-forward level 3 (Boss stage)
+    for (int tick = 0; tick < 3600; ++tick) {
+        game.update(0.1f);
+        if (game.gameState() == protocol::GameState::Finished)
+            break;
+    }
+    EXPECT_EQ(game.gameState(), protocol::GameState::Finished);
+}
+
+TEST(Game, InfiniteModeLoopsAndIncrementsLoopCount)
+{
+    Game game;
+    game.loadCampaign({"assets/levels/level1.json", "assets/levels/level2.json", "assets/levels/level3.json"});
+    game.setGameMode(Game::GameMode::Infinite);
+    game.rules().intermissionDelay = 0.0f;
+    game.onPlayerJoined(0);
+
+    // Move player safely out of the horizontal line of enemy fire
+    for (int tick = 0; tick < 120; ++tick) {
+        game.onInput(0, protocol::InputFlag::Up);
+        game.update(1.f / 60.f);
+    }
+
+    EXPECT_EQ(game.infiniteLoopCount(), 1u);
+    EXPECT_EQ(game.currentLevelIndex(), 0u);
+
+    // Fast-forward all 3 levels
+    for (int level = 0; level < 3; ++level) {
+        for (int tick = 0; tick < 3600; ++tick) {
+            game.update(0.1f);
+            if (level < 2 && game.currentLevelIndex() == static_cast<std::size_t>(level + 1))
+                break;
+            if (level == 2 && game.infiniteLoopCount() == 2u)
+                break;
+        }
+    }
+
+    // Now in loop 2, back to stage 0, and game is still Playing!
+    EXPECT_EQ(game.infiniteLoopCount(), 2u);
+    EXPECT_EQ(game.currentLevelIndex(), 0u);
+    EXPECT_EQ(game.gameState(), protocol::GameState::Playing);
+}
+
+TEST(Game, EnemyMultipleAttacksShootSimultaneously)
+{
+    engine::ecs::Registry registry;
+    auto enemy = registry.spawn();
+    registry.emplace<rtype::components::Position>(enemy, 500.f, 200.f);
+    registry.emplace<rtype::components::Kind>(enemy, protocol::EntityType::Enemy, 0);
+
+    std::vector<rtype::components::AttackEntry> attacks = {
+        {0.f, 0.5f, 400.f, 1, "straight", 0.f},
+        {0.f, 0.5f, 250.f, 0, "zigzag", 30.f}
+    };
+    registry.emplace<rtype::components::EnemyAttack>(enemy, rtype::components::EnemyAttack{attacks});
+
+    std::vector<engine::ecs::Entity> spawnedBullets;
+    updateEnemyShooting(registry, [&](protocol::EntityType type, std::uint8_t variant, float x, float y) {
+        auto bullet = registry.spawn();
+        registry.emplace<rtype::components::Kind>(bullet, type, variant);
+        registry.emplace<rtype::components::Position>(bullet, x, y);
+        registry.emplace<rtype::components::Velocity>(bullet, 0.f, 0.f);
+        spawnedBullets.push_back(bullet);
+        return bullet;
+    }, 0.6f);
+
+    ASSERT_EQ(spawnedBullets.size(), 2u);
+
+    // Bullet 1: straight, offset 0, variant 1
+    const auto *pos1 = registry.get<rtype::components::Position>(spawnedBullets[0]);
+    const auto *kind1 = registry.get<rtype::components::Kind>(spawnedBullets[0]);
+    ASSERT_NE(pos1, nullptr);
+    ASSERT_NE(kind1, nullptr);
+    EXPECT_FLOAT_EQ(pos1->y, 200.f);
+    EXPECT_EQ(kind1->variant, 1);
+
+    // Bullet 2: zigzag, offset +30, variant 0
+    const auto *pos2 = registry.get<rtype::components::Position>(spawnedBullets[1]);
+    const auto *kind2 = registry.get<rtype::components::Kind>(spawnedBullets[1]);
+    const auto *pattern2 = registry.get<rtype::components::MovementPattern>(spawnedBullets[1]);
+    ASSERT_NE(pos2, nullptr);
+    ASSERT_NE(kind2, nullptr);
+    ASSERT_NE(pattern2, nullptr);
+    EXPECT_FLOAT_EQ(pos2->y, 230.f);
+    EXPECT_EQ(kind2->variant, 0);
+    EXPECT_EQ(pattern2->type, "zigzag");
+}
+
+
+

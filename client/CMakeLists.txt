@@ -6,6 +6,7 @@ add_executable(r-type_client
     src/ui/Button.cpp
     src/ui/TextInput.cpp
     src/ui/OptionSelector.cpp
+    src/ui/GameConfig.cpp
     src/ui/MainMenu.cpp
 )
 target_include_directories(r-type_client PRIVATE src)

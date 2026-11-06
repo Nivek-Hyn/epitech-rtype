@@ -1,0 +1,45 @@
+{
+  "stage": 8,
+  "level_name": "Monde 3-2 : Tempete de Singularites",
+  "waves": [
+    {
+      "wave_id": 1,
+      "delay_before_start": 2.0,
+      "enemies": [
+        { "type": "singularity_fragment", "spawn_y": 180.0, "speed": 56.0 },
+        { "type": "singularity_fragment", "spawn_y": 460.0, "speed": 56.0 }
+      ]
+    },
+    {
+      "wave_id": 2,
+      "delay_before_start": 10.0,
+      "enemies": [
+        { "type": "vortex_drone", "spawn_y": 100.0, "speed": 108.0 },
+        { "type": "quantum_shifter", "spawn_y": 240.0, "speed": 152.0 },
+        { "type": "vortex_drone", "spawn_y": 380.0, "speed": 108.0 },
+        { "type": "quantum_shifter", "spawn_y": 520.0, "speed": 152.0 }
+      ]
+    },
+    {
+      "wave_id": 3,
+      "delay_before_start": 20.0,
+      "enemies": [
+        { "type": "quantum_shifter", "spawn_y": 120.0, "speed": 155.0 },
+        { "type": "singularity_fragment", "spawn_y": 260.0, "speed": 58.0 },
+        { "type": "quantum_shifter", "spawn_y": 400.0, "speed": 155.0 },
+        { "type": "singularity_fragment", "spawn_y": 540.0, "speed": 58.0 }
+      ]
+    },
+    {
+      "wave_id": 4,
+      "delay_before_start": 31.0,
+      "enemies": [
+        { "type": "vortex_drone", "spawn_y": 90.0, "speed": 110.0 },
+        { "type": "vortex_drone", "spawn_y": 220.0, "speed": 110.0 },
+        { "type": "quantum_shifter", "spawn_y": 330.0, "speed": 158.0 },
+        { "type": "vortex_drone", "spawn_y": 440.0, "speed": 110.0 },
+        { "type": "vortex_drone", "spawn_y": 570.0, "speed": 110.0 }
+      ]
+    }
+  ]
+}

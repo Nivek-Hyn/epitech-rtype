@@ -6,22 +6,35 @@ namespace rtype::server {
 
 void updateEnemyShooting(engine::ecs::Registry &registry, const std::function<engine::ecs::Entity(protocol::EntityType, std::uint8_t, float, float)> &spawnFunc, float dt)
 {
-    registry.each<rtype::components::Position, rtype::components::Kind, rtype::components::EnemyAttack>([&registry, &spawnFunc, dt](engine::ecs::Entity /*entity*/, const rtype::components::Position &pos, const rtype::components::Kind &kind, rtype::components::EnemyAttack &attack) {
+    struct PendingShot {
+        std::uint8_t variant;
+        float x;
+        float y;
+        float speed;
+        std::string pattern;
+    };
+    std::vector<PendingShot> shots;
+
+    registry.each<rtype::components::Position, rtype::components::Kind, rtype::components::EnemyAttack>([&shots, dt](engine::ecs::Entity /*entity*/, const rtype::components::Position &pos, const rtype::components::Kind &kind, rtype::components::EnemyAttack &enemyAttack) {
             if (kind.type != protocol::EntityType::Enemy)
                 return;
 
-            attack.shootTimer += dt;
-            if (attack.shootTimer >= attack.fireRate) {
-                attack.shootTimer = 0.f;
-
-                engine::ecs::Entity bullet = spawnFunc(protocol::EntityType::EnemyMissile, attack.bulletVariant, pos.x - 30.0f, pos.y);
-                registry.emplace<rtype::components::Velocity>(bullet, -attack.bulletSpeed, 0.0f);
-                if (!attack.bulletPattern.empty() && attack.bulletPattern != "straight") {
-                    registry.emplace<rtype::components::MovementPattern>(bullet, rtype::components::MovementPattern{attack.bulletPattern});
+            for (auto &attack : enemyAttack.attacks) {
+                attack.shootTimer += dt;
+                if (attack.shootTimer >= attack.fireRate) {
+                    attack.shootTimer = 0.f;
+                    shots.push_back({attack.bulletVariant, pos.x - 30.0f, pos.y + attack.offsetY, attack.bulletSpeed, attack.bulletPattern});
                 }
             }
         });
 
+    for (const auto &shot : shots) {
+        engine::ecs::Entity bullet = spawnFunc(protocol::EntityType::EnemyMissile, shot.variant, shot.x, shot.y);
+        registry.emplace<rtype::components::Velocity>(bullet, -shot.speed, 0.0f);
+        if (!shot.pattern.empty() && shot.pattern != "straight") {
+            registry.emplace<rtype::components::MovementPattern>(bullet, rtype::components::MovementPattern{shot.pattern});
+        }
+    }
     registry.each<rtype::components::Position, rtype::components::Velocity, rtype::components::Kind, rtype::components::MovementPattern>([](engine::ecs::Entity /*entity*/, const rtype::components::Position &pos, rtype::components::Velocity &vel, const rtype::components::Kind &kind, const rtype::components::MovementPattern &pattern) {
             if (kind.type != protocol::EntityType::EnemyMissile)
                 return;

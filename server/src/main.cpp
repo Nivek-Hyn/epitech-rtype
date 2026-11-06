@@ -28,29 +28,58 @@ void onSignal(int)
 int main(int argc, char **argv)
 {
     std::uint16_t port = rtype::DefaultPort;
+    std::string modeStr = "campaign";
+    std::string diffStr = "normal";
     std::string levelPath;
-    if (argc > 1) {
-        try {
-            port = static_cast<std::uint16_t>(std::stoul(argv[1]));
-        } catch (const std::exception &) {
-            std::cerr << "Usage: " << argv[0] << " [port] [level_path]\n";
-            return 84;
+
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg == "--mode" && i + 1 < argc) {
+            modeStr = argv[++i];
+        } else if (arg == "--difficulty" && i + 1 < argc) {
+            diffStr = argv[++i];
+        } else if (arg == "--level" && i + 1 < argc) {
+            levelPath = argv[++i];
+        } else if (arg == "-h" || arg == "--help") {
+            std::cout << "Usage: " << argv[0] << " [port] [level_path] [--mode campaign|infinite] [--difficulty easy|normal|hard] [--level path]\n";
+            return 0;
+        } else if (arg.rfind("--", 0) != 0 && i == 1) {
+            try {
+                port = static_cast<std::uint16_t>(std::stoul(arg));
+            } catch (const std::exception &) {
+                std::cerr << "Usage: " << argv[0] << " [port] [level_path] [--mode campaign|infinite] [--difficulty easy|normal|hard] [--level path]\n";
+                return 84;
+            }
+        } else if (arg.rfind("--", 0) != 0 && i == 2 && levelPath.empty()) {
+            levelPath = arg;
         }
-    }
-    if (argc > 2) {
-        levelPath = argv[2];
     }
 
     std::signal(SIGINT, onSignal);
     std::signal(SIGTERM, onSignal);
 
     rtype::server::Game game;
+    if (modeStr == "infinite") {
+        game.setGameMode(rtype::server::Game::GameMode::Infinite);
+    } else {
+        game.setGameMode(rtype::server::Game::GameMode::Campaign);
+    }
+
+    if (diffStr == "easy") {
+        game.setDifficulty(rtype::server::Game::Difficulty::Easy);
+    } else if (diffStr == "hard") {
+        game.setDifficulty(rtype::server::Game::Difficulty::Hard);
+    } else {
+        game.setDifficulty(rtype::server::Game::Difficulty::Normal);
+    }
+
     if (!levelPath.empty()) {
         try {
             game.loadLevel(levelPath);
             std::cout << "r-type_server: Loaded level: " << levelPath << '\n';
         } catch (const std::exception &e) {
-            std::cerr << "Warning: Could not load level " << levelPath << ": " << e.what() << '\n';
+            std::cerr << "Failed to load custom level: " << e.what() << '\n';
+            return 84;
         }
     }
     rtype::server::AsioNetworkServer network;
@@ -60,7 +89,10 @@ int main(int argc, char **argv)
         std::cerr << "Could not start UDP server: " << error.what() << '\n';
         return EXIT_FAILURE;
     }
-    std::cout << "r-type_server: listening on UDP port " << port << '\n';
+
+    std::cout << "r-type_server: listening on UDP port " << port
+              << " [Mode: " << (game.gameMode() == rtype::server::Game::GameMode::Infinite ? "Infinite" : "Campaign")
+              << ", Difficulty: " << diffStr << "]\n";
 
     engine::core::FixedTimestep clock(rtype::TickRate);
     while (g_running) {

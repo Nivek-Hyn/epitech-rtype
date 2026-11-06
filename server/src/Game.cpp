@@ -19,16 +19,11 @@ namespace rtype::server {
 
 namespace {
 
-constexpr float EnemySpawnIntervalSeconds = 2.f;
-constexpr float EnemySpeed = 100.f; // world units per second, towards the left
-// Hitbox sizes match the client sprites (scaled x2): enemy 33x36, missile 18x12.
 constexpr float EnemyWidth = 66.f;
 constexpr float EnemyHeight = 72.f;
 constexpr float MissileWidth = 36.f;
 constexpr float MissileHeight = 24.f;
 constexpr std::uint32_t PointsPerEnemy = 100;
-// Rows where enemies appear, in turn. The first one is level with a new player's ship (y = 300).
-constexpr std::array<float, 4> EnemyRows = {290.f, 150.f, 600.f, 450.f};
 
 } // namespace
 
@@ -37,28 +32,67 @@ Game::Game()
     _players.fill(engine::ecs::NullEntity);
     _registry.addSystem(engine::systems::movement<rtype::components::Position, rtype::components::Velocity>);
 
-    _currentLevel = loadLevelFromJson("assets/levels/level1.json");
-    _levelTimer = 0.f;
+    // Default configuration calibrated for Game Designers
+    _rules.difficulties[Difficulty::Easy] = {0.8f, 0.85f, 0.8f, 0.8f, 0.8f};
+    _rules.difficulties[Difficulty::Normal] = {1.0f, 1.0f, 1.0f, 1.0f, 1.0f};
+    _rules.difficulties[Difficulty::Hard] = {1.25f, 1.15f, 1.25f, 1.2f, 1.5f};
+    _rules.infinite = {0.2f, 0.05f, 0.1f, 0.5f, 0.1f, 700.0f, 0.5f};
+    _rules.campaignLevels = {
+        "assets/levels/level1.json",
+        "assets/levels/level2.json",
+        "assets/levels/level3.json"
+    };
+    _rules.intermissionDelay = 2.0f;
 
+    loadEntitiesConfig("assets/config/entities.json");
+    loadRules("assets/config/game_rules.json");
+
+    _campaignLevels = _rules.campaignLevels;
+    _currentLevelIndex = 0;
+    if (!_campaignLevels.empty()) {
+        try {
+            _currentLevel = loadLevelFromJson(_campaignLevels[0]);
+        } catch (...) {
+            // Level file might not be found in some test environments
+        }
+    }
+}
+
+void Game::loadEntitiesConfig(const std::string &filepath)
+{
     try {
-        std::ifstream file("assets/config/entities.json");
+        std::ifstream file(filepath);
         if (file.is_open()) {
             nlohmann::json j;
             file >> j;
             if (j.contains("enemies") && j["enemies"].is_object()) {
                 for (auto &[key, val] : j["enemies"].items()) {
                     EnemyDefinition def;
-                    def.health = val.value("health", 3);
+                    def.health = val.value("health", 1);
                     def.speed = val.value("speed", 100.f);
                     def.pattern = val.value("pattern", "straight");
                     def.variant = val.value<std::uint8_t>("variant", 0);
                     
-                    if (val.contains("attack")) {
+                    if (val.contains("attacks") && val["attacks"].is_array()) {
                         def.hasAttack = true;
-                        def.fireRate = val["attack"].value("fire_rate", 2.0f);
-                        def.bulletSpeed = val["attack"].value("bullet_speed", 350.f);
-                        def.bulletVariant = val["attack"].value<std::uint8_t>("bullet_variant", 0);
-                        def.bulletPattern = val["attack"].value("bullet_pattern", "straight");
+                        for (const auto &atkVal : val["attacks"]) {
+                            AttackDefinition atk;
+                            atk.fireRate = atkVal.value("fire_rate", 2.0f);
+                            atk.bulletSpeed = atkVal.value("bullet_speed", 350.f);
+                            atk.bulletVariant = atkVal.value<std::uint8_t>("bullet_variant", 0);
+                            atk.bulletPattern = atkVal.value("bullet_pattern", "straight");
+                            atk.offsetY = atkVal.value("offset_y", 0.f);
+                            def.attacks.push_back(atk);
+                        }
+                    } else if (val.contains("attack") && val["attack"].is_object()) {
+                        def.hasAttack = true;
+                        AttackDefinition atk;
+                        atk.fireRate = val["attack"].value("fire_rate", 2.0f);
+                        atk.bulletSpeed = val["attack"].value("bullet_speed", 350.f);
+                        atk.bulletVariant = val["attack"].value<std::uint8_t>("bullet_variant", 0);
+                        atk.bulletPattern = val["attack"].value("bullet_pattern", "straight");
+                        atk.offsetY = val["attack"].value("offset_y", 0.f);
+                        def.attacks.push_back(atk);
                     } else {
                         def.hasAttack = false;
                     }
@@ -66,22 +100,89 @@ Game::Game()
                 }
             }
         }
-    }catch (...) {
+    } catch (...) {
+    }
+}
+
+void Game::loadRules(const std::string &filepath)
+{
+    try {
+        std::ifstream file(filepath);
+        if (!file.is_open())
+            return;
+        nlohmann::json j;
+        file >> j;
+
+        if (j.contains("difficulties") && j["difficulties"].is_object()) {
+            auto parseDiff = [&](const std::string &name, Difficulty diff) {
+                if (j["difficulties"].contains(name)) {
+                    const auto &d = j["difficulties"][name];
+                    DifficultyConfig cfg;
+                    cfg.healthMultiplier = d.value("health_multiplier", 1.0f);
+                    cfg.speedMultiplier = d.value("speed_multiplier", 1.0f);
+                    cfg.fireRateMultiplier = d.value("fire_rate_multiplier", 1.0f);
+                    cfg.bulletSpeedMultiplier = d.value("bullet_speed_multiplier", 1.0f);
+                    cfg.scoreMultiplier = d.value("score_multiplier", 1.0f);
+                    _rules.difficulties[diff] = cfg;
+                }
+            };
+            parseDiff("easy", Difficulty::Easy);
+            parseDiff("normal", Difficulty::Normal);
+            parseDiff("hard", Difficulty::Hard);
+        }
+
+        if (j.contains("infinite_mode") && j["infinite_mode"].is_object()) {
+            const auto &inf = j["infinite_mode"];
+            _rules.infinite.healthGrowthPerLoop = inf.value("health_growth_per_loop", 0.2f);
+            _rules.infinite.speedGrowthPerLoop = inf.value("speed_growth_per_loop", 0.05f);
+            _rules.infinite.fireRateGrowthPerLoop = inf.value("fire_rate_growth_per_loop", 0.1f);
+            _rules.infinite.minFireRate = inf.value("min_fire_rate", 0.5f);
+            _rules.infinite.bulletSpeedGrowthPerLoop = inf.value("bullet_speed_growth_per_loop", 0.1f);
+            _rules.infinite.maxBulletSpeed = inf.value("max_bullet_speed", 700.0f);
+            _rules.infinite.scoreMultiplierPerLoop = inf.value("score_multiplier_per_loop", 0.5f);
+        }
+
+        if (j.contains("campaign") && j["campaign"].is_object()) {
+            const auto &camp = j["campaign"];
+            if (camp.contains("levels") && camp["levels"].is_array()) {
+                _rules.campaignLevels.clear();
+                for (const auto &lvl : camp["levels"]) {
+                    _rules.campaignLevels.push_back(lvl.get<std::string>());
+                }
+            }
+            _rules.intermissionDelay = camp.value("intermission_delay", 2.0f);
+        }
+    } catch (...) {
     }
 }
 
 void Game::loadLevel(const std::string &filepath)
 {
+    _campaignLevels = {filepath};
+    _currentLevelIndex = 0;
     _currentLevel = loadLevelFromJson(filepath);
     _levelTimer = 0.f;
+    _transitionTimer = 0.f;
 
     for (auto &wave : _currentLevel.waves) {
         wave.isSpawned = false;
     }
 }
 
+void Game::loadCampaign(const std::vector<std::string> &levelPaths)
+{
+    _campaignLevels = levelPaths;
+    _currentLevelIndex = 0;
+    if (!_campaignLevels.empty()) {
+        _currentLevel = loadLevelFromJson(_campaignLevels[0]);
+        _levelTimer = 0.f;
+        _transitionTimer = 0.f;
+        for (auto &wave : _currentLevel.waves) {
+            wave.isSpawned = false;
+        }
+    }
+}
 
-// TODO(gameplay): spawn the player's ship (NetworkId, Kind, Position, Velocity...) and remember it in _players.
 void Game::onPlayerJoined(PlayerId player)
 {
     if (player >= MaxPlayers || _players[player] != engine::ecs::NullEntity)
@@ -169,6 +270,8 @@ void Game::update(float dt)
     for (float &cooldown : _shootCooldowns)
         cooldown = std::max(0.f, cooldown - dt);
 
+    updateLevelProgression(dt);
+
     std::vector<std::pair<engine::ecs::Entity, std::uint32_t>> expiredMissiles;
     _registry.each<rtype::components::Position, rtype::components::Kind, rtype::components::NetworkId>(
         [&expiredMissiles](engine::ecs::Entity entity, const rtype::components::Position &position,
@@ -176,7 +279,8 @@ void Game::update(float dt)
             const bool missileOut =
                 (kind.type == protocol::EntityType::PlayerMissile || kind.type == protocol::EntityType::EnemyMissile) &&
                 (position.x > WorldWidth || position.x < 0.f || position.y > WorldHeight || position.y < 0.f);
-            const bool enemyOut = kind.type == protocol::EntityType::Enemy && position.x < -320.f;
+            const bool enemyOut = kind.type == protocol::EntityType::Enemy &&
+                (position.x < -EnemyWidth || position.y < -300.f || position.y > WorldHeight + 300.f);
             if (missileOut || enemyOut)
                 expiredMissiles.emplace_back(entity, networkId.id);
         });
@@ -187,12 +291,66 @@ void Game::update(float dt)
     _tick++;
 }
 
-// TODO(gameplay): one EntityState per entity having NetworkId + Kind + Position.
+void Game::updateLevelProgression(float dt)
+{
+    if (_state == protocol::GameState::Finished)
+        return;
+
+    bool allWavesSpawned = !_currentLevel.waves.empty() && std::all_of(
+        _currentLevel.waves.begin(), _currentLevel.waves.end(), [](const WaveConfig &w) {
+            return w.isSpawned;
+        });
+    bool noMoreEnemies = true;
+    _registry.each<rtype::components::Kind>([&noMoreEnemies](engine::ecs::Entity /*entity*/, const rtype::components::Kind &kind) {
+        if (kind.type == protocol::EntityType::Enemy) {
+            noMoreEnemies = false;
+        }
+    });
+
+    if (allWavesSpawned && noMoreEnemies) {
+        _transitionTimer += dt;
+        if (_transitionTimer >= _rules.intermissionDelay) {
+            _transitionTimer = 0.f;
+
+            if (_gameMode == GameMode::Campaign) {
+                if (_currentLevelIndex + 1 < _campaignLevels.size()) {
+                    _currentLevelIndex++;
+                    _currentLevel = loadLevelFromJson(_campaignLevels[_currentLevelIndex]);
+                    _levelTimer = 0.f;
+                    for (auto &wave : _currentLevel.waves)
+                        wave.isSpawned = false;
+                } else {
+                    _state = protocol::GameState::Finished;
+                }
+            } else if (_gameMode == GameMode::Infinite) {
+                if (_currentLevelIndex + 1 < _campaignLevels.size()) {
+                    _currentLevelIndex++;
+                    _currentLevel = loadLevelFromJson(_campaignLevels[_currentLevelIndex]);
+                    _levelTimer = 0.f;
+                    for (auto &wave : _currentLevel.waves)
+                        wave.isSpawned = false;
+                } else {
+                    _infiniteLoopCount++;
+                    _currentLevelIndex = 0;
+                    if (!_campaignLevels.empty()) {
+                        _currentLevel = loadLevelFromJson(_campaignLevels[0]);
+                    }
+                    _levelTimer = 0.f;
+                    for (auto &wave : _currentLevel.waves)
+                        wave.isSpawned = false;
+                }
+            }
+        }
+    } else {
+        _transitionTimer = 0.f;
+    }
+}
+
 protocol::Snapshot Game::snapshot()
 {
     protocol::Snapshot snap;
     snap.tick = _tick;
-    snap.state = protocol::GameState::Playing;
+    snap.state = _state;
     snap.score = _score;
 
     _registry.each<rtype::components::Position, rtype::components::Kind, rtype::components::NetworkId>(
@@ -218,7 +376,9 @@ std::vector<protocol::Message> Game::takeEvents()
 
 void Game::spawnEnemies(float dt)
 {
-    const bool anyPlayer = std::any_of(_players.begin(), _players.end(), [](engine::ecs::Entity player) { return player != engine::ecs::NullEntity; });
+    const bool anyPlayer = std::any_of(_players.begin(), _players.end(), [](engine::ecs::Entity player) {
+        return player != engine::ecs::NullEntity;
+    });
     if (!anyPlayer) {
         _levelTimer = 0.f;
         for (auto &wave : _currentLevel.waves)
@@ -231,45 +391,70 @@ void Game::spawnEnemies(float dt)
     static std::random_device rd;
     static std::mt19937 gen(rd());
     static std::uniform_real_distribution<float> disVertical(50.0f, 650.0f);
-    
+
+    const auto &diffCfg = _rules.difficulties[_difficulty];
+    const float loopOffset = (_gameMode == GameMode::Infinite && _infiniteLoopCount > 1)
+                                 ? static_cast<float>(_infiniteLoopCount - 1)
+                                 : 0.0f;
+
+    const float hpGrowth = 1.0f + loopOffset * _rules.infinite.healthGrowthPerLoop;
+    const float speedGrowth = 1.0f + loopOffset * _rules.infinite.speedGrowthPerLoop;
+    const float fireRateGrowth = 1.0f + loopOffset * _rules.infinite.fireRateGrowthPerLoop;
+    const float bulletSpeedGrowth = 1.0f + loopOffset * _rules.infinite.bulletSpeedGrowthPerLoop;
+
     for (auto &wave : _currentLevel.waves) {
         if (!wave.isSpawned && _levelTimer >= wave.delay_before_start) {
             for (const auto &enemyConfig : wave.enemies) {
-                int hp = 3;
-                float speed = enemyConfig.speed;
+                int hp = 1;
+                float speed = enemyConfig.speed > 0.f ? enemyConfig.speed : 100.f;
                 std::string patternType = "straight";
+                float amplitude = enemyConfig.amplitude;
+                float frequency = enemyConfig.frequency;
+
                 bool hasAttack = false;
-                float fireRate = 2.0f;
-                float bulletSpeed = 350.f;
-                std::uint8_t bulletVariant = 0;
-                std::string bulletPattern = "straight";
+                std::vector<AttackDefinition> attacks;
                 std::uint8_t enemyVariant = 0;
 
                 if (_entityDefinitions.find(enemyConfig.type) != _entityDefinitions.end()) {
                     const auto &def = _entityDefinitions[enemyConfig.type];
                     hp = def.health;
-                    if (speed <= 0.f)
+                    if (enemyConfig.health > 0) {
+                        hp = enemyConfig.health;
+                    }
+                    if (enemyConfig.speed <= 0.f) {
                         speed = def.speed;
+                    }
                     patternType = def.pattern;
                     hasAttack = def.hasAttack;
-                    fireRate = def.fireRate;
-                    bulletSpeed = def.bulletSpeed;
-                    bulletVariant = def.bulletVariant;
-                    bulletPattern = def.bulletPattern;
+                    attacks = def.attacks;
                     enemyVariant = def.variant;
                 }
 
-                const float spawnY = (enemyConfig.spawn_y > 0.f) ? enemyConfig.spawn_y : disVertical(gen);
+                const int finalHp = std::max(1, static_cast<int>(std::round(static_cast<float>(hp) * diffCfg.healthMultiplier * hpGrowth)));
+                const float finalSpeed = speed * diffCfg.speedMultiplier * speedGrowth;
+
+                float spawnY = enemyConfig.spawn_y;
+                if (spawnY < 0.f) {
+                    spawnY = disVertical(gen);
+                }
+
                 engine::ecs::Entity enemy =
                     spawnNetworked(protocol::EntityType::Enemy, enemyVariant, WorldWidth, spawnY);
                 
-                _registry.emplace<rtype::components::Velocity>(enemy, -speed, 0.f);
-                _registry.emplace<rtype::components::Health>(enemy, hp);
-                _registry.emplace<rtype::components::MovementPattern>(enemy, rtype::components::MovementPattern{patternType});
+                _registry.emplace<rtype::components::Velocity>(enemy, -finalSpeed, 0.f);
+                _registry.emplace<rtype::components::Health>(enemy, finalHp);
+                _registry.emplace<rtype::components::MovementPattern>(
+                    enemy, rtype::components::MovementPattern{patternType, amplitude, frequency});
 
-                if (hasAttack) {
+                if (hasAttack && !attacks.empty()) {
+                    std::vector<rtype::components::AttackEntry> attackEntries;
+                    for (const auto &atk : attacks) {
+                        const float finalFireRate = std::max(_rules.infinite.minFireRate, atk.fireRate / (diffCfg.fireRateMultiplier * fireRateGrowth));
+                        const float finalBulletSpeed = std::min(_rules.infinite.maxBulletSpeed, atk.bulletSpeed * diffCfg.bulletSpeedMultiplier * bulletSpeedGrowth);
+                        attackEntries.push_back(rtype::components::AttackEntry{0.f, finalFireRate, finalBulletSpeed, atk.bulletVariant, atk.bulletPattern, atk.offsetY});
+                    }
                     _registry.emplace<rtype::components::EnemyAttack>(
-                        enemy, rtype::components::EnemyAttack{0.f, fireRate, bulletSpeed, bulletVariant, bulletPattern});
+                        enemy, rtype::components::EnemyAttack{std::move(attackEntries)});
                 }
             }
             wave.isSpawned = true;
@@ -277,7 +462,6 @@ void Game::spawnEnemies(float dt)
     }
 }
 
-// A player missile touching an enemy inflicts damage and adds PointsPerEnemy to the score if destroyed.
 void Game::handleCollisions()
 {
     using rtype::components::Kind;
@@ -320,6 +504,13 @@ void Game::handleCollisions()
     std::vector<bool> enemyHit(enemies.size(), false);
     std::vector<engine::ecs::Entity> destroyed;
 
+    const auto &diffCfg = _rules.difficulties[_difficulty];
+    float scoreMult = diffCfg.scoreMultiplier;
+    if (_gameMode == GameMode::Infinite && _infiniteLoopCount > 1) {
+        scoreMult += static_cast<float>(_infiniteLoopCount - 1) * _rules.infinite.scoreMultiplierPerLoop;
+    }
+    const auto awardedPoints = static_cast<std::uint32_t>(std::round(static_cast<float>(PointsPerEnemy) * scoreMult));
+
     _registry.each<Position, Kind>([&](engine::ecs::Entity missile, const Position &position, const Kind &kind) {
         if (kind.type != protocol::EntityType::PlayerMissile)
             return;
@@ -333,11 +524,11 @@ void Game::handleCollisions()
                     health->hp -= 1;
                     if (health->hp <= 0) {
                         destroyed.push_back(enemies[i].first);
-                        _score += PointsPerEnemy;
+                        _score += awardedPoints;
                     }
                 } else {
                     destroyed.push_back(enemies[i].first);
-                    _score += PointsPerEnemy;
+                    _score += awardedPoints;
                 }
                 return;
             }
@@ -380,6 +571,7 @@ void Game::handleCollisions()
             }
         });
     });
+
     for (const engine::ecs::Entity entity : destroyed) {
         for (std::size_t player = 0; player < _players.size(); player++) {
             if (_players[player] == entity) {

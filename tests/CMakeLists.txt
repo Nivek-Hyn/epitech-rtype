@@ -9,8 +9,11 @@ add_executable(rtype_tests
     test_protocol.cpp
     test_game.cpp
     test_thread_safe_queue.cpp
+    test_game_config.cpp
+    ../client/src/ui/GameConfig.cpp
 )
-target_link_libraries(rtype_tests PRIVATE rtype_server_lib GTest::gtest_main)
+target_include_directories(rtype_tests PRIVATE "${PROJECT_SOURCE_DIR}/client/src")
+target_link_libraries(rtype_tests PRIVATE rtype_server_lib GTest::gtest_main SFML::Window nlohmann_json::nlohmann_json)
 set_target_properties(rtype_tests PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 
 include(GoogleTest)

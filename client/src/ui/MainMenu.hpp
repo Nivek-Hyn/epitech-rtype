@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Button.hpp"
+#include "GameConfig.hpp"
 #include "OptionSelector.hpp"
 #include "Starfield.hpp"
 #include "TextInput.hpp"
@@ -29,22 +30,6 @@ enum class MenuAction {
     Exit
 };
 
-struct GameConfig {
-    int gameMode{0};
-    int difficulty{1};
-    int mission{0};
-    std::string hostPort{"4242"};
-
-    std::string joinIp{"127.0.0.1"};
-    std::string joinPort{"4242"};
-
-    float sfxVolume{100.f};
-    float musicVolume{100.f};
-
-    static GameConfig loadFromFile(const std::string &path = "config.json");
-    bool saveToFile(const std::string &path = "config.json") const;
-};
-
 class MainMenu {
 public:
     explicit MainMenu(const sf::Font &font, ResourceManager *resources = nullptr);
@@ -63,6 +48,7 @@ private:
     void initHostScreen();
     void initJoinScreen();
     void initSettingsScreen();
+    void updateKeyButtonLabels();
 
     void navigateMenu(int direction);
     void triggerCurrentSelection();
@@ -98,9 +84,12 @@ private:
 
     std::unique_ptr<OptionSelector> _sfxVolumeSelector;
     std::unique_ptr<OptionSelector> _musicVolumeSelector;
-    sf::Text _controlsInfo;
+    sf::Text _controlsTitleText;
+    std::vector<std::unique_ptr<Button>> _keyButtons;
+    std::vector<std::unique_ptr<Button>> _presetButtons;
     std::vector<std::unique_ptr<Button>> _settingsButtons;
     int _settingsSelectedIndex{0};
+    int _rebindingAction{-1};
 };
 
 }

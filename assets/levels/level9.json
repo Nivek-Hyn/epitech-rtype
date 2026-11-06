@@ -1,0 +1,32 @@
+{
+  "stage": 9,
+  "level_name": "Monde 3-3 : Coeur de l'Horizon",
+  "waves": [
+    {
+      "wave_id": 1,
+      "delay_before_start": 2.5,
+      "enemies": [
+        { "type": "quantum_shifter", "spawn_y": 130.0, "speed": 158.0 },
+        { "type": "vortex_drone", "spawn_y": 260.0, "speed": 112.0 },
+        { "type": "quantum_shifter", "spawn_y": 390.0, "speed": 158.0 },
+        { "type": "vortex_drone", "spawn_y": 520.0, "speed": 112.0 }
+      ]
+    },
+    {
+      "wave_id": 2,
+      "delay_before_start": 13.0,
+      "enemies": [
+        { "type": "singularity_fragment", "spawn_y": 180.0, "speed": 60.0 },
+        { "type": "singularity_fragment", "spawn_y": 460.0, "speed": 60.0 },
+        { "type": "quantum_shifter", "spawn_y": 320.0, "speed": 160.0 }
+      ]
+    },
+    {
+      "wave_id": 3,
+      "delay_before_start": 25.0,
+      "enemies": [
+        { "type": "boss_singularity_core", "spawn_y": 320.0, "speed": 25.0 }
+      ]
+    }
+  ]
+}
