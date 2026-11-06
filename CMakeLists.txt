@@ -23,6 +23,7 @@ include(cmake/Warnings.cmake)
 add_subdirectory(engine)
 add_subdirectory(common)
 add_subdirectory(server)
+add_subdirectory(tools/level-editor)
 
 if(RTYPE_BUILD_CLIENT)
     add_subdirectory(client)
