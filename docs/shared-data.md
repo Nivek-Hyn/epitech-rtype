@@ -35,7 +35,7 @@ Shared components belong in `common/`; game-independent operations remain in `en
 server gameplay belongs in `server/`, while textures, UI and SFML objects belong in `client/`.
 Health, configurable hitbox and control-state structs are not already supplied by Components.hpp.
 The current missile/enemy and player/enemy collision code builds AABBs from positions and fixed
-dimensions in Game.cpp. A player killed by a collision loses its local player/entity association before
+dimensions in GameCollisions.cpp and Components.hpp. A player killed by a collision loses its local player/entity association before
 the id is recycled; a dead player's inputs are ignored.
 
 ## Input and state flow

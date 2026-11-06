@@ -24,7 +24,13 @@ Campaign and balancing rely on these files:
 
 Runtime loading and scaling are implemented in:
 
-- `server/src/Game.cpp`
+- `server/src/GameConfigLoader.cpp`: reading the configuration files.
+- `server/src/GameLevels.cpp`: going from one level to the next.
+- `server/src/GameWaves.cpp`: making enemies and tiles appear.
+- `server/src/GameDifficulty.cpp`: difficulty and infinite mode scaling.
+- `server/src/GamePlayers.cpp`: controls, lives and respawn.
+- `server/src/GameCollisions.cpp`: what happens when a shot or a ship touches something.
+- `server/src/Game.cpp`: one step of the game.
 
 ## World pillars
 

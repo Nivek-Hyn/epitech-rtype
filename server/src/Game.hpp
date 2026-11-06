@@ -3,11 +3,14 @@
 #include "common/Constants.hpp"
 #include "common/Protocol.hpp"
 #include "engine/ecs/Registry.hpp"
+#include "engine/physics/Aabb.hpp"
 #include "levelLoader.hpp"
 #include "net/INetworkServer.hpp"
 
 #include <array>
+#include <cstddef>
 #include <cstdint>
+#include <utility>
 #include <vector>
 #include <string>
 #include <unordered_map>
@@ -130,16 +133,71 @@ public:
     GameRules &rules() { return _rules; }
 
 private:
-    engine::ecs::Entity spawnNetworked(protocol::EntityType type, std::uint8_t variant, float x, float y);
-    void spawnEnemies(float dt);
-    void handleCollisions();
-    void updateLevelProgression(float dt);
-    void clearEnemies();
-    void updatePlayerLives(float dt);
+    struct CollisionFrame;
+
+    // GameConfigLoader.cpp
+    void applyDefaultRules();
+
+    // GameLevels.cpp
+    void loadCurrentLevel();
+    void loadFirstLevel();
     void resetWaves();
+    bool allWavesSpawned() const;
+    bool anyEnemyAlive();
+    void updateLevelProgression(float dt);
+    void goToNextLevel();
     void restartCampaign();
-    void restoreLivesOnNewWorld();
+
+    // GamePlayers.cpp
+    void applyMovementInput(std::size_t player, std::uint8_t flags);
+    void shootIfReady(std::size_t player);
+    void spawnPlayerShip(std::size_t player);
+    void removePlayerShip(std::size_t player);
+    void updatePlayerLives(float dt);
+    void updatePlayerRespawn(std::size_t player, float dt);
     bool isInvulnerable(engine::ecs::Entity entity) const;
+    bool anyPlayerConnected() const;
+    bool anyPlayerStillInGame() const;
+    void restoreLivesOnNewWorld();
+
+    // Game.cpp
+    engine::ecs::Entity spawnNetworked(protocol::EntityType type, std::uint8_t variant, float x, float y);
+    void keepPlayersOnScreen();
+    void updateShootCooldowns(float dt);
+    void removeEntitiesOutOfScreen();
+    void clearEnemies();
+    void removeAsOutOfBounds(const std::vector<std::pair<engine::ecs::Entity, std::uint32_t>> &entities);
+
+    // GameDifficulty.cpp
+    DifficultyConfig &currentDifficulty();
+    float completedLoops() const;
+    int scaledHealth(int health);
+    float scaledSpeed(float speed);
+    float scaledFireRate(float fireRate);
+    float scaledBulletSpeed(float bulletSpeed);
+
+    // GameWaves.cpp
+    void updateWaves(float dt);
+    void spawnWave(WaveConfig &wave);
+    EnemyDefinition resolveEnemy(const EnemySpawnConfig &config);
+    void spawnEnemy(const EnemySpawnConfig &config);
+    void giveAttacks(engine::ecs::Entity enemy, const std::vector<AttackDefinition> &attacks);
+    void spawnObstacle(const EnemySpawnConfig &config);
+
+    // GameCollisions.cpp
+    void handleCollisions();
+    CollisionFrame collectHitAreas();
+    void resolvePlayerMissiles(CollisionFrame &frame);
+    bool missileHitsObstacle(CollisionFrame &frame, engine::ecs::Entity missile, const engine::physics::Aabb &box);
+    bool missileHitsEnemy(CollisionFrame &frame, engine::ecs::Entity missile, const engine::physics::Aabb &box);
+    void damageEnemy(CollisionFrame &frame, engine::ecs::Entity enemy);
+    std::uint32_t pointsFor(engine::ecs::Entity enemy);
+    void resolveShipContacts(CollisionFrame &frame);
+    void shipRamsEnemies(CollisionFrame &frame, engine::ecs::Entity ship, const engine::physics::Aabb &box);
+    void resolveEnemyMissiles(CollisionFrame &frame);
+    void missileHitsShips(CollisionFrame &frame, engine::ecs::Entity missile, const engine::physics::Aabb &box);
+    void destroyEntities(const std::vector<engine::ecs::Entity> &entities);
+    void loseLifeIfShip(engine::ecs::Entity entity);
 
     engine::ecs::Registry _registry;
     std::array<engine::ecs::Entity, MaxPlayers> _players;
