@@ -5,7 +5,10 @@
 
 #include <gtest/gtest.h>
 
+#include <nlohmann/json.hpp>
+
 #include <algorithm>
+#include <fstream>
 
 using namespace rtype;
 using namespace rtype::server;
@@ -16,6 +19,7 @@ namespace {
 constexpr const char *TestEntities = "tests/data/entities.json";
 constexpr const char *OneGrunt = "tests/data/one_grunt.json";
 constexpr const char *OneBoss = "tests/data/one_boss.json";
+constexpr const char *OneSprite = "tests/data/one_sprite.json";
 
 void run(Game &game, float seconds)
 {
@@ -664,5 +668,54 @@ TEST(Movement, StoppedBossNeverLeavesTheScreen)
     EXPECT_FLOAT_EQ(velocity->y, 0.f);
 }
 
+TEST(Game, EnemyKeepsTheSpriteOfItsDefinition)
+{
+    Game game;
+    game.loadEntitiesConfig(TestEntities);
+    game.loadLevel(OneSprite);
+    game.onPlayerJoined(0);
+    run(game, 0.1f);
 
+    const auto snap = game.snapshot();
+    const auto enemy = std::find_if(snap.entities.begin(), snap.entities.end(), [](const auto &entity) {
+        return entity.type == protocol::EntityType::Enemy;
+    });
+    ASSERT_NE(enemy, snap.entities.end());
+    EXPECT_EQ(enemy->variant, 3);
+}
 
+TEST(Game, EveryEnemyOfTheGameDeclaresItsSprite)
+{
+    std::ifstream file("assets/config/entities.json");
+    ASSERT_TRUE(file.is_open());
+    const auto config = nlohmann::json::parse(file);
+    for (const auto &[name, enemy] : config.at("enemies").items()) {
+        ASSERT_TRUE(enemy.contains("variant")) << name;
+        if (enemy.value("is_boss", false)) {
+            EXPECT_GE(enemy.at("variant").get<int>(), 5) << name;
+        }
+    }
+}
+
+TEST(Movement, BossSpriteStaysOnScreenWhileBouncing)
+{
+    engine::ecs::Registry registry;
+    const auto boss = registry.spawn();
+    registry.emplace<rtype::components::Position>(boss, 1200.f, 700.f);
+    registry.emplace<rtype::components::Velocity>(boss, 0.f, 0.f);
+    registry.emplace<rtype::components::Kind>(boss, protocol::EntityType::Enemy, 6);
+    registry.emplace<rtype::components::MovementPattern>(
+        boss, rtype::components::MovementPattern{"martian_bounce", 60.f, 0.f, 35.f, 1200.f});
+
+    const auto box = rtype::components::enemyHitbox(6);
+    const float dt = 1.f / 60.f;
+    for (int tick = 0; tick < 60 * 60; ++tick) {
+        updateEnemyMovements(registry, dt);
+        auto *position = registry.get<rtype::components::Position>(boss);
+        const auto *velocity = registry.get<rtype::components::Velocity>(boss);
+        position->y += velocity->y * dt;
+        // One tick of tolerance: the ground is detected once it has been reached.
+        EXPECT_LE(position->y + box.offsetY + box.height, WorldHeight + 5.f);
+        EXPECT_GE(position->y + box.offsetY, -5.f);
+    }
+}

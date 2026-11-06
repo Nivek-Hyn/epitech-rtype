@@ -21,7 +21,6 @@ namespace rtype::server {
 namespace {
 
 constexpr float EnemyWidth = 66.f;
-constexpr float EnemyHeight = 72.f;
 constexpr float MissileWidth = 36.f;
 constexpr float MissileHeight = 24.f;
 constexpr float PlayerSpawnX = 100.f;
@@ -70,6 +69,7 @@ void Game::loadEntitiesConfig(const std::string &filepath)
             if (j.contains("enemies") && j["enemies"].is_object()) {
                 for (auto &[key, val] : j["enemies"].items()) {
                     EnemyDefinition def;
+                    def.variant = val.value<std::uint8_t>("variant", 0);
                     def.health = val.value("health", 1);
                     def.speed = val.value("speed", 100.f);
                     def.pattern = val.value("pattern", "straight");
@@ -510,6 +510,7 @@ void Game::spawnEnemies(float dt)
 
                 if (_entityDefinitions.find(enemyConfig.type) != _entityDefinitions.end()) {
                     const auto &def = _entityDefinitions[enemyConfig.type];
+                    enemyVariant = def.variant;
                     hp = def.health;
                     if (enemyConfig.health > 0) {
                         hp = enemyConfig.health;
@@ -574,34 +575,8 @@ void Game::handleCollisions()
     _registry.each<Position, Kind>([&enemies](engine::ecs::Entity entity, const Position &position, const Kind &kind) {
         if (kind.type != protocol::EntityType::Enemy)
             return;
-        float w = EnemyWidth;
-        float h = EnemyHeight;
-        float offsetY = 0.f;
-        if (kind.variant == 0) {
-            w = 66.f;
-            h = 72.f;
-        } else if (kind.variant == 1) {
-            w = 64.f;
-            h = 56.f;
-        } else if (kind.variant == 2) {
-            w = 64.f;
-            h = 56.f;
-        } else if (kind.variant == 3) {
-            w = 56.f;
-            h = 46.f;
-        } else if (kind.variant == 4) {
-            w = 72.f;
-            h = 83.f;
-        } else if (kind.variant == 5) {
-            w = 200.f;
-            h = 200.f;
-            offsetY = -15.f;
-        } else if (kind.variant == 6) {
-            w = 280.f;
-            h = 222.f;
-            offsetY = -60.f;
-        }
-        enemies.push_back({entity, {position.x, position.y + offsetY, w, h}});
+        const auto box = rtype::components::enemyHitbox(kind.variant);
+        enemies.push_back({entity, {position.x, position.y + box.offsetY, box.width, box.height}});
     });
 
     std::vector<bool> enemyHit(enemies.size(), false);
