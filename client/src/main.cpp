@@ -128,6 +128,8 @@ int main(int argc, char **argv)
         lastEnemyCount = 0;
         gameOver = false;
         gameWon = false;
+        playerWasSpawned = false;
+        lastScore = 0;
         localPlayerId.reset();
         localPlayerTilt = 0.0f;
         playerYHistory.clear();
@@ -246,7 +248,6 @@ int main(int argc, char **argv)
                 if (const auto *accepted = std::get_if<rtype::protocol::ConnectAccepted>(&*message)) {
                     localPlayerId = accepted->playerId;
                 } else if (const auto *snapshot = std::get_if<rtype::protocol::Snapshot>(&*message)) {
-                    scoreText.setString("SCORE: " + std::to_string(snapshot->score));
                     lastScore = snapshot->score;
 
                     int enemyCount = 0;
@@ -260,9 +261,16 @@ int main(int argc, char **argv)
                         gameOver = true;
                         gameWon = false;
                     }
+                    if (playerCount > 0) {
+                        playerWasSpawned = true;
+                    }
+
                     if (snapshot->state == rtype::protocol::GameState::Finished) {
                         gameOver = true;
                         gameWon = true;
+                    } else if (playerWasSpawned && playerCount == 0 && !gameOver) {
+                        gameOver = true;
+                        gameWon = false;
                     }
 
                     if (reportedConnected && !waveStarted) {
@@ -415,6 +423,24 @@ int main(int argc, char **argv)
                         else if (col == 0 || col == 1) thrusterY = entity.y + 11.f;
                         thrusterGlow.setPosition({entity.x - 5.f, thrusterY});
                         window.draw(thrusterGlow);
+
+                        // Authoritative player identification tag above ship
+                        const std::uint8_t pId = entity.variant;
+                        std::string tagStr = "P" + std::to_string(pId + 1);
+                        if (localPlayerId.has_value() && localPlayerId.value() == pId)
+                            tagStr += " (YOU)";
+                        sf::Text tagText(resources.getFont("default"), tagStr, 15);
+                        static const std::array<sf::Color, 4> playerTagColors = {
+                            sf::Color(0, 230, 255),    // P1 Cyan
+                            sf::Color(255, 170, 40),   // P2 Orange
+                            sf::Color(80, 255, 120),   // P3 Green
+                            sf::Color(240, 110, 255)   // P4 Magenta
+                        };
+                        tagText.setFillColor(playerTagColors[pId % 4]);
+                        const auto tBounds = tagText.getLocalBounds();
+                        tagText.setOrigin({tBounds.size.x / 2.f, tBounds.size.y});
+                        tagText.setPosition({entity.x + 33.f, entity.y - 8.f});
+                        window.draw(tagText);
                     } else if (entity.type == rtype::protocol::EntityType::PlayerMissile) {
                         sf::Sprite sprite(resources.getTexture("bullet"));
                         const int bulletFrame = static_cast<int>(totalTime * 18.f) % 2;
@@ -494,48 +520,85 @@ int main(int argc, char **argv)
                         } else if (entity.variant == 1) {
                             const auto &tex = resources.hasTexture("enemy_patrol") ? resources.getTexture("enemy_patrol") : resources.getTexture("enemy");
                             sf::Sprite sprite(tex);
-                            const int frame = (animFrame / 2) % 3;
-                            sprite.setTextureRect(sf::IntRect({frame * 34 + 1, 3}, {32, 28}));
+                            // Scout ship: Frame 0 faces left towards players (Frame 1 in r-typesheet27 is 180° flipped facing backwards)
+                            sprite.setTextureRect(sf::IntRect({1, 2}, {32, 28}));
                             sprite.setScale({2.0f, 2.0f});
                             sprite.setPosition({entity.x, entity.y});
                             window.draw(sprite);
+
+                            // Active engine glow behind the scout ship
+                            const float enginePulse = 1.0f + 0.2f * std::sin(entityTime * 18.f);
+                            sf::CircleShape glow(3.5f * enginePulse);
+                            glow.setOrigin({3.5f, 3.5f});
+                            glow.setFillColor(sf::Color(255, 130, 40, 210));
+                            glow.setPosition({entity.x + 58.f, entity.y + 26.f});
+                            window.draw(glow);
                         } else if (entity.variant == 2) {
-                            const auto &tex = resources.hasTexture("enemy_sine") ? resources.getTexture("enemy_sine") : resources.getTexture("enemy");
+                            const auto &tex = resources.hasTexture("enemy_orbital_probe") ? resources.getTexture("enemy_orbital_probe") : resources.getTexture("enemy");
                             sf::Sprite sprite(tex);
-                            const int frame = animFrame % 8;
-                            sprite.setTextureRect(sf::IntRect({frame * 33 + 1, 3}, {32, 28}));
-                            sprite.setScale({2.0f, 2.0f});
+                            // Probe scans forward towards the player without turning backwards or snapping
+                            static const std::array<sf::IntRect, 4> probeFrames = {
+                                sf::IntRect({1, 2}, {16, 32}),
+                                sf::IntRect({19, 2}, {15, 32}),
+                                sf::IntRect({36, 2}, {15, 32}),
+                                sf::IntRect({19, 2}, {15, 32})
+                            };
+                            const int frame = (animFrame / 2) % 4;
+                            sprite.setTextureRect(probeFrames[frame]);
+                            sprite.setScale({2.2f, 2.2f});
                             sprite.setPosition({entity.x, entity.y});
                             window.draw(sprite);
                         } else if (entity.variant == 3) {
-                            const auto &tex = resources.hasTexture("enemy_diver") ? resources.getTexture("enemy_diver") : resources.getTexture("enemy");
+                            const auto &tex = resources.hasTexture("enemy_solar_relay") ? resources.getTexture("enemy_solar_relay") : (resources.hasTexture("enemy_diver") ? resources.getTexture("enemy_diver") : resources.getTexture("enemy"));
                             sf::Sprite sprite(tex);
-                            const int frame = animFrame % 8;
-                            sprite.setTextureRect(sf::IntRect({frame * 33 + 4, 7}, {28, 23}));
-                            sprite.setScale({2.0f, 2.0f});
+                            // Rotating orbital solar relay satellite: full 16-frame 360° rotation across Row 0 (0-7) and Row 1 (8-15)
+                            const int frame = (animFrame / 2) % 16;
+                            const int col = frame % 8;
+                            const int rowY = (frame < 8) ? 2 : 36;
+                            sprite.setTextureRect(sf::IntRect({col * 33 + 1, rowY}, {32, 32}));
+                            sprite.setScale({2.2f, 2.2f});
                             sprite.setPosition({entity.x, entity.y});
                             window.draw(sprite);
                         } else if (entity.variant == 4) {
+                            const auto &tex = resources.hasTexture("enemy_interceptor") ? resources.getTexture("enemy_interceptor") : resources.getTexture("enemy");
+                            sf::Sprite sprite(tex);
+                            const int frame = (animFrame / 2) % 5;
+                            sprite.setTextureRect(sf::IntRect({frame * 65 + 9, 9}, {48, 48}));
+                            sprite.setScale({1.8f, 1.8f});
+                            sprite.setPosition({entity.x, entity.y});
+                            window.draw(sprite);
+                        } else if (entity.variant == 7) {
                             const auto &tex = resources.hasTexture("enemy_tentacle") ? resources.getTexture("enemy_tentacle") : resources.getTexture("enemy");
                             sf::Sprite sprite(tex);
-                            const int frame = animFrame % 8;
-                            sprite.setTextureRect(sf::IntRect({frame * 41 + 1, 1}, {40, 46}));
+                            // Surface jumping Martian alien on Mars (ping-pong 4 frames facing forward: 0, 1, 2, 1)
+                            static const std::array<sf::IntRect, 4> tentacleFrames = {
+                                sf::IntRect({2, 1}, {47, 56}),
+                                sf::IntRect({52, 1}, {56, 56}),
+                                sf::IntRect({116, 1}, {49, 56}),
+                                sf::IntRect({52, 1}, {56, 56})
+                            };
+                            const int frame = (animFrame / 2) % 4;
+                            sprite.setTextureRect(tentacleFrames[frame]);
                             sprite.setScale({1.8f, 1.8f});
                             sprite.setPosition({entity.x, entity.y});
                             window.draw(sprite);
                         } else if (entity.variant == 5) {
                             const auto &tex = resources.hasTexture("enemy_boss_heavy") ? resources.getTexture("enemy_boss_heavy") : resources.getTexture("enemy");
                             sf::Sprite sprite(tex);
-                            const int frame = (animFrame / 3) % 5;
-                            sprite.setTextureRect(sf::IntRect({frame * 130 + 1, 99}, {128, 62}));
-                            sprite.setScale({1.8f, 1.8f});
+                            // Heavy War Cruiser Boss with frontal cannon and top/bottom missile silos (130x50, r-typesheet28)
+                            sprite.setTextureRect(sf::IntRect({0, 0}, {130, 50}));
+                            sprite.setScale({2.2f, 2.2f});
                             sprite.setPosition({entity.x, entity.y - 20.f});
                             window.draw(sprite);
                         } else {
                             const auto &tex = resources.hasTexture("enemy_boss") ? resources.getTexture("enemy_boss") : resources.getTexture("enemy");
                             sf::Sprite sprite(tex);
-                            const int frame = (animFrame / 4) % 2;
-                            sprite.setTextureRect(sf::IntRect({frame == 0 ? 3 : 191, 3}, {174, 142}));
+                            static const std::array<sf::IntRect, 2> bossFrames = {
+                                sf::IntRect({2, 2}, {176, 144}),
+                                sf::IntRect({191, 2}, {176, 144})
+                            };
+                            const int frame = (animFrame / 6) % 2;
+                            sprite.setTextureRect(bossFrames[frame]);
                             sprite.setScale({1.6f, 1.6f});
                             sprite.setPosition({entity.x, entity.y - 60.f});
                             window.draw(sprite);
@@ -564,9 +627,81 @@ int main(int argc, char **argv)
                 window.draw(expSprite);
             }
 
+            // Authoritative Score HUD (Top Left)
+            scoreText.setString("SCORE: " + std::to_string(lastScore));
+            scoreText.setPosition({45.f, 25.f});
             window.draw(scoreText);
-            waveHudText.setString("WAVE: " + std::to_string(currentWave));
-            window.draw(waveHudText);
+
+            // Stage & Wave Progression (Top Left, under score)
+            sf::Text stageText(resources.getFont("default"), "", 20);
+            stageText.setFillColor(sf::Color(255, 204, 0));
+            stageText.setString("STAGE 1 - WAVE " + std::to_string(currentWave));
+            stageText.setPosition({45.f, 62.f});
+            window.draw(stageText);
+
+            // Boss Alert banner if boss is present
+            bool bossPresent = false;
+            for (const auto &ent : entities) {
+                if (ent.type == rtype::protocol::EntityType::Enemy && ent.variant == 5) {
+                    bossPresent = true;
+                    break;
+                }
+            }
+            if (bossPresent) {
+                sf::RectangleShape bossBg({360.f, 24.f});
+                bossBg.setOrigin({180.f, 12.f});
+                bossBg.setPosition({rtype::WorldWidth / 2.f, 45.f});
+                bossBg.setFillColor(sf::Color(20, 10, 15, 220));
+                bossBg.setOutlineThickness(2.f);
+                bossBg.setOutlineColor(sf::Color(255, 50, 70));
+                window.draw(bossBg);
+
+                sf::Text bossLabel(resources.getFont("default"), "WARNING - BOSS ENCOUNTER", 16);
+                bossLabel.setFillColor(sf::Color(255, 70, 70));
+                const auto bBounds = bossLabel.getLocalBounds();
+                bossLabel.setOrigin({bBounds.size.x / 2.f, bBounds.size.y / 2.f});
+                bossLabel.setPosition({rtype::WorldWidth / 2.f, 43.f});
+                window.draw(bossLabel);
+            }
+
+            // Player Identification HUD (Top Right)
+            {
+                float rightOffset = rtype::WorldWidth - 45.f;
+                float startY = 25.f;
+                static const std::array<sf::Color, 4> pColors = {
+                    sf::Color(0, 230, 255),
+                    sf::Color(255, 170, 40),
+                    sf::Color(80, 255, 120),
+                    sf::Color(240, 110, 255)
+                };
+
+                std::array<bool, 4> playerActive{false, false, false, false};
+                for (const auto &ent : entities) {
+                    if (ent.type == rtype::protocol::EntityType::Player && ent.variant < 4) {
+                        playerActive[ent.variant] = true;
+                    }
+                }
+
+                for (std::size_t i = 0; i < 4; ++i) {
+                    const bool isLocal = (localPlayerId.has_value() && localPlayerId.value() == i);
+                    if (!playerActive[i] && !isLocal)
+                        continue;
+
+                    std::string pLabel = "P" + std::to_string(i + 1);
+                    if (isLocal)
+                        pLabel += " (YOU)";
+
+                    std::string statusStr = playerActive[i] ? "ACTIVE" : "DOWN";
+
+                    sf::Text pText(resources.getFont("default"), pLabel + " : " + statusStr, 20);
+                    pText.setFillColor(playerActive[i] ? pColors[i] : sf::Color(140, 140, 140));
+                    const auto bounds = pText.getLocalBounds();
+                    pText.setOrigin({bounds.size.x, 0.f});
+                    pText.setPosition({rightOffset, startY});
+                    window.draw(pText);
+                    startY += 26.f;
+                }
+            }
 
             if (damageFlashTimer > 0.f) {
                 sf::RectangleShape flash({rtype::WorldWidth, rtype::WorldHeight});
