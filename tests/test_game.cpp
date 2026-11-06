@@ -733,7 +733,7 @@ TEST(Obstacle, EveryTileOfTheCampaignExistsAndEveryWorldHasItsOwn)
 {
     std::ifstream configFile("assets/config/entities.json");
     ASSERT_TRUE(configFile.is_open());
-    const auto obstacles = nlohmann::json::parse(configFile).at("obstacles");
+    const auto prefabs = nlohmann::json::parse(configFile).at("prefabs");
 
     const std::array<std::string, 3> themes = {"satellite_debris", "mars_rock", "singularity_shard"};
     for (int level = 1; level <= 9; ++level) {
@@ -745,7 +745,8 @@ TEST(Obstacle, EveryTileOfTheCampaignExistsAndEveryWorldHasItsOwn)
             for (const auto &tile : wave.value("obstacles", nlohmann::json::array())) {
                 tiles++;
                 const auto type = tile.at("type").get<std::string>();
-                EXPECT_TRUE(obstacles.contains(type)) << type;
+                ASSERT_TRUE(prefabs.contains(type)) << type;
+                EXPECT_EQ(prefabs[type].at("Kind").at("type"), "obstacle") << type;
                 EXPECT_EQ(type, themes[static_cast<std::size_t>((level - 1) / 3)]) << "level " << level;
             }
         }
@@ -822,6 +823,7 @@ Flight fly(const std::string &pattern, float startX, float startY, float speed, 
     registry.emplace<rtype::components::Kind>(enemy, protocol::EntityType::Enemy, 0);
     registry.emplace<rtype::components::MovementPattern>(
         enemy, rtype::components::MovementPattern{pattern, 0.f, 0.f, speed, 0.f, 0.f, 0.f, false});
+    registry.emplace<rtype::components::Hitbox>(enemy, 66.f, 72.f);
 
     Flight flight;
     const float dt = 1.f / 60.f;
@@ -906,6 +908,7 @@ TEST(Movement, StoppedBossNeverLeavesTheScreen)
     registry.emplace<rtype::components::Kind>(boss, protocol::EntityType::Enemy, 0);
     registry.emplace<rtype::components::MovementPattern>(
         boss, rtype::components::MovementPattern{"dive", 0.f, 0.f, 30.f, 1500.f, 0.f, 0.f});
+    registry.emplace<rtype::components::Hitbox>(boss, 66.f, 72.f);
 
     updateEnemyMovements(registry, 1.f / 60.f);
     const auto *velocity = registry.get<rtype::components::Velocity>(boss);
@@ -930,15 +933,18 @@ TEST(Game, EnemyKeepsTheSpriteOfItsDefinition)
     EXPECT_EQ(enemy->variant, 3);
 }
 
-TEST(Game, EveryEnemyOfTheGameDeclaresItsSprite)
+TEST(Game, EveryEnemyOfTheGameDeclaresItsSpriteAndHitbox)
 {
     std::ifstream file("assets/config/entities.json");
     ASSERT_TRUE(file.is_open());
     const auto config = nlohmann::json::parse(file);
-    for (const auto &[name, enemy] : config.at("enemies").items()) {
-        ASSERT_TRUE(enemy.contains("variant")) << name;
-        if (enemy.value("is_boss", false)) {
-            EXPECT_GE(enemy.at("variant").get<int>(), 5) << name;
+    for (const auto &[name, prefab] : config.at("prefabs").items()) {
+        if (prefab.at("Kind").at("type") != "enemy")
+            continue;
+        ASSERT_TRUE(prefab.at("Kind").contains("variant")) << name;
+        EXPECT_GT(prefab.at("Hitbox").value("width", 0.f), 0.f) << name;
+        if (prefab.value("EnemyTraits", nlohmann::json::object()).value("is_boss", false)) {
+            EXPECT_GE(prefab.at("Kind").at("variant").get<int>(), 5) << name;
         }
     }
 }
@@ -952,8 +958,8 @@ TEST(Movement, BossSpriteStaysOnScreenWhileBouncing)
     registry.emplace<rtype::components::Kind>(boss, protocol::EntityType::Enemy, 6);
     registry.emplace<rtype::components::MovementPattern>(
         boss, rtype::components::MovementPattern{"martian_bounce", 60.f, 0.f, 35.f, 1200.f});
-
-    const auto box = rtype::components::enemyHitbox(6);
+    const rtype::components::Hitbox box{280.f, 222.f, -60.f};
+    registry.emplace<rtype::components::Hitbox>(boss, box);
     const float dt = 1.f / 60.f;
     for (int tick = 0; tick < 60 * 60; ++tick) {
         updateEnemyMovements(registry, dt);

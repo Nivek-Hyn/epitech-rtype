@@ -11,6 +11,7 @@ add_library(rtype_server_lib STATIC
     src/levelLoader.cpp
     src/MovementSystem.cpp
     src/EnemyShootSystem.cpp
+    src/Prefabs.cpp
 )
 target_include_directories(rtype_server_lib PUBLIC src)
 target_link_libraries(rtype_server_lib PUBLIC rtype_common rtype_engine asio nlohmann_json::nlohmann_json)

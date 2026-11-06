@@ -1,11 +1,10 @@
 // The game itself: its creation, one step of the simulation, and what is sent to the clients.
 
 #include "Game.hpp"
-#include "GameConstants.hpp"
+#include "EnemyShootSystem.hpp"
+#include "MovementSystem.hpp"
 #include "common/Components.hpp"
 #include "engine/systems/Movement.hpp"
-#include "MovementSystem.hpp"
-#include "EnemyShootSystem.hpp"
 #include <algorithm>
 #include <utility>
 #include <vector>
@@ -16,18 +15,16 @@ namespace {
 
 using NetworkedEntity = std::pair<engine::ecs::Entity, std::uint32_t>;
 
-constexpr float EnemyWidth = 66.f;
-
-bool isOutOfScreen(const rtype::components::Kind &kind, const rtype::components::Position &position)
+bool isOutOfScreen(const rtype::components::Kind &kind, const rtype::components::Position &position, float width)
 {
     switch (kind.type) {
     case protocol::EntityType::PlayerMissile:
     case protocol::EntityType::EnemyMissile:
         return position.x > WorldWidth || position.x < 0.f || position.y > WorldHeight || position.y < 0.f;
     case protocol::EntityType::Enemy:
-        return position.x < -EnemyWidth || position.y > WorldHeight;
+        return position.x < -width || position.y > WorldHeight;
     case protocol::EntityType::Obstacle:
-        return position.x < -ObstacleSize;
+        return position.x < -width;
     default:
         return false;
     }
@@ -41,6 +38,7 @@ Game::Game()
     _registry.addSystem(engine::systems::movement<rtype::components::Position, rtype::components::Velocity>);
 
     applyDefaultRules();
+    registerGameComponents(_prefabs);
     loadEntitiesConfig("assets/config/entities.json");
     loadRules("assets/config/game_rules.json");
 
@@ -60,9 +58,12 @@ void Game::update(float dt)
     updatePlayerLives(dt);
     updateWaves(dt);
     updateEnemyMovements(_registry, dt);
-    updateEnemyShooting(_registry, [this](protocol::EntityType type, std::uint8_t variant, float x, float y) {
-        return spawnNetworked(type, variant, x, y);
-    }, dt);
+    updateEnemyShooting(
+        _registry,
+        [this](protocol::EntityType type, std::uint8_t variant, float x, float y) {
+            return spawnShot(type, variant, x, y);
+        },
+        dt);
     _registry.update(dt);
     keepPlayersOnScreen();
     handleCollisions();
@@ -75,11 +76,12 @@ void Game::update(float dt)
 void Game::keepPlayersOnScreen()
 {
     _registry.each<rtype::components::Position, rtype::components::Kind>(
-        [](engine::ecs::Entity /*entity*/, rtype::components::Position &position, const rtype::components::Kind &kind) {
+        [this](engine::ecs::Entity entity, rtype::components::Position &position, const rtype::components::Kind &kind) {
             if (kind.type != protocol::EntityType::Player)
                 return;
-            position.x = std::clamp(position.x, 0.f, WorldWidth - PlayerWidth);
-            position.y = std::clamp(position.y, 0.f, WorldHeight - PlayerHeight);
+            const engine::physics::Aabb box = hitArea(entity);
+            position.x = std::clamp(position.x, 0.f, WorldWidth - box.width);
+            position.y = std::clamp(position.y, 0.f, WorldHeight - box.height);
         });
 }
 
@@ -93,9 +95,9 @@ void Game::removeEntitiesOutOfScreen()
 {
     std::vector<NetworkedEntity> outOfScreen;
     _registry.each<rtype::components::Position, rtype::components::Kind, rtype::components::NetworkId>(
-        [&outOfScreen](engine::ecs::Entity entity, const rtype::components::Position &position,
-                       const rtype::components::Kind &kind, const rtype::components::NetworkId &networkId) {
-            if (isOutOfScreen(kind, position))
+        [this, &outOfScreen](engine::ecs::Entity entity, const rtype::components::Position &position,
+                             const rtype::components::Kind &kind, const rtype::components::NetworkId &networkId) {
+            if (isOutOfScreen(kind, position, hitArea(entity).width))
                 outOfScreen.emplace_back(entity, networkId.id);
         });
     removeAsOutOfBounds(outOfScreen);
@@ -130,6 +132,42 @@ engine::ecs::Entity Game::spawnNetworked(protocol::EntityType type, std::uint8_t
     _registry.emplace<rtype::components::Position>(entity, x, y);
     _registry.emplace<rtype::components::Velocity>(entity, 0.0f, 0.0f);
     return entity;
+}
+
+// The prefab, made visible to the clients at the given position. Nothing is created for an unknown name.
+std::optional<engine::ecs::Entity> Game::spawnPrefab(const std::string &name, float x, float y)
+{
+    if (!_prefabs.contains(name))
+        return std::nullopt;
+    const engine::ecs::Entity entity = _prefabs.spawn(_registry, name);
+    _registry.emplace<rtype::components::NetworkId>(entity, _nextNetId++);
+    _registry.emplace<rtype::components::Position>(entity, x, y);
+    if (!_registry.has<rtype::components::Kind>(entity))
+        _registry.emplace<rtype::components::Kind>(entity);
+    if (!_registry.has<rtype::components::Velocity>(entity))
+        _registry.emplace<rtype::components::Velocity>(entity);
+    return entity;
+}
+
+// A missile from the prefab of its type, with the sprite variant chosen by the shooter.
+engine::ecs::Entity Game::spawnShot(protocol::EntityType type, std::uint8_t variant, float x, float y)
+{
+    const char *prefab = type == protocol::EntityType::PlayerMissile ? "player_missile" : "enemy_missile";
+    const auto shot = spawnPrefab(prefab, x, y);
+    if (!shot)
+        return spawnNetworked(type, variant, x, y);
+    _registry.get<rtype::components::Kind>(*shot)->variant = variant;
+    return *shot;
+}
+
+// Where the entity can be hit this tick, from its Position and Hitbox. Empty without a Hitbox.
+engine::physics::Aabb Game::hitArea(engine::ecs::Entity entity)
+{
+    const auto *position = _registry.get<rtype::components::Position>(entity);
+    const auto *hitbox = _registry.get<rtype::components::Hitbox>(entity);
+    if (!position || !hitbox)
+        return {};
+    return {position->x, position->y + hitbox->offsetY, hitbox->width, hitbox->height};
 }
 
 protocol::Snapshot Game::snapshot()

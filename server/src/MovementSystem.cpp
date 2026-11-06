@@ -24,7 +24,7 @@ constexpr float EjectionSpeedRatio = 3.f;
 void updateEnemyMovements(engine::ecs::Registry &registry, float dt)
 {
     // On applique le mouvement selon le pattern stocké dans le composant
-    registry.each<rtype::components::Position, rtype::components::Velocity, rtype::components::Kind, rtype::components::MovementPattern>([dt](engine::ecs::Entity /*entity*/, const rtype::components::Position &pos, rtype::components::Velocity &vel, const rtype::components::Kind &kind, rtype::components::MovementPattern &pattern) {
+    registry.each<rtype::components::Position, rtype::components::Velocity, rtype::components::Kind, rtype::components::MovementPattern>([dt, &registry](engine::ecs::Entity entity, const rtype::components::Position &pos, rtype::components::Velocity &vel, const rtype::components::Kind &kind, rtype::components::MovementPattern &pattern) {
             if (kind.type != protocol::EntityType::Enemy)
                 return;
 
@@ -34,7 +34,8 @@ void updateEnemyMovements(engine::ecs::Registry &registry, float dt)
             const float time = pattern.age;
 
             // Positions extrêmes pour que tout le sprite reste à l'écran (le bas est aussi le sol de Mars).
-            const auto box = rtype::components::enemyHitbox(kind.variant);
+            const auto *hitbox = registry.get<rtype::components::Hitbox>(entity);
+            const rtype::components::Hitbox box = hitbox ? *hitbox : rtype::components::Hitbox{};
             const float topY = -box.offsetY;
             const float bottomY = WorldHeight - box.offsetY - box.height;
 
