@@ -12,3 +12,8 @@ compile_commands.json
 site/
 docs/html/
 .venv/
+
+#tests/data/entities.json
+#tests/data/one_boss.json
+#tests/data/one_grunt.json
+#tests/test_game.cpp
