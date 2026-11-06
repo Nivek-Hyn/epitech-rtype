@@ -15,7 +15,7 @@
 namespace rtype::protocol {
 
 inline constexpr std::uint16_t Magic = 0x5254; // "RT"
-inline constexpr std::uint8_t Version = 3;
+inline constexpr std::uint8_t Version = 4;
 inline constexpr std::size_t HeaderSize = 10;
 // Stay under the usual Internet MTU so datagrams are never fragmented.
 inline constexpr std::size_t MaxPacketSize = 1200;
@@ -40,6 +40,7 @@ enum class EntityType : std::uint8_t {
     Enemy = 2,
     PlayerMissile = 3,
     EnemyMissile = 4,
+    Obstacle = 5,
 };
 
 // Bit flags of the Input message.

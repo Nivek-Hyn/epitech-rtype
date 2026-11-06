@@ -99,7 +99,7 @@ queue. The client renders entities directly from the latest snapshot rather than
 | Threading | `engine/include/engine/core/ThreadSafeQueue.hpp` | Implemented; mutex-protected FIFO queue |
 | Protocol | `common/include/common/Protocol.hpp`, `common/src/Protocol.cpp`, [protocol.md](protocol.md) | Implemented; validates datagrams and message payloads |
 | Shared components | `common/include/common/Components.hpp`, `common/include/common/Constants.hpp` | Implemented |
-| Game logic | `server/src/Game.hpp`, `server/src/Game.cpp` | Player movement, shooting, enemy spawning, missile/enemy collisions, score and snapshots |
+| Game logic | `server/src/Game.hpp`, `server/src/Game.cpp` and `server/src/Game*.cpp` (one file per part of the game) | Player movement, shooting, enemy spawning, missile/enemy collisions, score and snapshots |
 | Server network | `server/src/net/INetworkServer.hpp`, `server/src/net/AsioNetworkServer.cpp` | Implemented; UDP handshake, inputs, snapshots, ping/pong and timeout handling |
 | Client network | `client/src/net/INetworkClient.hpp`, `client/src/net/AsioNetworkClient.cpp` | Implemented; UDP connection retry, input sending and server timeout detection |
 | Rendering | `client/src/main.cpp`, `client/src/ResourceManager.cpp` | Sprites for players, missiles and enemies; no starfield or audio integration yet |

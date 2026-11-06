@@ -1,0 +1,13 @@
+{
+  "stage": 1,
+  "level_name": "Test: one tile on the line of the player spawn",
+  "waves": [
+    {
+      "wave_id": 1,
+      "delay_before_start": 0.0,
+      "obstacles": [
+        { "type": "test_tile", "spawn_y": 300.0 }
+      ]
+    }
+  ]
+}
