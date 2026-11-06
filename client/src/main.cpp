@@ -112,8 +112,10 @@ int main(int argc, char **argv)
 
     bool gameOver = false;
     bool gameWon = false;
+    bool playerWasSpawned = false;
     std::uint32_t lastScore = 0;
     std::optional<std::uint8_t> localPlayerId;
+    std::array<std::uint8_t, 4> playerLives{};
     float localPlayerTilt = 0.0f;
     std::unordered_map<std::uint32_t, float> playerYHistory;
     std::unordered_map<std::uint32_t, float> playerTiltMap;
@@ -131,6 +133,7 @@ int main(int argc, char **argv)
         playerWasSpawned = false;
         lastScore = 0;
         localPlayerId.reset();
+        playerLives.fill(0);
         localPlayerTilt = 0.0f;
         playerYHistory.clear();
         playerTiltMap.clear();
@@ -249,28 +252,28 @@ int main(int argc, char **argv)
                     localPlayerId = accepted->playerId;
                 } else if (const auto *snapshot = std::get_if<rtype::protocol::Snapshot>(&*message)) {
                     lastScore = snapshot->score;
+                    playerLives = snapshot->lives;
 
                     int enemyCount = 0;
+                    int playerCount = 0;
                     for (const auto &ent : snapshot->entities) {
                         if (ent.type == rtype::protocol::EntityType::Enemy)
                             enemyCount++;
+                        else if (ent.type == rtype::protocol::EntityType::Player)
+                            playerCount++;
                     }
 
-                    // The server decides: a dead player may still have lives left.
-                    if (snapshot->state == rtype::protocol::GameState::GameOver) {
-                        gameOver = true;
-                        gameWon = false;
-                    }
                     if (playerCount > 0) {
                         playerWasSpawned = true;
                     }
 
-                    if (snapshot->state == rtype::protocol::GameState::Finished) {
-                        gameOver = true;
-                        gameWon = true;
-                    } else if (playerWasSpawned && playerCount == 0 && !gameOver) {
+                    // Authoritative server game state
+                    if (snapshot->state == rtype::protocol::GameState::GameOver) {
                         gameOver = true;
                         gameWon = false;
+                    } else if (snapshot->state == rtype::protocol::GameState::Finished) {
+                        gameOver = true;
+                        gameWon = true;
                     }
 
                     if (reportedConnected && !waveStarted) {
@@ -684,17 +687,27 @@ int main(int argc, char **argv)
 
                 for (std::size_t i = 0; i < 4; ++i) {
                     const bool isLocal = (localPlayerId.has_value() && localPlayerId.value() == i);
-                    if (!playerActive[i] && !isLocal)
+                    const int lives = playerLives[i];
+                    if (!playerActive[i] && lives == 0 && !isLocal)
                         continue;
 
                     std::string pLabel = "P" + std::to_string(i + 1);
                     if (isLocal)
                         pLabel += " (YOU)";
 
-                    std::string statusStr = playerActive[i] ? "ACTIVE" : "DOWN";
+                    std::string statusStr;
+                    if (lives > 0) {
+                        if (!playerActive[i] && playerWasSpawned) {
+                            statusStr = "RESPAWNING... (" + std::to_string(lives) + " LIVES)";
+                        } else {
+                            statusStr = std::to_string(lives) + " LIVES";
+                        }
+                    } else {
+                        statusStr = playerActive[i] ? "LAST CHANCE" : "DEAD";
+                    }
 
                     sf::Text pText(resources.getFont("default"), pLabel + " : " + statusStr, 20);
-                    pText.setFillColor(playerActive[i] ? pColors[i] : sf::Color(140, 140, 140));
+                    pText.setFillColor(lives > 0 ? pColors[i] : (playerActive[i] ? sf::Color(255, 200, 50) : sf::Color(140, 140, 140)));
                     const auto bounds = pText.getLocalBounds();
                     pText.setOrigin({bounds.size.x, 0.f});
                     pText.setPosition({rightOffset, startY});
