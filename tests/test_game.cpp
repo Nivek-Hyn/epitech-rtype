@@ -8,7 +8,9 @@
 #include <nlohmann/json.hpp>
 
 #include <algorithm>
+#include <array>
 #include <fstream>
+#include <string>
 
 using namespace rtype;
 using namespace rtype::server;
@@ -652,6 +654,103 @@ TEST(Game, SnapshotTellsTheLivesLeftOfEachPlayer)
     ramTheBossUntilOutOfLives(game, 0);
     EXPECT_EQ(game.snapshot().lives[0], 0);
     EXPECT_EQ(game.snapshot().lives[1], 3);
+}
+
+TEST(Obstacle, CostsALifeOnContactAndStaysInPlace)
+{
+    Game game;
+    game.loadEntitiesConfig(TestEntities);
+    game.loadLevel("tests/data/one_tile.json");
+    game.rules().intermissionDelay = 1000.f;
+    game.onPlayerJoined(0);
+    run(game, 15.f); // the tile comes from the right edge at 120 units per second
+
+    EXPECT_EQ(game.playerLives(0), 2);
+    EXPECT_EQ(countOf(game, protocol::EntityType::Obstacle), 1);
+}
+
+TEST(Obstacle, ResistsAsManyShotsAsItsHealthAndGivesNoScore)
+{
+    Game game;
+    game.loadEntitiesConfig(TestEntities);
+    game.loadLevel("tests/data/one_tile.json");
+    game.setGameMode(Game::GameMode::Infinite);
+    game.rules().intermissionDelay = 1000.f;
+    game.onPlayerJoined(0);
+
+    game.onInput(0, protocol::InputFlag::Shoot);
+    game.onInput(0, 0);
+    run(game, 5.f);
+    EXPECT_EQ(countOf(game, protocol::EntityType::Obstacle), 1);
+    EXPECT_EQ(countOf(game, protocol::EntityType::PlayerMissile), 0);
+
+    game.onInput(0, protocol::InputFlag::Shoot);
+    game.onInput(0, 0);
+    run(game, 3.f);
+    EXPECT_EQ(countOf(game, protocol::EntityType::Obstacle), 0);
+    EXPECT_EQ(game.snapshot().score, 0u);
+}
+
+TEST(Obstacle, StopsEnemyFireWithoutBeingDamaged)
+{
+    Game game;
+    game.loadEntitiesConfig(TestEntities);
+    game.loadLevel("tests/data/tile_shield.json");
+    game.onPlayerJoined(0);
+    run(game, 8.f); // without the tile, the first shots would have reached the ship
+
+    EXPECT_EQ(game.playerLives(0), 3);
+    EXPECT_EQ(countOf(game, protocol::EntityType::Obstacle), 1); // health 1: any damage would destroy it
+}
+
+TEST(Obstacle, DoesNotHoldTheLevelBack)
+{
+    Game game;
+    game.loadEntitiesConfig(TestEntities);
+    game.loadLevel("tests/data/one_tile.json");
+    game.rules().intermissionDelay = 0.f;
+    game.onPlayerJoined(0);
+    run(game, 0.5f);
+
+    EXPECT_EQ(game.gameState(), protocol::GameState::Finished);
+}
+
+TEST(Obstacle, LeavesTheGameAtTheLeftOfTheScreen)
+{
+    Game game;
+    game.loadEntitiesConfig(TestEntities);
+    game.loadLevel("tests/data/one_tile.json");
+    game.rules().intermissionDelay = 1000.f;
+    game.onPlayerJoined(0);
+    game.onInput(0, protocol::InputFlag::Down); // out of its way
+    run(game, 25.f);
+
+    EXPECT_EQ(countOf(game, protocol::EntityType::Obstacle), 0);
+    EXPECT_EQ(game.playerLives(0), 3);
+}
+
+TEST(Obstacle, EveryTileOfTheCampaignExistsAndEveryWorldHasItsOwn)
+{
+    std::ifstream configFile("assets/config/entities.json");
+    ASSERT_TRUE(configFile.is_open());
+    const auto obstacles = nlohmann::json::parse(configFile).at("obstacles");
+
+    const std::array<std::string, 3> themes = {"satellite_debris", "mars_rock", "singularity_shard"};
+    for (int level = 1; level <= 9; ++level) {
+        std::ifstream levelFile("assets/levels/level" + std::to_string(level) + ".json");
+        ASSERT_TRUE(levelFile.is_open());
+        const auto config = nlohmann::json::parse(levelFile);
+        int tiles = 0;
+        for (const auto &wave : config.at("waves")) {
+            for (const auto &tile : wave.value("obstacles", nlohmann::json::array())) {
+                tiles++;
+                const auto type = tile.at("type").get<std::string>();
+                EXPECT_TRUE(obstacles.contains(type)) << type;
+                EXPECT_EQ(type, themes[static_cast<std::size_t>((level - 1) / 3)]) << "level " << level;
+            }
+        }
+        EXPECT_GT(tiles, 0) << "level " << level;
+    }
 }
 
 TEST(Game, PlayerJoiningAFinishedGameGetsNoShip)

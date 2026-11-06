@@ -16,6 +16,11 @@
     {
       "wave_id": 2,
       "delay_before_start": 8.5,
+      "obstacles": [
+        { "type": "mars_rock", "spawn_y": 1008.0 },
+        { "type": "mars_rock", "spawn_y": 936.0 },
+        { "type": "mars_rock", "spawn_y": 864.0 }
+      ],
       "enemies": [
         { "type": "martian_hopper", "spawn_y": 780.0, "speed": 128.0 },
         { "type": "dust_striker", "spawn_y": 540.0, "speed": 135.0 },
@@ -25,6 +30,12 @@
     {
       "wave_id": 3,
       "delay_before_start": 15.0,
+      "obstacles": [
+        { "type": "mars_rock", "spawn_y": 0.0 },
+        { "type": "mars_rock", "spawn_y": 72.0 },
+        { "type": "mars_rock", "spawn_y": 1008.0 },
+        { "type": "mars_rock", "spawn_y": 936.0 }
+      ],
       "enemies": [
         { "type": "gravity_diver", "spawn_y": 140.0, "speed": 160.0 },
         { "type": "gravity_diver", "spawn_y": 260.0, "speed": 160.0 },

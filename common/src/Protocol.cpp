@@ -80,7 +80,7 @@ void writePayload(engine::net::ByteWriter &writer, const Message &message)
 bool validEntityType(std::uint8_t value)
 {
     return value >= static_cast<std::uint8_t>(EntityType::Player) &&
-           value <= static_cast<std::uint8_t>(EntityType::EnemyMissile);
+           value <= static_cast<std::uint8_t>(EntityType::Obstacle);
 }
 
 } // namespace

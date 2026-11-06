@@ -105,6 +105,15 @@ void Game::loadEntitiesConfig(const std::string &filepath)
                     _entityDefinitions[key] = def;
                 }
             }
+            if (j.contains("obstacles") && j["obstacles"].is_object()) {
+                for (auto &[key, val] : j["obstacles"].items()) {
+                    ObstacleDefinition def;
+                    def.variant = val.value<std::uint8_t>("variant", 0);
+                    def.health = val.value("health", 2);
+                    def.speed = val.value("speed", 110.f);
+                    _obstacleDefinitions[key] = def;
+                }
+            }
         } else {
             std::cerr << "Warning: could not open " << filepath << '\n';
         }
@@ -370,7 +379,8 @@ void Game::update(float dt)
                 (position.x > WorldWidth || position.x < 0.f || position.y > WorldHeight || position.y < 0.f);
             const bool enemyOut =
                 kind.type == protocol::EntityType::Enemy && (position.x < -EnemyWidth || position.y > WorldHeight);
-            if (missileOut || enemyOut)
+            const bool obstacleOut = kind.type == protocol::EntityType::Obstacle && position.x < -ObstacleSize;
+            if (missileOut || enemyOut || obstacleOut)
                 expiredMissiles.emplace_back(entity, networkId.id);
         });
     for (const auto &[entity, networkId] : expiredMissiles) {
@@ -472,7 +482,8 @@ void Game::clearEnemies()
     _registry.each<rtype::components::Kind, rtype::components::NetworkId>(
         [&toRemove](engine::ecs::Entity entity, const rtype::components::Kind &kind,
                     const rtype::components::NetworkId &networkId) {
-            if (kind.type == protocol::EntityType::Enemy || kind.type == protocol::EntityType::EnemyMissile)
+            if (kind.type == protocol::EntityType::Enemy || kind.type == protocol::EntityType::EnemyMissile ||
+                kind.type == protocol::EntityType::Obstacle)
                 toRemove.emplace_back(entity, networkId.id);
         });
     for (const auto &[entity, networkId] : toRemove) {
@@ -591,6 +602,21 @@ void Game::spawnEnemies(float dt)
                         enemy, rtype::components::EnemyAttack{std::move(attackEntries)});
                 }
             }
+            for (const auto &obstacleConfig : wave.obstacles) {
+                const auto def = _obstacleDefinitions.find(obstacleConfig.type);
+                if (def == _obstacleDefinitions.end()) {
+                    std::cerr << "Warning: unknown obstacle type '" << obstacleConfig.type << "' in level '"
+                              << _currentLevel.level_name << "'\n";
+                    continue;
+                }
+                const int hp = obstacleConfig.health > 0 ? obstacleConfig.health : def->second.health;
+                const float speed = obstacleConfig.speed > 0.f ? obstacleConfig.speed : def->second.speed;
+                engine::ecs::Entity obstacle = spawnNetworked(protocol::EntityType::Obstacle, def->second.variant,
+                                                              WorldWidth, obstacleConfig.spawn_y);
+                _registry.emplace<rtype::components::Velocity>(obstacle, -speed * diffCfg.speedMultiplier * speedGrowth, 0.f);
+                _registry.emplace<rtype::components::Health>(
+                    obstacle, std::max(1, static_cast<int>(std::round(static_cast<float>(hp) * diffCfg.healthMultiplier * hpGrowth))));
+            }
             wave.isSpawned = true;
         }
     }
@@ -609,7 +635,14 @@ void Game::handleCollisions()
         enemies.push_back({entity, {position.x, position.y + box.offsetY, box.width, box.height}});
     });
 
+    std::vector<std::pair<engine::ecs::Entity, engine::physics::Aabb>> obstacles;
+    _registry.each<Position, Kind>([&obstacles](engine::ecs::Entity entity, const Position &position, const Kind &kind) {
+        if (kind.type == protocol::EntityType::Obstacle)
+            obstacles.push_back({entity, {position.x, position.y, ObstacleSize, ObstacleSize}});
+    });
+
     std::vector<bool> enemyHit(enemies.size(), false);
+    std::vector<bool> obstacleHit(obstacles.size(), false);
     std::vector<engine::ecs::Entity> destroyed;
 
     const auto &diffCfg = _rules.difficulties[_difficulty];
@@ -629,6 +662,16 @@ void Game::handleCollisions()
         if (kind.type != protocol::EntityType::PlayerMissile)
             return;
         const engine::physics::Aabb missileBox{position.x, position.y, MissileWidth, MissileHeight};
+        for (std::size_t i = 0; i < obstacles.size(); i++) {
+            if (!obstacleHit[i] && engine::physics::overlaps(missileBox, obstacles[i].second)) {
+                obstacleHit[i] = true;
+                destroyed.push_back(missile);
+                auto *health = _registry.get<rtype::components::Health>(obstacles[i].first);
+                if (health && --health->hp <= 0)
+                    destroyed.push_back(obstacles[i].first);
+                return;
+            }
+        }
         for (std::size_t i = 0; i < enemies.size(); i++) {
             if (!enemyHit[i] && engine::physics::overlaps(missileBox, enemies[i].second)) {
                 enemyHit[i] = true;
@@ -669,6 +712,13 @@ void Game::handleCollisions()
                 }
             }
         }
+
+        // A tile destroys the ship and stays in place.
+        const bool hitsObstacle = std::any_of(obstacles.begin(), obstacles.end(), [&playerBox](const auto &obstacle) {
+            return engine::physics::overlaps(playerBox, obstacle.second);
+        });
+        if (hitsObstacle)
+            destroyed.push_back(playerEntity);
     });
 
     _registry.each<Position, Kind>([&](engine::ecs::Entity missile, const Position &position, const Kind &kind) {
@@ -676,6 +726,15 @@ void Game::handleCollisions()
             return;
         
         const engine::physics::Aabb missileBox{position.x, position.y, MissileWidth, MissileHeight};
+
+        // A tile stops enemy fire without being damaged, so players can take cover behind it.
+        const bool blocked = std::any_of(obstacles.begin(), obstacles.end(), [&missileBox](const auto &obstacle) {
+            return engine::physics::overlaps(missileBox, obstacle.second);
+        });
+        if (blocked) {
+            destroyed.push_back(missile);
+            return;
+        }
 
         _registry.each<Position, Kind>([&](engine::ecs::Entity playerEntity, const Position &playerPos, const Kind &playerKind) {
             if (playerKind.type != protocol::EntityType::Player || isInvulnerable(playerEntity))

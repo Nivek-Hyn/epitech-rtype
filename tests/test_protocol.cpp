@@ -46,6 +46,17 @@ TEST(Protocol, SnapshotCarriesTheLivesOfEachPlayer)
     EXPECT_EQ(received.entities[0].variant, 2);
 }
 
+TEST(Protocol, SnapshotCarriesObstaclesButNoUnknownEntityType)
+{
+    auto bytes = encode({1, Snapshot{1, GameState::Playing, 0, {{1, EntityType::Obstacle, 2, 500.f, 300.f}}}});
+    const auto packet = decode(bytes);
+    ASSERT_TRUE(packet);
+    EXPECT_EQ(std::get<Snapshot>(packet->message).entities[0].type, EntityType::Obstacle);
+
+    bytes[HeaderSize + SnapshotFixedSize + 4] = 6;
+    EXPECT_FALSE(decode(bytes));
+}
+
 TEST(Protocol, SnapshotCarriesTheGameOverStateButNoUnknownState)
 {
     auto bytes = encode({1, Snapshot{1, GameState::GameOver, 0, {}}});

@@ -15,6 +15,11 @@
     {
       "wave_id": 2,
       "delay_before_start": 11.0,
+      "obstacles": [
+        { "type": "mars_rock", "spawn_y": 1008.0 },
+        { "type": "mars_rock", "spawn_y": 936.0 },
+        { "type": "mars_rock", "spawn_y": 864.0 }
+      ],
       "enemies": [
         { "type": "martian_hopper", "spawn_y": 795.0, "speed": 134.0 },
         { "type": "martian_hopper", "spawn_y": 555.0, "speed": 134.0 },
@@ -25,6 +30,10 @@
     {
       "wave_id": 3,
       "delay_before_start": 21.0,
+      "obstacles": [
+        { "type": "mars_rock", "spawn_y": 620.0 },
+        { "type": "mars_rock", "spawn_y": 692.0 }
+      ],
       "enemies": [
         { "type": "boss_mars_excavator", "spawn_y": 700.0, "speed": 50.0 }
       ]

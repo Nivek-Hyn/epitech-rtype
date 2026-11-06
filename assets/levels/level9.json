@@ -15,6 +15,10 @@
     {
       "wave_id": 2,
       "delay_before_start": 13.0,
+      "obstacles": [
+        { "type": "singularity_shard", "spawn_y": 150.0 },
+        { "type": "singularity_shard", "spawn_y": 850.0 }
+      ],
       "enemies": [
         { "type": "singularity_fragment", "spawn_y": 270.0, "speed": 60.0 },
         { "type": "singularity_fragment", "spawn_y": 690.0, "speed": 60.0 },
@@ -24,6 +28,10 @@
     {
       "wave_id": 3,
       "delay_before_start": 25.0,
+      "obstacles": [
+        { "type": "singularity_shard", "spawn_y": 400.0 },
+        { "type": "singularity_shard", "spawn_y": 640.0 }
+      ],
       "enemies": [
         { "type": "boss_singularity_core", "spawn_y": 480.0, "speed": 60.0 }
       ]

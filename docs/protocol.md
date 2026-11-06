@@ -1,4 +1,4 @@
-# R-Type Network Protocol — version 3 (draft)
+# R-Type Network Protocol — version 4 (draft)
 
 This document describes every message exchanged between `r-type_client` and `r-type_server`.
 It should be enough to write a new client. The reference implementation is `common/src/Protocol.cpp`.
@@ -14,7 +14,7 @@ It should be enough to write a new client. The reference implementation is `comm
 | Offset | Size | Field | Description |
 |---|---|---|---|
 | 0 | u16 | magic | Always `0x5254` ("RT") |
-| 2 | u8 | version | Protocol version, currently `3` |
+| 2 | u8 | version | Protocol version, currently `4` |
 | 3 | u8 | type | Message type (see §4) |
 | 4 | u32 | sequence | Incremented by the sender for each packet it sends |
 | 8 | u16 | payload_size | Number of bytes after the header |
@@ -72,7 +72,7 @@ Each entity:
 | Size | Field | Description |
 |---|---|---|
 | u32 | net_id | Network id of the entity, unique for the whole game |
-| u8 | type | `1` player, `2` enemy, `3` player missile, `4` enemy missile |
+| u8 | type | `1` player, `2` enemy, `3` player missile, `4` enemy missile, `5` obstacle |
 | u8 | variant | Player index (0–3) for players, subtype for other types |
 | f32 | x | World position (world is 1920 × 1080, origin top-left) |
 | f32 | y | |

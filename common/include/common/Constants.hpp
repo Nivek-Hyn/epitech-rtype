@@ -11,6 +11,9 @@ namespace rtype {
 inline constexpr float WorldWidth = 1920.f;
 inline constexpr float WorldHeight = 1080.f;
 
+// Side of a destructible tile, in world units.
+inline constexpr float ObstacleSize = 72.f;
+
 // Simulation (server and client) runs at a fixed rate.
 inline constexpr double TickRate = 60.0;
 

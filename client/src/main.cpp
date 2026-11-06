@@ -293,7 +293,8 @@ int main(int argc, char **argv)
 
                         for (const auto &prev : entities) {
                             if (!currentIds.contains(prev.netId)) {
-                                if (prev.type == rtype::protocol::EntityType::Enemy &&
+                                if ((prev.type == rtype::protocol::EntityType::Enemy ||
+                                     prev.type == rtype::protocol::EntityType::Obstacle) &&
                                     prev.x > 30.f && prev.x < rtype::WorldWidth + 100.f) {
                                     resources.playSound("explosion", 90.f);
                                     explosions.push_back({sf::Vector2f(prev.x, prev.y), 0.f, 0.35f});
@@ -469,6 +470,16 @@ int main(int argc, char **argv)
                             sprite.setPosition({entity.x, entity.y});
                             window.draw(sprite);
                         }
+                    } else if (entity.type == rtype::protocol::EntityType::Obstacle) {
+                        // Placeholder until the tiles have sprites: 0 debris, 1 Mars rock, 2 singularity shard.
+                        static const std::array<sf::Color, 3> tileColors = {
+                            sf::Color(120, 135, 150), sf::Color(165, 85, 50), sf::Color(120, 70, 190)};
+                        sf::RectangleShape tile({rtype::ObstacleSize - 4.f, rtype::ObstacleSize - 4.f});
+                        tile.setPosition({entity.x + 2.f, entity.y + 2.f});
+                        tile.setFillColor(tileColors[entity.variant % tileColors.size()]);
+                        tile.setOutlineColor(sf::Color(235, 235, 245));
+                        tile.setOutlineThickness(2.f);
+                        window.draw(tile);
                     } else if (entity.type == rtype::protocol::EntityType::Enemy) {
                         const float entityTime = totalTime + static_cast<float>(entity.netId % 11) * 0.23f;
                         const int animFrame = static_cast<int>(entityTime * 9.f);

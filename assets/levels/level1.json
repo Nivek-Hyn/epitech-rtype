@@ -14,6 +14,10 @@
     {
       "wave_id": 2,
       "delay_before_start": 8.5,
+      "obstacles": [
+        { "type": "satellite_debris", "spawn_y": 120.0 },
+        { "type": "satellite_debris", "spawn_y": 900.0 }
+      ],
       "enemies": [
         { "type": "orbital_probe", "spawn_y": 195.0, "speed": 92.0 },
         { "type": "satellite_scout", "spawn_y": 375.0, "speed": 112.0 },
@@ -24,6 +28,11 @@
     {
       "wave_id": 3,
       "delay_before_start": 18.5,
+      "obstacles": [
+        { "type": "satellite_debris", "spawn_y": 300.0 },
+        { "type": "satellite_debris", "spawn_y": 372.0 },
+        { "type": "satellite_debris", "spawn_y": 700.0 }
+      ],
       "enemies": [
         { "type": "solar_relay", "spawn_y": 450.0, "speed": 62.0 },
         { "type": "satellite_scout", "spawn_y": 180.0, "speed": 114.0 },

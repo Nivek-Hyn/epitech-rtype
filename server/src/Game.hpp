@@ -84,6 +84,12 @@ public:
         std::vector<AttackDefinition> attacks;
     };
 
+    struct ObstacleDefinition {
+        std::uint8_t variant = 0;
+        int health = 2;
+        float speed = 110.f;
+    };
+
     Game();
 
     void onPlayerJoined(PlayerId player);
@@ -154,6 +160,7 @@ private:
     float _transitionTimer = 0.f;
 
     std::unordered_map<std::string, EnemyDefinition> _entityDefinitions;
+    std::unordered_map<std::string, ObstacleDefinition> _obstacleDefinitions;
     GameRules _rules;
     std::vector<std::string> _campaignLevels;
     std::size_t _currentLevelIndex = 0;

@@ -1,0 +1,16 @@
+{
+  "stage": 1,
+  "level_name": "Test: a tile between a shooter and the player spawn",
+  "waves": [
+    {
+      "wave_id": 1,
+      "delay_before_start": 0.0,
+      "enemies": [
+        { "type": "test_shooter", "spawn_y": 300.0 }
+      ],
+      "obstacles": [
+        { "type": "test_shield", "spawn_y": 300.0 }
+      ]
+    }
+  ]
+}
