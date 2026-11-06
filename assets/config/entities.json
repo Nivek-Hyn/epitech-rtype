@@ -191,7 +191,7 @@
       ]
     },
     "martian_hopper": {
-      "variant": 1,
+      "variant": 7,
       "health": 3,
       "speed": 120.0,
       "pattern": "martian_bounce",
