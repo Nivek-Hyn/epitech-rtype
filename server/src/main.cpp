@@ -41,13 +41,17 @@ int main(int argc, char **argv)
         } else if (arg == "--level" && i + 1 < argc) {
             levelPath = argv[++i];
         } else if (arg == "-h" || arg == "--help") {
-            std::cout << "Usage: " << argv[0] << " [port] [level_path] [--mode campaign|infinite] [--difficulty easy|normal|hard] [--level path]\n";
+            std::cout
+                << "Usage: " << argv[0]
+                << " [port] [level_path] [--mode campaign|infinite] [--difficulty easy|normal|hard] [--level path]\n";
             return 0;
         } else if (arg.rfind("--", 0) != 0 && i == 1) {
             try {
                 port = static_cast<std::uint16_t>(std::stoul(arg));
             } catch (const std::exception &) {
-                std::cerr << "Usage: " << argv[0] << " [port] [level_path] [--mode campaign|infinite] [--difficulty easy|normal|hard] [--level path]\n";
+                std::cerr << "Usage: " << argv[0]
+                          << " [port] [level_path] [--mode campaign|infinite] [--difficulty easy|normal|hard] [--level "
+                             "path]\n";
                 return 84;
             }
         } else if (arg.rfind("--", 0) != 0 && i == 2 && levelPath.empty()) {

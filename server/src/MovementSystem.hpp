@@ -1,7 +1,7 @@
 #pragma once
 
-#include "engine/ecs/Registry.hpp"
 #include "common/Components.hpp"
+#include "engine/ecs/Registry.hpp"
 
 namespace rtype::server {
 
