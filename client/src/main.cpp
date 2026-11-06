@@ -112,8 +112,10 @@ int main(int argc, char **argv)
 
     bool gameOver = false;
     bool gameWon = false;
+    bool playerWasSpawned = false;
     std::uint32_t lastScore = 0;
     std::optional<std::uint8_t> localPlayerId;
+    std::array<std::uint8_t, 4> playerLives{};
     float localPlayerTilt = 0.0f;
     std::unordered_map<std::uint32_t, float> playerYHistory;
     std::unordered_map<std::uint32_t, float> playerTiltMap;
@@ -131,6 +133,7 @@ int main(int argc, char **argv)
         playerWasSpawned = false;
         lastScore = 0;
         localPlayerId.reset();
+        playerLives.fill(0);
         localPlayerTilt = 0.0f;
         playerYHistory.clear();
         playerTiltMap.clear();
@@ -249,28 +252,28 @@ int main(int argc, char **argv)
                     localPlayerId = accepted->playerId;
                 } else if (const auto *snapshot = std::get_if<rtype::protocol::Snapshot>(&*message)) {
                     lastScore = snapshot->score;
+                    playerLives = snapshot->lives;
 
                     int enemyCount = 0;
+                    int playerCount = 0;
                     for (const auto &ent : snapshot->entities) {
                         if (ent.type == rtype::protocol::EntityType::Enemy)
                             enemyCount++;
+                        else if (ent.type == rtype::protocol::EntityType::Player)
+                            playerCount++;
                     }
 
-                    // The server decides: a dead player may still have lives left.
-                    if (snapshot->state == rtype::protocol::GameState::GameOver) {
-                        gameOver = true;
-                        gameWon = false;
-                    }
                     if (playerCount > 0) {
                         playerWasSpawned = true;
                     }
 
-                    if (snapshot->state == rtype::protocol::GameState::Finished) {
-                        gameOver = true;
-                        gameWon = true;
-                    } else if (playerWasSpawned && playerCount == 0 && !gameOver) {
+                    // Authoritative server game state
+                    if (snapshot->state == rtype::protocol::GameState::GameOver) {
                         gameOver = true;
                         gameWon = false;
+                    } else if (snapshot->state == rtype::protocol::GameState::Finished) {
+                        gameOver = true;
+                        gameWon = true;
                     }
 
                     if (reportedConnected && !waveStarted) {
@@ -497,15 +500,55 @@ int main(int argc, char **argv)
                             window.draw(sprite);
                         }
                     } else if (entity.type == rtype::protocol::EntityType::Obstacle) {
-                        // Placeholder until the tiles have sprites: 0 debris, 1 Mars rock, 2 singularity shard.
-                        static const std::array<sf::Color, 3> tileColors = {
-                            sf::Color(120, 135, 150), sf::Color(165, 85, 50), sf::Color(120, 70, 190)};
-                        sf::RectangleShape tile({rtype::ObstacleSize - 4.f, rtype::ObstacleSize - 4.f});
-                        tile.setPosition({entity.x + 2.f, entity.y + 2.f});
-                        tile.setFillColor(tileColors[entity.variant % tileColors.size()]);
-                        tile.setOutlineColor(sf::Color(235, 235, 245));
-                        tile.setOutlineThickness(2.f);
-                        window.draw(tile);
+                        const float entityTime = totalTime + static_cast<float>(entity.netId % 13) * 0.31f;
+
+                        if (resources.hasTexture("obstacles")) {
+                            const auto &tex = resources.getTexture("obstacles");
+                            sf::Sprite sprite(tex);
+
+                            if (entity.variant == 0) {
+                                // Variant 0: Space tumbling debris chunk (r-typesheet21, Row 7: 16 frames, 32x32)
+                                const int animFrame = static_cast<int>(entityTime * 9.f) % 16;
+                                sprite.setTextureRect(sf::IntRect({1 + animFrame * 34, 363}, {32, 32}));
+                                constexpr float scale = rtype::ObstacleSize / 32.f;
+                                sprite.setScale({scale, scale});
+                                sprite.setPosition({entity.x, entity.y});
+                                window.draw(sprite);
+                            } else if (entity.variant == 1) {
+                                // Variant 1: Rotating Martian asteroid rock boulder (r-typesheet21, Row 2: 8 frames, 62x46)
+                                const int animFrame = static_cast<int>(entityTime * 6.f) % 8;
+                                sprite.setTextureRect(sf::IntRect({28 + animFrame * 65, 140}, {62, 46}));
+                                constexpr float scale = rtype::ObstacleSize / 52.f;
+                                sprite.setScale({scale, scale});
+                                sprite.setPosition({entity.x, entity.y});
+                                window.draw(sprite);
+                            } else if (entity.variant == 2) {
+                                // Variant 2: Rotating crystalline singularity shard (r-typesheet21, Row 4: 8 frames, 32x32)
+                                const int animFrame = static_cast<int>(entityTime * 8.f) % 8;
+                                sprite.setTextureRect(sf::IntRect({134 + animFrame * 34, 261}, {32, 32}));
+                                constexpr float scale = rtype::ObstacleSize / 32.f;
+                                sprite.setScale({scale, scale});
+                                sprite.setColor(sf::Color(220, 150, 255)); // violet / purple singularity glow
+                                sprite.setPosition({entity.x, entity.y});
+                                window.draw(sprite);
+                            } else {
+                                const int animFrame = static_cast<int>(entityTime * 9.f) % 16;
+                                sprite.setTextureRect(sf::IntRect({1 + animFrame * 34, 363}, {32, 32}));
+                                constexpr float scale = rtype::ObstacleSize / 32.f;
+                                sprite.setScale({scale, scale});
+                                sprite.setPosition({entity.x, entity.y});
+                                window.draw(sprite);
+                            }
+                        } else {
+                            static const std::array<sf::Color, 3> tileColors = {
+                                sf::Color(120, 135, 150), sf::Color(165, 85, 50), sf::Color(120, 70, 190)};
+                            sf::RectangleShape tile({rtype::ObstacleSize - 4.f, rtype::ObstacleSize - 4.f});
+                            tile.setPosition({entity.x + 2.f, entity.y + 2.f});
+                            tile.setFillColor(tileColors[entity.variant % tileColors.size()]);
+                            tile.setOutlineColor(sf::Color(235, 235, 245));
+                            tile.setOutlineThickness(2.f);
+                            window.draw(tile);
+                        }
                     } else if (entity.type == rtype::protocol::EntityType::Enemy) {
                         const float entityTime = totalTime + static_cast<float>(entity.netId % 11) * 0.23f;
                         const int animFrame = static_cast<int>(entityTime * 9.f);
@@ -684,17 +727,27 @@ int main(int argc, char **argv)
 
                 for (std::size_t i = 0; i < 4; ++i) {
                     const bool isLocal = (localPlayerId.has_value() && localPlayerId.value() == i);
-                    if (!playerActive[i] && !isLocal)
+                    const int lives = playerLives[i];
+                    if (!playerActive[i] && lives == 0 && !isLocal)
                         continue;
 
                     std::string pLabel = "P" + std::to_string(i + 1);
                     if (isLocal)
                         pLabel += " (YOU)";
 
-                    std::string statusStr = playerActive[i] ? "ACTIVE" : "DOWN";
+                    std::string statusStr;
+                    if (lives > 0) {
+                        if (!playerActive[i] && playerWasSpawned) {
+                            statusStr = "RESPAWNING... (" + std::to_string(lives) + " LIVES)";
+                        } else {
+                            statusStr = std::to_string(lives) + " LIVES";
+                        }
+                    } else {
+                        statusStr = playerActive[i] ? "LAST CHANCE" : "DEAD";
+                    }
 
                     sf::Text pText(resources.getFont("default"), pLabel + " : " + statusStr, 20);
-                    pText.setFillColor(playerActive[i] ? pColors[i] : sf::Color(140, 140, 140));
+                    pText.setFillColor(lives > 0 ? pColors[i] : (playerActive[i] ? sf::Color(255, 200, 50) : sf::Color(140, 140, 140)));
                     const auto bounds = pText.getLocalBounds();
                     pText.setOrigin({bounds.size.x, 0.f});
                     pText.setPosition({rightOffset, startY});
