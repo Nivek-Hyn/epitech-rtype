@@ -112,7 +112,6 @@ int main(int argc, char **argv)
 
     bool gameOver = false;
     bool gameWon = false;
-    bool playerWasSpawned = false;
     std::uint32_t lastScore = 0;
     std::optional<std::uint8_t> localPlayerId;
     float localPlayerTilt = 0.0f;
@@ -129,7 +128,6 @@ int main(int argc, char **argv)
         lastEnemyCount = 0;
         gameOver = false;
         gameWon = false;
-        playerWasSpawned = false;
         localPlayerId.reset();
         localPlayerTilt = 0.0f;
         playerYHistory.clear();
@@ -252,18 +250,13 @@ int main(int argc, char **argv)
                     lastScore = snapshot->score;
 
                     int enemyCount = 0;
-                    int playerCount = 0;
                     for (const auto &ent : snapshot->entities) {
                         if (ent.type == rtype::protocol::EntityType::Enemy)
                             enemyCount++;
-                        else if (ent.type == rtype::protocol::EntityType::Player)
-                            playerCount++;
                     }
 
-                    if (playerCount > 0) {
-                        playerWasSpawned = true;
-                    }
-                    if (playerWasSpawned && playerCount == 0 && !gameOver) {
+                    // The server decides: a dead player may still have lives left.
+                    if (snapshot->state == rtype::protocol::GameState::GameOver) {
                         gameOver = true;
                         gameWon = false;
                     }

@@ -8,10 +8,6 @@ namespace rtype::server {
 
 namespace {
 
-constexpr float BossHeight = 72.f;
-
-// Mars: the ground an enemy bounces on.
-constexpr float MarsGroundY = WorldHeight - BossHeight;
 constexpr float MinBounceHeight = 50.f;
 
 // Singularity: the black hole is at the center of the screen. The screen being wider than
@@ -36,6 +32,11 @@ void updateEnemyMovements(engine::ecs::Registry &registry, float dt)
             // la durée d'ouverture du serveur.
             pattern.age += dt;
             const float time = pattern.age;
+
+            // Positions extrêmes pour que tout le sprite reste à l'écran (le bas est aussi le sol de Mars).
+            const auto box = rtype::components::enemyHitbox(kind.variant);
+            const float topY = -box.offsetY;
+            const float bottomY = WorldHeight - box.offsetY - box.height;
 
             // Un boss arrêté continue d'avancer "virtuellement", pour que les
             // patterns basés sur X continuent d'osciller.
@@ -84,9 +85,9 @@ void updateEnemyMovements(engine::ecs::Registry &registry, float dt)
                 // Bonds d'astronaute : chute lente, rebond au sol, remontée jusqu'à spawn_y (amplitude = gravité)
                 float gravity = pattern.amplitude > 0.f ? pattern.amplitude : 150.f;
                 if (pattern.bounceSpeed <= 0.f)
-                    pattern.bounceSpeed = std::sqrt(2.f * gravity * std::max(MarsGroundY - pos.y, MinBounceHeight));
+                    pattern.bounceSpeed = std::sqrt(2.f * gravity * std::max(bottomY - pos.y, MinBounceHeight));
                 vel.y += gravity * dt;
-                if (pos.y >= MarsGroundY && vel.y > 0.f)
+                if (pos.y >= bottomY && vel.y > 0.f)
                     vel.y = -pattern.bounceSpeed;
             }
             else if (pattern.type == "gravity_pull") {
@@ -136,7 +137,7 @@ void updateEnemyMovements(engine::ecs::Registry &registry, float dt)
             if (pattern.holdX > 0.f) {
                 if (holding)
                     vel.x = 0.f;
-                if ((pos.y <= 0.f && vel.y < 0.f) || (pos.y >= WorldHeight - BossHeight && vel.y > 0.f))
+                if ((pos.y <= topY && vel.y < 0.f) || (pos.y >= bottomY && vel.y > 0.f))
                     vel.y = 0.f;
             }
         });

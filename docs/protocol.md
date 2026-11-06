@@ -1,4 +1,4 @@
-# R-Type Network Protocol — version 1 (draft)
+# R-Type Network Protocol — version 2 (draft)
 
 This document describes every message exchanged between `r-type_client` and `r-type_server`.
 It should be enough to write a new client. The reference implementation is `common/src/Protocol.cpp`.
@@ -14,7 +14,7 @@ It should be enough to write a new client. The reference implementation is `comm
 | Offset | Size | Field | Description |
 |---|---|---|---|
 | 0 | u16 | magic | Always `0x5254` ("RT") |
-| 2 | u8 | version | Protocol version, currently `1` |
+| 2 | u8 | version | Protocol version, currently `2` |
 | 3 | u8 | type | Message type (see §4) |
 | 4 | u32 | sequence | Incremented by the sender for each packet it sends |
 | 8 | u16 | payload_size | Number of bytes after the header |
@@ -61,7 +61,7 @@ Input flags: `0x01` up, `0x02` down, `0x04` left, `0x08` right, `0x10` shoot.
 | Size | Field |
 |---|---|
 | u32 | tick |
-| u8 | state: `1` waiting for players, `2` playing, `3` finished |
+| u8 | state: `1` waiting for players, `2` playing, `3` finished (victory), `4` game over (defeat) |
 | u32 | score |
 | u16 | count (max 84) |
 | count × 14 bytes | entities |
@@ -78,7 +78,7 @@ Each entity:
 
 A tick with more than 84 entities is sent as several Snapshot packets with the same `tick`.
 
-The end of the game is not a separate message: the client sees `state = 3` in the snapshots, with the final score.
+The end of the game is not a separate message: the client sees `state = 3` or `state = 4` in the snapshots, with the final score.
 Since a snapshot is sent every tick, this information cannot be lost.
 
 ## 5. Session

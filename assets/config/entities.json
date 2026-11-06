@@ -61,6 +61,7 @@
       }
     },
     "boss_heavy": {
+      "variant": 5,
       "is_boss": true,
       "hold_x": 1500.0,
       "score": 1000,
@@ -155,6 +156,7 @@
       ]
     },
     "boss_orbital_carrier": {
+      "variant": 6,
       "is_boss": true,
       "hold_x": 1500.0,
       "score": 1000,
@@ -225,6 +227,7 @@
       }
     },
     "boss_mars_excavator": {
+      "variant": 6,
       "is_boss": true,
       "hold_x": 1200.0,
       "score": 1500,
@@ -308,6 +311,7 @@
       ]
     },
     "boss_singularity_core": {
+      "variant": 6,
       "is_boss": true,
       "hold_x": 960.0,
       "score": 2500,

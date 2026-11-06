@@ -59,6 +59,7 @@ public:
         int playerLives = 3;
         float respawnDelay = 2.0f;
         float invulnerability = 2.0f;
+        std::size_t levelsPerWorld = 3;
     };
 
     struct AttackDefinition {
@@ -130,6 +131,8 @@ private:
     void clearEnemies();
     void updatePlayerLives(float dt);
     void resetWaves();
+    void restartCampaign();
+    void restoreLivesOnNewWorld();
     bool isInvulnerable(engine::ecs::Entity entity) const;
 
     engine::ecs::Registry _registry;

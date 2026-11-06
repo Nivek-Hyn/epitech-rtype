@@ -166,7 +166,7 @@ std::optional<Packet> decode(std::span<const std::uint8_t> datagram)
             snapshot.tick = reader.u32();
             const auto state = reader.u8();
             if (state < static_cast<std::uint8_t>(GameState::Waiting) ||
-                state > static_cast<std::uint8_t>(GameState::Finished))
+                state > static_cast<std::uint8_t>(GameState::GameOver))
                 return std::nullopt;
             snapshot.state = static_cast<GameState>(state);
             snapshot.score = reader.u32();

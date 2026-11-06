@@ -1,0 +1,13 @@
+{
+  "stage": 1,
+  "level_name": "Test: one enemy with its own sprite",
+  "waves": [
+    {
+      "wave_id": 1,
+      "delay_before_start": 0.0,
+      "enemies": [
+        { "type": "test_sprite", "spawn_y": 300.0 }
+      ]
+    }
+  ]
+}

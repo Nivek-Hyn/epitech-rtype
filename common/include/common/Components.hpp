@@ -49,6 +49,32 @@ struct MovementPattern {
     float bounceSpeed = 0.f;
 };
 
+// Area of an enemy that can be hit, relative to its position. Matches the size of its sprite.
+struct EnemyHitbox {
+    float width = 66.f;
+    float height = 72.f;
+    float offsetY = 0.f;
+};
+
+inline EnemyHitbox enemyHitbox(std::uint8_t variant)
+{
+    switch (variant) {
+    case 1:
+    case 2:
+        return {64.f, 56.f, 0.f};
+    case 3:
+        return {56.f, 46.f, 0.f};
+    case 4:
+        return {72.f, 83.f, 0.f};
+    case 5:
+        return {200.f, 200.f, -15.f};
+    case 6:
+        return {280.f, 222.f, -60.f};
+    default:
+        return {};
+    }
+}
+
 // Game rules specific to an enemy type.
 struct EnemyTraits {
     std::uint32_t score = 100;

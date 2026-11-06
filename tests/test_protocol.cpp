@@ -34,6 +34,17 @@ TEST(Protocol, RoundTripSnapshot)
     EXPECT_EQ(received.entities[1].type, EntityType::Enemy);
 }
 
+TEST(Protocol, SnapshotCarriesTheGameOverStateButNoUnknownState)
+{
+    auto bytes = encode({1, Snapshot{1, GameState::GameOver, 0, {}}});
+    const auto packet = decode(bytes);
+    ASSERT_TRUE(packet);
+    EXPECT_EQ(std::get<Snapshot>(packet->message).state, GameState::GameOver);
+
+    bytes[HeaderSize + 4] = 5; // the state comes right after the u32 tick
+    EXPECT_FALSE(decode(bytes));
+}
+
 TEST(Protocol, RoundTripsEveryMessageType)
 {
     const std::vector<Message> messages = {Connect{},

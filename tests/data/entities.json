@@ -5,6 +5,12 @@
       "speed": 120.0,
       "pattern": "straight"
     },
+    "test_sprite": {
+      "variant": 3,
+      "health": 1,
+      "speed": 120.0,
+      "pattern": "straight"
+    },
     "test_boss": {
       "health": 2,
       "speed": 400.0,
