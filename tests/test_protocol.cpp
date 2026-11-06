@@ -46,7 +46,7 @@ TEST(Protocol, SnapshotCarriesTheLivesOfEachPlayer)
     EXPECT_EQ(received.entities[0].variant, 2);
 }
 
-TEST(Protocol, SnapshotCarriesObstaclesButNoUnknownEntityType)
+TEST(Protocol, SnapshotCarriesObstaclesAndBonusesButNoUnknownEntityType)
 {
     auto bytes = encode({1, Snapshot{1, GameState::Playing, 0, {{1, EntityType::Obstacle, 2, 500.f, 300.f}}}});
     const auto packet = decode(bytes);
@@ -54,6 +54,8 @@ TEST(Protocol, SnapshotCarriesObstaclesButNoUnknownEntityType)
     EXPECT_EQ(std::get<Snapshot>(packet->message).entities[0].type, EntityType::Obstacle);
 
     bytes[HeaderSize + SnapshotFixedSize + 4] = 6;
+    EXPECT_EQ(std::get<Snapshot>(decode(bytes)->message).entities[0].type, EntityType::Bonus);
+    bytes[HeaderSize + SnapshotFixedSize + 4] = 7;
     EXPECT_FALSE(decode(bytes));
 }
 
@@ -78,6 +80,7 @@ TEST(Protocol, RoundTripsEveryMessageType)
                                            ConnectRejected{RejectReason::VersionMismatch},
                                            Snapshot{},
                                            EntityDestroyed{9, DestroyReason::OutOfBounds},
+                                           EntityDestroyed{10, DestroyReason::Collected},
                                            PlayerLeft{2, LeaveReason::TimedOut},
                                            Pong{456}};
 

@@ -1,0 +1,34 @@
+{
+  "prefabs": {
+    "paddle": {
+      "Box": { "width": 120, "height": 18 },
+      "Color": { "r": 230, "g": 230, "b": 240 },
+      "Paddle": { "speed": 650 }
+    },
+    "ball": {
+      "Box": { "width": 14, "height": 14 },
+      "Color": { "r": 255, "g": 255, "b": 255 },
+      "Ball": { "speed": 460 }
+    },
+    "brick_red": {
+      "Box": { "width": 76, "height": 26 },
+      "Color": { "r": 230, "g": 70, "b": 80 },
+      "Brick": { "hits": 1, "points": 10 }
+    },
+    "brick_orange": {
+      "Box": { "width": 76, "height": 26 },
+      "Color": { "r": 245, "g": 160, "b": 50 },
+      "Brick": { "hits": 1, "points": 20 }
+    },
+    "brick_steel": {
+      "Box": { "width": 76, "height": 26 },
+      "Color": { "r": 120, "g": 150, "b": 190 },
+      "Brick": { "hits": 2, "points": 50 }
+    },
+    "brick_wall": {
+      "Box": { "width": 76, "height": 26 },
+      "Color": { "r": 70, "g": 70, "b": 80 },
+      "Brick": { "hits": 0 }
+    }
+  }
+}

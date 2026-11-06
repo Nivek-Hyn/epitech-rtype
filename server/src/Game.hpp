@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Prefabs.hpp"
+#include "Weapons.hpp"
 #include "common/Constants.hpp"
 #include "common/Protocol.hpp"
 #include "engine/ecs/Registry.hpp"
@@ -10,10 +12,12 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
-#include <utility>
-#include <vector>
+#include <optional>
+#include <random>
 #include <string>
 #include <unordered_map>
+#include <utility>
+#include <vector>
 
 namespace rtype::server {
 
@@ -21,16 +25,9 @@ namespace rtype::server {
 // main.cpp feeds it network events and sends what it produces, so it can be tested without a network.
 class Game {
 public:
-    enum class GameMode {
-        Campaign,
-        Infinite
-    };
+    enum class GameMode { Campaign, Infinite };
 
-    enum class Difficulty {
-        Easy,
-        Normal,
-        Hard
-    };
+    enum class Difficulty { Easy, Normal, Hard };
 
     struct DifficultyConfig {
         float healthMultiplier = 1.0f;
@@ -53,44 +50,13 @@ public:
     struct GameRules {
         std::unordered_map<Difficulty, DifficultyConfig> difficulties;
         InfiniteConfig infinite;
-        std::vector<std::string> campaignLevels = {
-            "assets/levels/level1.json",
-            "assets/levels/level2.json",
-            "assets/levels/level3.json"
-        };
+        std::vector<std::string> campaignLevels = {"assets/levels/level1.json", "assets/levels/level2.json",
+                                                   "assets/levels/level3.json"};
         float intermissionDelay = 2.0f;
         int playerLives = 3;
         float respawnDelay = 2.0f;
         float invulnerability = 2.0f;
         std::size_t levelsPerWorld = 3;
-    };
-
-    struct AttackDefinition {
-        float fireRate = 2.0f;
-        float bulletSpeed = 350.f;
-        std::uint8_t bulletVariant = 0;
-        std::string bulletPattern = "straight";
-        float offsetY = 0.f;
-    };
-
-    struct EnemyDefinition {
-        std::uint8_t variant = 0;
-        int health = 1;
-        float speed = 100.f;
-        std::string pattern = "straight";
-        float amplitude = 0.f;
-        float frequency = 0.f;
-        std::uint32_t score = 100;
-        bool isBoss = false;
-        float holdX = 0.f;
-        bool hasAttack = false;
-        std::vector<AttackDefinition> attacks;
-    };
-
-    struct ObstacleDefinition {
-        std::uint8_t variant = 0;
-        int health = 2;
-        float speed = 110.f;
     };
 
     Game();
@@ -113,6 +79,7 @@ public:
     void loadLevel(const std::string &filepath);
     void loadCampaign(const std::vector<std::string> &levelPaths);
     void loadRules(const std::string &filepath);
+    // Adds the prefabs of an entities file (see assets/config/entities.json).
     void loadEntitiesConfig(const std::string &filepath);
 
     void setGameMode(GameMode mode) { _gameMode = mode; }
@@ -128,6 +95,9 @@ public:
     const LevelConfig &currentLevel() const { return _currentLevel; }
     protocol::GameState gameState() const { return _state; }
     int playerLives(PlayerId player) const { return player < MaxPlayers ? _lives[player] : 0; }
+    const std::string &playerWeapon(PlayerId player) const { return _weapons.at(player); }
+    // Weapons and bonus drops from assets/config/weapons.json.
+    Arsenal &arsenal() { return _arsenal; }
 
     const GameRules &rules() const { return _rules; }
     GameRules &rules() { return _rules; }
@@ -162,6 +132,9 @@ private:
 
     // Game.cpp
     engine::ecs::Entity spawnNetworked(protocol::EntityType type, std::uint8_t variant, float x, float y);
+    std::optional<engine::ecs::Entity> spawnPrefab(const std::string &name, float x, float y);
+    engine::ecs::Entity spawnShot(protocol::EntityType type, std::uint8_t variant, float x, float y);
+    engine::physics::Aabb hitArea(engine::ecs::Entity entity);
     void keepPlayersOnScreen();
     void updateShootCooldowns(float dt);
     void removeEntitiesOutOfScreen();
@@ -179,18 +152,25 @@ private:
     // GameWaves.cpp
     void updateWaves(float dt);
     void spawnWave(WaveConfig &wave);
-    EnemyDefinition resolveEnemy(const EnemySpawnConfig &config);
-    void spawnEnemy(const EnemySpawnConfig &config);
-    void giveAttacks(engine::ecs::Entity enemy, const std::vector<AttackDefinition> &attacks);
-    void spawnObstacle(const EnemySpawnConfig &config);
+    void spawnFromLevel(const EnemySpawnConfig &config);
+    void applyLevelOverrides(engine::ecs::Entity entity, const EnemySpawnConfig &config);
+    void applyDifficulty(engine::ecs::Entity entity);
 
     // GameCollisions.cpp
     void handleCollisions();
+    // GameWeapons.cpp
+    void fire(std::size_t player, float x, float y);
+    void dropBonuses(const std::vector<std::pair<float, float>> &positions);
+    std::optional<std::size_t> playerTouching(const engine::physics::Aabb &box);
+    void collectBonuses();
+    void giveBonus(engine::ecs::Entity bonus, std::size_t player);
+
     CollisionFrame collectHitAreas();
     void resolvePlayerMissiles(CollisionFrame &frame);
     bool missileHitsObstacle(CollisionFrame &frame, engine::ecs::Entity missile, const engine::physics::Aabb &box);
     bool missileHitsEnemy(CollisionFrame &frame, engine::ecs::Entity missile, const engine::physics::Aabb &box);
-    void damageEnemy(CollisionFrame &frame, engine::ecs::Entity enemy);
+    void damageEnemy(CollisionFrame &frame, const std::pair<engine::ecs::Entity, engine::physics::Aabb> &enemy,
+                     engine::ecs::Entity missile);
     std::uint32_t pointsFor(engine::ecs::Entity enemy);
     void resolveShipContacts(CollisionFrame &frame);
     void shipRamsEnemies(CollisionFrame &frame, engine::ecs::Entity ship, const engine::physics::Aabb &box);
@@ -212,13 +192,15 @@ private:
     float _enemySpawnTimer = 0.f;
     std::uint32_t _enemiesSpawned = 0;
     std::uint32_t _score = 0;
+    Arsenal _arsenal;
+    std::array<std::string, MaxPlayers> _weapons;
+    std::mt19937 _random{std::random_device{}()};
 
     LevelConfig _currentLevel;
     float _levelTimer = 0.f;
     float _transitionTimer = 0.f;
 
-    std::unordered_map<std::string, EnemyDefinition> _entityDefinitions;
-    std::unordered_map<std::string, ObstacleDefinition> _obstacleDefinitions;
+    Prefabs _prefabs;
     GameRules _rules;
     std::vector<std::string> _campaignLevels;
     std::size_t _currentLevelIndex = 0;

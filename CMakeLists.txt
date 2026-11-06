@@ -23,6 +23,8 @@ include(cmake/Warnings.cmake)
 add_subdirectory(engine)
 add_subdirectory(common)
 add_subdirectory(server)
+add_subdirectory(tools/level-editor)
+add_subdirectory(games/brickrush)
 
 if(RTYPE_BUILD_CLIENT)
     add_subdirectory(client)

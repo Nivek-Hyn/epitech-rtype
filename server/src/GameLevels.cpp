@@ -46,18 +46,18 @@ void Game::resetWaves()
 
 bool Game::allWavesSpawned() const
 {
-    return !_currentLevel.waves.empty() &&
-           std::all_of(_currentLevel.waves.begin(), _currentLevel.waves.end(),
-                       [](const WaveConfig &wave) { return wave.isSpawned; });
+    return !_currentLevel.waves.empty() && std::all_of(_currentLevel.waves.begin(), _currentLevel.waves.end(),
+                                                       [](const WaveConfig &wave) { return wave.isSpawned; });
 }
 
 bool Game::anyEnemyAlive()
 {
     bool alive = false;
-    _registry.each<rtype::components::Kind>([&alive](engine::ecs::Entity /*entity*/, const rtype::components::Kind &kind) {
-        if (kind.type == protocol::EntityType::Enemy)
-            alive = true;
-    });
+    _registry.each<rtype::components::Kind>(
+        [&alive](engine::ecs::Entity /*entity*/, const rtype::components::Kind &kind) {
+            if (kind.type == protocol::EntityType::Enemy)
+                alive = true;
+        });
     return alive;
 }
 
@@ -97,6 +97,7 @@ void Game::restartCampaign()
     clearEnemies();
     _state = protocol::GameState::Playing;
     _score = 0;
+    _weapons.fill(_arsenal.defaultWeapon);
     _infiniteLoopCount = 1;
     loadFirstLevel();
 }

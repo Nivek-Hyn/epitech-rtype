@@ -10,9 +10,6 @@ namespace {
 
 constexpr float PlayerSpawnX = 100.f;
 constexpr float PlayerSpawnY = 300.f;
-constexpr float PlayerSpeed = 200.f;
-constexpr float PlayerShootCooldown = 0.25f;
-constexpr float PlayerMissileSpeed = 400.f;
 constexpr float PlayerMissileOffsetX = 30.f;
 
 } // namespace
@@ -53,16 +50,18 @@ void Game::onInput(PlayerId player, std::uint8_t flags)
 
 void Game::applyMovementInput(std::size_t player, std::uint8_t flags)
 {
+    const auto *control = _registry.get<rtype::components::PlayerControl>(_players[player]);
+    const float speed = control ? control->speed : rtype::components::PlayerControl{}.speed;
     float vx = 0.0f;
     float vy = 0.0f;
     if (flags & protocol::InputFlag::Up)
-        vy -= PlayerSpeed;
+        vy -= speed;
     if (flags & protocol::InputFlag::Down)
-        vy += PlayerSpeed;
+        vy += speed;
     if (flags & protocol::InputFlag::Left)
-        vx -= PlayerSpeed;
+        vx -= speed;
     if (flags & protocol::InputFlag::Right)
-        vx += PlayerSpeed;
+        vx += speed;
     _registry.emplace<rtype::components::Velocity>(_players[player], vx, vy);
 }
 
@@ -73,16 +72,15 @@ void Game::shootIfReady(std::size_t player)
     const auto *position = _registry.get<rtype::components::Position>(_players[player]);
     if (!position)
         return;
-    const engine::ecs::Entity missile =
-        spawnNetworked(protocol::EntityType::PlayerMissile, 0, position->x + PlayerMissileOffsetX, position->y);
-    _registry.emplace<rtype::components::Velocity>(missile, PlayerMissileSpeed, 0.0f);
-    _shootCooldowns[player] = PlayerShootCooldown;
+    fire(player, position->x + PlayerMissileOffsetX, position->y);
 }
 
 void Game::spawnPlayerShip(std::size_t player)
 {
-    _players[player] =
-        spawnNetworked(protocol::EntityType::Player, static_cast<std::uint8_t>(player), PlayerSpawnX, PlayerSpawnY);
+    const auto variant = static_cast<std::uint8_t>(player);
+    const auto ship = spawnPrefab("player_ship", PlayerSpawnX, PlayerSpawnY);
+    _players[player] = ship ? *ship : spawnNetworked(protocol::EntityType::Player, variant, PlayerSpawnX, PlayerSpawnY);
+    _registry.get<rtype::components::Kind>(_players[player])->variant = variant; // the player's color
 }
 
 void Game::removePlayerShip(std::size_t player)

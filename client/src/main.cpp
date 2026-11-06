@@ -26,6 +26,33 @@ struct Explosion {
     float maxDuration{0.35f};
 };
 
+// Bonus = colored orb with a letter, so bonuses can be told apart without color: S spread, L laser, + life.
+// The variant comes from the Kind of the bonus prefab in entities.json.
+static void drawBonus(sf::RenderWindow &window, const sf::Font &font, const rtype::protocol::EntityState &entity,
+                      float time)
+{
+    static const std::array<std::pair<sf::Color, const char *>, 3> looks = {
+        {{sf::Color(80, 200, 255), "S"}, {sf::Color(255, 90, 220), "L"}, {sf::Color(90, 230, 120), "+"}}};
+    const auto &[color, letter] = looks[entity.variant % looks.size()];
+    const sf::Vector2f center{entity.x + 16.f, entity.y + 16.f};
+    const float radius = 16.f * (1.f + 0.1f * std::sin(time * 8.f));
+
+    sf::CircleShape orb(radius);
+    orb.setOrigin({radius, radius});
+    orb.setPosition(center);
+    orb.setFillColor(color);
+    orb.setOutlineColor(sf::Color::White);
+    orb.setOutlineThickness(2.f);
+    window.draw(orb);
+
+    sf::Text label(font, letter, 20);
+    label.setFillColor(sf::Color::Black);
+    const auto bounds = label.getLocalBounds();
+    label.setOrigin({bounds.position.x + bounds.size.x / 2.f, bounds.position.y + bounds.size.y / 2.f});
+    label.setPosition(center);
+    window.draw(label);
+}
+
 int main(int argc, char **argv)
 {
     std::string host = "127.0.0.1";
@@ -448,10 +475,13 @@ int main(int argc, char **argv)
                         sf::Sprite sprite(resources.getTexture("bullet"));
                         const int bulletFrame = static_cast<int>(totalTime * 18.f) % 2;
                         sprite.setTextureRect(bulletFrame == 0 ? sf::IntRect({249, 102}, {16, 12}) : sf::IntRect({266, 102}, {16, 12}));
-                        sprite.setScale({2.f, 2.f});
-                        sprite.setColor(sf::Color(120, 230, 255));
+                        // Variant 1 = laser_missile (entities.json): longer and magenta.
+                        sprite.setScale(entity.variant == 1 ? sf::Vector2f{3.5f, 1.5f} : sf::Vector2f{2.f, 2.f});
+                        sprite.setColor(entity.variant == 1 ? sf::Color(255, 90, 220) : sf::Color(120, 230, 255));
                         sprite.setPosition({entity.x, entity.y});
                         window.draw(sprite);
+                    } else if (entity.type == rtype::protocol::EntityType::Bonus) {
+                        drawBonus(window, resources.getFont("default"), entity, totalTime);
                     } else if (entity.type == rtype::protocol::EntityType::EnemyMissile) {
                         const float mTime = totalTime + static_cast<float>(entity.netId % 7) * 0.15f;
                         if (entity.variant == 0) {

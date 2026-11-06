@@ -14,13 +14,15 @@ Game::DifficultyConfig &Game::currentDifficulty()
 // Number of infinite mode loops already completed.
 float Game::completedLoops() const
 {
-    return (_gameMode == GameMode::Infinite && _infiniteLoopCount > 1) ? static_cast<float>(_infiniteLoopCount - 1) : 0.0f;
+    return (_gameMode == GameMode::Infinite && _infiniteLoopCount > 1) ? static_cast<float>(_infiniteLoopCount - 1)
+                                                                       : 0.0f;
 }
 
 int Game::scaledHealth(int health)
 {
     const float growth = 1.0f + completedLoops() * _rules.infinite.healthGrowthPerLoop;
-    return std::max(1, static_cast<int>(std::round(static_cast<float>(health) * currentDifficulty().healthMultiplier * growth)));
+    return std::max(
+        1, static_cast<int>(std::round(static_cast<float>(health) * currentDifficulty().healthMultiplier * growth)));
 }
 
 float Game::scaledSpeed(float speed)

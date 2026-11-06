@@ -80,7 +80,7 @@ void writePayload(engine::net::ByteWriter &writer, const Message &message)
 bool validEntityType(std::uint8_t value)
 {
     return value >= static_cast<std::uint8_t>(EntityType::Player) &&
-           value <= static_cast<std::uint8_t>(EntityType::Obstacle);
+           value <= static_cast<std::uint8_t>(EntityType::Bonus);
 }
 
 } // namespace
@@ -199,7 +199,7 @@ std::optional<Packet> decode(std::span<const std::uint8_t> datagram)
             const auto netId = reader.u32();
             const auto reason = reader.u8();
             if (reason < static_cast<std::uint8_t>(DestroyReason::Killed) ||
-                reason > static_cast<std::uint8_t>(DestroyReason::OutOfBounds))
+                reason > static_cast<std::uint8_t>(DestroyReason::Collected))
                 return std::nullopt;
             message = EntityDestroyed{netId, static_cast<DestroyReason>(reason)};
             break;

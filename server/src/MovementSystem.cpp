@@ -3,10 +3,14 @@
 #include "common/Constants.hpp"
 #include <algorithm>
 #include <cmath>
+#include <string>
+#include <unordered_map>
 
 namespace rtype::server {
 
 namespace {
+
+using rtype::components::MovementPattern;
 
 constexpr float MinBounceHeight = 50.f;
 
@@ -19,127 +23,190 @@ constexpr float BlackHoleCaptureRadius = 120.f;
 constexpr float OrbitInwardRatio = 0.6f; // part of the speed used to fall toward the hole
 constexpr float EjectionSpeedRatio = 3.f;
 
+// What a movement pattern needs to decide the velocity of one enemy for this tick.
+struct Motion {
+    const rtype::components::Position &position;
+    rtype::components::Velocity &velocity;
+    MovementPattern &pattern;
+    float dt;
+    float time;    // age of the enemy: its movement does not depend on how long the server has run
+    float x;       // horizontal position, still advancing while a boss holds its position
+    float bottomY; // lowest position keeping the whole sprite on screen (also the ground of Mars)
+};
+
+// The value set in the JSON, or the pattern's default when it is 0.
+float orDefault(float value, float fallback)
+{
+    return value > 0.f ? value : fallback;
+}
+
+void straight(Motion &m)
+{
+    m.velocity.y = 0.f;
+}
+
+void sineWave(Motion &m)
+{
+    m.velocity.y = std::sin(m.x * orDefault(m.pattern.frequency, 0.02f)) * orDefault(m.pattern.amplitude, 150.f);
+}
+
+void zigzag(Motion &m)
+{
+    m.velocity.y = std::cos(m.x * orDefault(m.pattern.frequency, 0.05f)) * orDefault(m.pattern.amplitude, 100.f);
+}
+
+void dive(Motion &m)
+{
+    m.velocity.y = orDefault(m.pattern.amplitude, 80.f);
+}
+
+void backAndForth(Motion &m)
+{
+    const float amplitude = orDefault(m.pattern.amplitude, 50.f);
+    m.velocity.x = -m.pattern.baseSpeed + std::sin(m.time * orDefault(m.pattern.frequency, 3.0f)) * amplitude;
+    m.velocity.y = 0.f;
+}
+
+// Satellite: circular oscillation along its way.
+void orbital(Motion &m)
+{
+    const float amplitude = orDefault(m.pattern.amplitude, 120.f);
+    const float frequency = orDefault(m.pattern.frequency, 2.0f);
+    m.velocity.y = std::sin(m.time * frequency) * amplitude;
+    m.velocity.x = -m.pattern.baseSpeed + std::cos(m.time * frequency) * (amplitude * 0.4f);
+}
+
+// Flies flat, then falls faster and faster (amplitude = gravity, frequency = seconds before the fall).
+void gravityDive(Motion &m)
+{
+    const float gravity = orDefault(m.pattern.amplitude, 300.f);
+    m.velocity.y = m.time < orDefault(m.pattern.frequency, 5.f) ? 0.f : m.velocity.y + gravity * m.dt;
+}
+
+// Astronaut jumps: slow fall, bounce on the ground, back up to the spawn height (amplitude = gravity).
+void martianBounce(Motion &m)
+{
+    const float gravity = orDefault(m.pattern.amplitude, 150.f);
+    if (m.pattern.bounceSpeed <= 0.f)
+        m.pattern.bounceSpeed = std::sqrt(2.f * gravity * std::max(m.bottomY - m.position.y, MinBounceHeight));
+    m.velocity.y += gravity * m.dt;
+    if (m.position.y >= m.bottomY && m.velocity.y > 0.f)
+        m.velocity.y = -m.pattern.bounceSpeed;
+}
+
+// Keeps crossing the line of the black hole and coming back (amplitude = strength of the pull).
+void gravityPull(Motion &m)
+{
+    m.velocity.y += (BlackHoleY - m.position.y) * orDefault(m.pattern.amplitude, 1.f) * m.dt;
+}
+
+// Spirals around the black hole, then is thrown to the left (amplitude = rotation speed).
+void blackHoleOrbit(Motion &m)
+{
+    if (!m.pattern.ejected) {
+        const float orbitSpeed = orDefault(m.pattern.amplitude, 220.f);
+        const float inwardSpeed = m.pattern.baseSpeed * OrbitInwardRatio;
+        const float toRight = m.position.x - BlackHoleX;
+        const float toBottom = (m.position.y - BlackHoleY) / OrbitFlattening;
+        const float radius = std::hypot(toRight, toBottom);
+        if (radius < BlackHoleCaptureRadius) {
+            m.pattern.ejected = true;
+        } else {
+            m.velocity.x = (-toBottom * orbitSpeed - toRight * inwardSpeed) / radius;
+            m.velocity.y = (toRight * orbitSpeed - toBottom * inwardSpeed) / radius * OrbitFlattening;
+        }
+    }
+    if (m.pattern.ejected) {
+        m.velocity.x = -m.pattern.baseSpeed * EjectionSpeedRatio;
+        m.velocity.y = 0.f;
+    }
+}
+
+// Jump along a parabolic arc under the gravity of Mars.
+void parabolic(Motion &m)
+{
+    m.velocity.y = std::sin(m.x * orDefault(m.pattern.frequency, 0.008f)) * orDefault(m.pattern.amplitude, 150.f);
+}
+
+// Sucked in a spiral toward the center line of the screen.
+void vortexSpiral(Motion &m)
+{
+    const float amplitude = orDefault(m.pattern.amplitude, 140.f);
+    m.velocity.y = std::sin(m.time * 3.5f) * amplitude + (BlackHoleY - m.position.y) * 0.6f;
+}
+
+// Unpredictable quantum distortion.
+void quantumErratic(Motion &m)
+{
+    const float amplitude = orDefault(m.pattern.amplitude, 130.f);
+    m.velocity.y = (std::sin(m.x * 0.03f) + std::cos(m.time * 4.0f)) * (amplitude * 0.6f);
+}
+
+// The "type" of a MovementPattern in entities.json, and the function that applies it.
+const std::unordered_map<std::string, void (*)(Motion &)> &patterns()
+{
+    static const std::unordered_map<std::string, void (*)(Motion &)> table = {
+        {"straight", straight},
+        {"sine_wave", sineWave},
+        {"zigzag", zigzag},
+        {"dive", dive},
+        {"back_and_forth", backAndForth},
+        {"orbital", orbital},
+        {"gravity_dive", gravityDive},
+        {"martian_bounce", martianBounce},
+        {"gravity_pull", gravityPull},
+        {"black_hole_orbit", blackHoleOrbit},
+        {"parabolic", parabolic},
+        {"vortex_spiral", vortexSpiral},
+        {"quantum_erratic", quantumErratic},
+    };
+    return table;
+}
+
+// A boss stops at its fighting position and never leaves the screen.
+void holdBoss(Motion &m, bool holding, float topY)
+{
+    if (m.pattern.holdX <= 0.f)
+        return;
+    if (holding)
+        m.velocity.x = 0.f;
+    if ((m.position.y <= topY && m.velocity.y < 0.f) || (m.position.y >= m.bottomY && m.velocity.y > 0.f))
+        m.velocity.y = 0.f;
+}
+
+void moveEnemy(const rtype::components::Position &position, rtype::components::Velocity &velocity,
+               MovementPattern &pattern, const rtype::components::Hitbox &box, float dt)
+{
+    pattern.age += dt;
+    // A stopped boss keeps advancing "virtually", so the patterns based on x keep oscillating.
+    const bool holding = pattern.holdX > 0.f && position.x <= pattern.holdX;
+    if (holding)
+        pattern.heldTravel += pattern.baseSpeed * dt;
+
+    Motion motion{position,
+                  velocity,
+                  pattern,
+                  dt,
+                  pattern.age,
+                  position.x - pattern.heldTravel,
+                  WorldHeight - box.offsetY - box.height};
+    if (const auto apply = patterns().find(pattern.type); apply != patterns().end())
+        apply->second(motion);
+    holdBoss(motion, holding, -box.offsetY);
+}
+
 } // namespace
 
 void updateEnemyMovements(engine::ecs::Registry &registry, float dt)
 {
-    // On applique le mouvement selon le pattern stocké dans le composant
-    registry.each<rtype::components::Position, rtype::components::Velocity, rtype::components::Kind, rtype::components::MovementPattern>([dt](engine::ecs::Entity /*entity*/, const rtype::components::Position &pos, rtype::components::Velocity &vel, const rtype::components::Kind &kind, rtype::components::MovementPattern &pattern) {
+    registry.each<rtype::components::Position, rtype::components::Velocity, rtype::components::Kind, MovementPattern>(
+        [dt, &registry](engine::ecs::Entity entity, const rtype::components::Position &position,
+                        rtype::components::Velocity &velocity, const rtype::components::Kind &kind,
+                        MovementPattern &pattern) {
             if (kind.type != protocol::EntityType::Enemy)
                 return;
-
-            // Chaque ennemi a sa propre horloge : son mouvement ne dépend pas de
-            // la durée d'ouverture du serveur.
-            pattern.age += dt;
-            const float time = pattern.age;
-
-            // Positions extrêmes pour que tout le sprite reste à l'écran (le bas est aussi le sol de Mars).
-            const auto box = rtype::components::enemyHitbox(kind.variant);
-            const float topY = -box.offsetY;
-            const float bottomY = WorldHeight - box.offsetY - box.height;
-
-            // Un boss arrêté continue d'avancer "virtuellement", pour que les
-            // patterns basés sur X continuent d'osciller.
-            const bool holding = pattern.holdX > 0.f && pos.x <= pattern.holdX;
-            if (holding)
-                pattern.heldTravel += pattern.baseSpeed * dt;
-            const float x = pos.x - pattern.heldTravel;
-
-            if (pattern.type == "sine_wave") {
-                float amp = pattern.amplitude > 0.f ? pattern.amplitude : 150.f;
-                float freq = pattern.frequency > 0.f ? pattern.frequency : 0.02f;
-                vel.y = std::sin(x * freq) * amp;
-            }
-            else if (pattern.type == "straight") {
-                vel.y = 0.f;
-            }
-            else if (pattern.type == "zigzag") {
-                float amp = pattern.amplitude > 0.f ? pattern.amplitude : 100.f;
-                float freq = pattern.frequency > 0.f ? pattern.frequency : 0.05f;
-                vel.y = std::cos(x * freq) * amp;
-            }
-            else if (pattern.type == "dive") {
-                float amp = pattern.amplitude > 0.f ? pattern.amplitude : 80.f;
-                vel.y = amp;
-            }
-            else if (pattern.type == "back_and_forth") {
-                float amp = pattern.amplitude > 0.f ? pattern.amplitude : 50.f;
-                float freq = pattern.frequency > 0.f ? pattern.frequency : 3.0f;
-                vel.x = -pattern.baseSpeed + std::sin(time * freq) * amp;
-                vel.y = 0.f;
-            }
-            else if (pattern.type == "orbital") {
-                // 6. Mouvement orbital de satellite (oscillation circulaire orbitale)
-                float amp = pattern.amplitude > 0.f ? pattern.amplitude : 120.f;
-                float freq = pattern.frequency > 0.f ? pattern.frequency : 2.0f;
-                vel.y = std::sin(time * freq) * amp;
-                vel.x = -pattern.baseSpeed + std::cos(time * freq) * (amp * 0.4f);
-            }
-            else if (pattern.type == "gravity_dive") {
-                // 7. Vol à plat, puis chute de plus en plus rapide (amplitude = gravité, frequency = secondes avant la chute)
-                float gravity = pattern.amplitude > 0.f ? pattern.amplitude : 300.f;
-                float delay = pattern.frequency > 0.f ? pattern.frequency : 5.f;
-                vel.y = time < delay ? 0.f : vel.y + gravity * dt;
-            }
-            else if (pattern.type == "martian_bounce") {
-                // Bonds d'astronaute : chute lente, rebond au sol, remontée jusqu'à spawn_y (amplitude = gravité)
-                float gravity = pattern.amplitude > 0.f ? pattern.amplitude : 150.f;
-                if (pattern.bounceSpeed <= 0.f)
-                    pattern.bounceSpeed = std::sqrt(2.f * gravity * std::max(bottomY - pos.y, MinBounceHeight));
-                vel.y += gravity * dt;
-                if (pos.y >= bottomY && vel.y > 0.f)
-                    vel.y = -pattern.bounceSpeed;
-            }
-            else if (pattern.type == "gravity_pull") {
-                // Traverse la ligne du trou noir et y revient sans cesse (amplitude = force d'attraction)
-                float strength = pattern.amplitude > 0.f ? pattern.amplitude : 1.f;
-                vel.y += (BlackHoleY - pos.y) * strength * dt;
-            }
-            else if (pattern.type == "black_hole_orbit") {
-                // Spirale autour du trou noir, puis éjection vers la gauche (amplitude = vitesse de rotation)
-                if (!pattern.ejected) {
-                    const float orbitSpeed = pattern.amplitude > 0.f ? pattern.amplitude : 220.f;
-                    const float inwardSpeed = pattern.baseSpeed * OrbitInwardRatio;
-                    const float toRight = pos.x - BlackHoleX;
-                    const float toBottom = (pos.y - BlackHoleY) / OrbitFlattening;
-                    const float radius = std::hypot(toRight, toBottom);
-                    if (radius < BlackHoleCaptureRadius) {
-                        pattern.ejected = true;
-                    } else {
-                        vel.x = (-toBottom * orbitSpeed - toRight * inwardSpeed) / radius;
-                        vel.y = (toRight * orbitSpeed - toBottom * inwardSpeed) / radius * OrbitFlattening;
-                    }
-                }
-                if (pattern.ejected) {
-                    vel.x = -pattern.baseSpeed * EjectionSpeedRatio;
-                    vel.y = 0.f;
-                }
-            }
-            else if (pattern.type == "parabolic") {
-                // 8. Saut / arc parabolique sous gravité martienne
-                float amp = pattern.amplitude > 0.f ? pattern.amplitude : 150.f;
-                float freq = pattern.frequency > 0.f ? pattern.frequency : 0.008f;
-                vel.y = std::sin(x * freq) * amp;
-            }
-            else if (pattern.type == "vortex_spiral") {
-                // 9. Aspiration spirale du trou noir vers le centre de l'espace (y ~ 540)
-                float amp = pattern.amplitude > 0.f ? pattern.amplitude : 140.f;
-                float dy = 540.f - pos.y;
-                vel.y = std::sin(time * 3.5f) * amp + (dy * 0.6f);
-            }
-            else if (pattern.type == "quantum_erratic") {
-                // 10. Distorsion quantique erratique imprévisible
-                float amp = pattern.amplitude > 0.f ? pattern.amplitude : 130.f;
-                vel.y = (std::sin(x * 0.03f) + std::cos(time * 4.0f)) * (amp * 0.6f);
-            }
-
-            // Un boss s'arrête à sa position de combat et ne quitte jamais l'écran.
-            if (pattern.holdX > 0.f) {
-                if (holding)
-                    vel.x = 0.f;
-                if ((pos.y <= topY && vel.y < 0.f) || (pos.y >= bottomY && vel.y > 0.f))
-                    vel.y = 0.f;
-            }
+            const auto *hitbox = registry.get<rtype::components::Hitbox>(entity);
+            moveEnemy(position, velocity, pattern, hitbox ? *hitbox : rtype::components::Hitbox{}, dt);
         });
 }
 
