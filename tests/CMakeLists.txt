@@ -6,6 +6,7 @@ add_executable(rtype_tests
     test_movement.cpp
     test_network_integration.cpp
     test_registry.cpp
+    test_prefabs.cpp
     test_protocol.cpp
     test_game.cpp
     test_thread_safe_queue.cpp
