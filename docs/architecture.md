@@ -102,7 +102,9 @@ queue. The client renders entities directly from the latest snapshot rather than
 | Game logic | `server/src/Game.hpp`, `server/src/Game.cpp` and `server/src/Game*.cpp` (one file per part of the game) | Player movement, shooting, enemy spawning, missile/enemy collisions, score and snapshots |
 | Server network | `server/src/net/INetworkServer.hpp`, `server/src/net/AsioNetworkServer.cpp` | Implemented; UDP handshake, inputs, snapshots, ping/pong and timeout handling |
 | Client network | `client/src/net/INetworkClient.hpp`, `client/src/net/AsioNetworkClient.cpp` | Implemented; UDP connection retry, input sending and server timeout detection |
-| Rendering | `client/src/main.cpp`, `client/src/ResourceManager.cpp` | Sprites for players, missiles and enemies; no starfield or audio integration yet |
+| Client application | `client/src/main.cpp`, `client/src/ui/` | Menu, settings saved in `config.json`, then a game session; Escape returns to the menu |
+| Game session | `client/src/game/Session.cpp`, `client/src/game/SessionHud.cpp` | Last snapshot, inputs sent, effects of destroyed entities (explosions, sounds, flash, shake), HUD and end screen |
+| Rendering | `client/src/render/EntityRenderer.cpp`, `client/src/ResourceManager.cpp` | One drawing function per entity type and variant; starfield, music and sound effects |
 
 ## 3. Client–server model
 
