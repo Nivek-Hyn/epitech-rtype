@@ -8,11 +8,36 @@
     "player_missile": {
       "Kind": {"type": "player_missile"},
       "Hitbox": {"width": 36, "height": 24},
-      "Velocity": {"x": 400.0}
+      "Velocity": {"x": 400.0},
+      "MissileDamage": {"damage": 1}
     },
     "enemy_missile": {
       "Kind": {"type": "enemy_missile"},
       "Hitbox": {"width": 36, "height": 24}
+    },
+    "laser_missile": {
+      "Kind": {"type": "player_missile", "variant": 1},
+      "Hitbox": {"width": 56, "height": 18},
+      "Velocity": {"x": 900.0},
+      "MissileDamage": {"damage": 3}
+    },
+    "bonus_spread": {
+      "Kind": {"type": "bonus", "variant": 0},
+      "Hitbox": {"width": 32, "height": 32},
+      "Velocity": {"x": -120.0},
+      "BonusEffect": {"weapon": "spread"}
+    },
+    "bonus_laser": {
+      "Kind": {"type": "bonus", "variant": 1},
+      "Hitbox": {"width": 32, "height": 32},
+      "Velocity": {"x": -120.0},
+      "BonusEffect": {"weapon": "laser"}
+    },
+    "bonus_life": {
+      "Kind": {"type": "bonus", "variant": 2},
+      "Hitbox": {"width": 32, "height": 32},
+      "Velocity": {"x": -120.0},
+      "BonusEffect": {"lives": 1}
     },
     "standard_red": {
       "Kind": {"type": "enemy", "variant": 0},

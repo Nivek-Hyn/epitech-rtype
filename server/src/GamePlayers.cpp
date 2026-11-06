@@ -10,7 +10,6 @@ namespace {
 
 constexpr float PlayerSpawnX = 100.f;
 constexpr float PlayerSpawnY = 300.f;
-constexpr float PlayerShootCooldown = 0.25f;
 constexpr float PlayerMissileOffsetX = 30.f;
 
 } // namespace
@@ -73,8 +72,7 @@ void Game::shootIfReady(std::size_t player)
     const auto *position = _registry.get<rtype::components::Position>(_players[player]);
     if (!position)
         return;
-    spawnShot(protocol::EntityType::PlayerMissile, 0, position->x + PlayerMissileOffsetX, position->y);
-    _shootCooldowns[player] = PlayerShootCooldown;
+    fire(player, position->x + PlayerMissileOffsetX, position->y);
 }
 
 void Game::spawnPlayerShip(std::size_t player)

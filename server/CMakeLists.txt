@@ -12,6 +12,8 @@ add_library(rtype_server_lib STATIC
     src/MovementSystem.cpp
     src/EnemyShootSystem.cpp
     src/Prefabs.cpp
+    src/Weapons.cpp
+    src/GameWeapons.cpp
 )
 target_include_directories(rtype_server_lib PUBLIC src)
 target_link_libraries(rtype_server_lib PUBLIC rtype_common rtype_engine asio nlohmann_json::nlohmann_json)

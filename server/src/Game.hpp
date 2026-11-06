@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Prefabs.hpp"
+#include "Weapons.hpp"
 #include "common/Constants.hpp"
 #include "common/Protocol.hpp"
 #include "engine/ecs/Registry.hpp"
@@ -12,6 +13,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <random>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -93,6 +95,9 @@ public:
     const LevelConfig &currentLevel() const { return _currentLevel; }
     protocol::GameState gameState() const { return _state; }
     int playerLives(PlayerId player) const { return player < MaxPlayers ? _lives[player] : 0; }
+    const std::string &playerWeapon(PlayerId player) const { return _weapons.at(player); }
+    // Weapons and bonus drops from assets/config/weapons.json.
+    Arsenal &arsenal() { return _arsenal; }
 
     const GameRules &rules() const { return _rules; }
     GameRules &rules() { return _rules; }
@@ -153,11 +158,19 @@ private:
 
     // GameCollisions.cpp
     void handleCollisions();
+    // GameWeapons.cpp
+    void fire(std::size_t player, float x, float y);
+    void dropBonuses(const std::vector<std::pair<float, float>> &positions);
+    std::optional<std::size_t> playerTouching(const engine::physics::Aabb &box);
+    void collectBonuses();
+    void giveBonus(engine::ecs::Entity bonus, std::size_t player);
+
     CollisionFrame collectHitAreas();
     void resolvePlayerMissiles(CollisionFrame &frame);
     bool missileHitsObstacle(CollisionFrame &frame, engine::ecs::Entity missile, const engine::physics::Aabb &box);
     bool missileHitsEnemy(CollisionFrame &frame, engine::ecs::Entity missile, const engine::physics::Aabb &box);
-    void damageEnemy(CollisionFrame &frame, engine::ecs::Entity enemy);
+    void damageEnemy(CollisionFrame &frame, const std::pair<engine::ecs::Entity, engine::physics::Aabb> &enemy,
+                     engine::ecs::Entity missile);
     std::uint32_t pointsFor(engine::ecs::Entity enemy);
     void resolveShipContacts(CollisionFrame &frame);
     void shipRamsEnemies(CollisionFrame &frame, engine::ecs::Entity ship, const engine::physics::Aabb &box);
@@ -179,6 +192,9 @@ private:
     float _enemySpawnTimer = 0.f;
     std::uint32_t _enemiesSpawned = 0;
     std::uint32_t _score = 0;
+    Arsenal _arsenal;
+    std::array<std::string, MaxPlayers> _weapons;
+    std::mt19937 _random{std::random_device{}()};
 
     LevelConfig _currentLevel;
     float _levelTimer = 0.f;

@@ -17,12 +17,13 @@ namespace components = rtype::components;
 
 protocol::EntityType entityType(const std::string &name)
 {
-    static const std::array<std::pair<const char *, protocol::EntityType>, 5> types = {{
+    static const std::array<std::pair<const char *, protocol::EntityType>, 6> types = {{
         {"player", protocol::EntityType::Player},
         {"enemy", protocol::EntityType::Enemy},
         {"player_missile", protocol::EntityType::PlayerMissile},
         {"enemy_missile", protocol::EntityType::EnemyMissile},
         {"obstacle", protocol::EntityType::Obstacle},
+        {"bonus", protocol::EntityType::Bonus},
     }};
     for (const auto &[typeName, type] : types) {
         if (name == typeName)
@@ -107,6 +108,11 @@ void registerGameComponents(Prefabs &prefabs)
     prefabs.registerComponent<components::EnemyAttack>("EnemyAttack", readEnemyAttack);
     prefabs.registerComponent<components::EnemyTraits>("EnemyTraits", [](const Json &json) {
         return components::EnemyTraits{json.value<std::uint32_t>("score", 100), json.value("is_boss", false)};
+    });
+    prefabs.registerComponent<components::MissileDamage>(
+        "MissileDamage", [](const Json &json) { return components::MissileDamage{json.value("damage", 1)}; });
+    prefabs.registerComponent<components::BonusEffect>("BonusEffect", [](const Json &json) {
+        return components::BonusEffect{json.value("weapon", std::string()), json.value("lives", 0)};
     });
     prefabs.registerComponent<components::PlayerControl>(
         "PlayerControl", [](const Json &json) { return components::PlayerControl{json.value("speed", 200.f)}; });

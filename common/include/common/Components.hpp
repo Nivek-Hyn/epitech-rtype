@@ -57,6 +57,17 @@ struct Hitbox {
     float offsetY = 0.f;
 };
 
+// Health removed by a missile from what it hits.
+struct MissileDamage {
+    int damage = 1;
+};
+
+// What a player gets by touching a bonus: a weapon (named in weapons.json), lives, or both.
+struct BonusEffect {
+    std::string weapon;
+    int lives = 0;
+};
+
 // A ship moved by a player's inputs, in world units per second.
 struct PlayerControl {
     float speed = 200.f;

@@ -24,6 +24,7 @@ bool isOutOfScreen(const rtype::components::Kind &kind, const rtype::components:
     case protocol::EntityType::Enemy:
         return position.x < -width || position.y > WorldHeight;
     case protocol::EntityType::Obstacle:
+    case protocol::EntityType::Bonus:
         return position.x < -width;
     default:
         return false;
@@ -41,6 +42,8 @@ Game::Game()
     registerGameComponents(_prefabs);
     loadEntitiesConfig("assets/config/entities.json");
     loadRules("assets/config/game_rules.json");
+    _arsenal = loadArsenal("assets/config/weapons.json");
+    _weapons.fill(_arsenal.defaultWeapon);
 
     _campaignLevels = _rules.campaignLevels;
     _currentLevelIndex = 0;
@@ -67,6 +70,7 @@ void Game::update(float dt)
     _registry.update(dt);
     keepPlayersOnScreen();
     handleCollisions();
+    collectBonuses();
     updateShootCooldowns(dt);
     updateLevelProgression(dt);
     removeEntitiesOutOfScreen();
@@ -110,7 +114,7 @@ void Game::clearEnemies()
         [&toRemove](engine::ecs::Entity entity, const rtype::components::Kind &kind,
                     const rtype::components::NetworkId &networkId) {
             if (kind.type == protocol::EntityType::Enemy || kind.type == protocol::EntityType::EnemyMissile ||
-                kind.type == protocol::EntityType::Obstacle)
+                kind.type == protocol::EntityType::Obstacle || kind.type == protocol::EntityType::Bonus)
                 toRemove.emplace_back(entity, networkId.id);
         });
     removeAsOutOfBounds(toRemove);

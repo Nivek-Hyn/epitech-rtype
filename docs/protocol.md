@@ -1,4 +1,4 @@
-# R-Type Network Protocol — version 4 (draft)
+# R-Type Network Protocol — version 5 (draft)
 
 This document describes every message exchanged between `r-type_client` and `r-type_server`.
 It should be enough to write a new client. The reference implementation is `common/src/Protocol.cpp`.
@@ -14,7 +14,7 @@ It should be enough to write a new client. The reference implementation is `comm
 | Offset | Size | Field | Description |
 |---|---|---|---|
 | 0 | u16 | magic | Always `0x5254` ("RT") |
-| 2 | u8 | version | Protocol version, currently `4` |
+| 2 | u8 | version | Protocol version, currently `5` |
 | 3 | u8 | type | Message type (see §4) |
 | 4 | u32 | sequence | Incremented by the sender for each packet it sends |
 | 8 | u16 | payload_size | Number of bytes after the header |
@@ -52,7 +52,7 @@ Input flags: `0x01` up, `0x02` down, `0x04` left, `0x08` right, `0x10` shoot.
 | `0x81` | ConnectAccepted | `u8 player_id` | `player_id` in 0–3. |
 | `0x82` | ConnectRejected | `u8 reason` | `1` server full, `2` version mismatch. |
 | `0x83` | Snapshot | see below | Game state, score and entities at a server tick. |
-| `0x84` | EntityDestroyed | `u32 net_id`, `u8 reason` | `1` killed, `2` out of bounds. |
+| `0x84` | EntityDestroyed | `u32 net_id`, `u8 reason` | `1` killed, `2` out of bounds, `3` collected (bonus picked up, no explosion). |
 | `0x85` | PlayerLeft | `u8 player_id`, `u8 reason` | `1` disconnected, `2` timed out. |
 | `0x86` | Pong | `u32 timestamp_ms` | Same value as the Ping. |
 
@@ -72,7 +72,7 @@ Each entity:
 | Size | Field | Description |
 |---|---|---|
 | u32 | net_id | Network id of the entity, unique for the whole game |
-| u8 | type | `1` player, `2` enemy, `3` player missile, `4` enemy missile, `5` obstacle |
+| u8 | type | `1` player, `2` enemy, `3` player missile, `4` enemy missile, `5` obstacle, `6` bonus |
 | u8 | variant | Player index (0–3) for players, subtype for other types |
 | f32 | x | World position (world is 1920 × 1080, origin top-left) |
 | f32 | y | |

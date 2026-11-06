@@ -29,6 +29,7 @@ struct Game::CollisionFrame {
     std::vector<bool> enemyHit;
     std::vector<bool> obstacleHit;
     std::vector<engine::ecs::Entity> destroyed;
+    std::vector<std::pair<float, float>> killedEnemies; // where a bonus may drop
 };
 
 void Game::handleCollisions()
@@ -38,6 +39,7 @@ void Game::handleCollisions()
     resolveShipContacts(frame);
     resolveEnemyMissiles(frame);
     destroyEntities(frame.destroyed);
+    dropBonuses(frame.killedEnemies);
 }
 
 Game::CollisionFrame Game::collectHitAreas()
@@ -94,21 +96,25 @@ bool Game::missileHitsEnemy(CollisionFrame &frame, engine::ecs::Entity missile, 
             continue;
         frame.enemyHit[i] = true;
         frame.destroyed.push_back(missile);
-        damageEnemy(frame, frame.enemies[i].first);
+        damageEnemy(frame, frame.enemies[i], missile);
         return true;
     }
     return false;
 }
 
-void Game::damageEnemy(CollisionFrame &frame, engine::ecs::Entity enemy)
+// The missile removes its damage from the enemy's health.
+void Game::damageEnemy(CollisionFrame &frame, const std::pair<engine::ecs::Entity, engine::physics::Aabb> &enemy,
+                       engine::ecs::Entity missile)
 {
-    if (auto *health = _registry.get<rtype::components::Health>(enemy)) {
-        health->hp -= 1;
+    const auto *damage = _registry.get<rtype::components::MissileDamage>(missile);
+    if (auto *health = _registry.get<rtype::components::Health>(enemy.first)) {
+        health->hp -= damage ? damage->damage : 1;
         if (health->hp > 0)
             return;
     }
-    frame.destroyed.push_back(enemy);
-    _score += pointsFor(enemy);
+    frame.destroyed.push_back(enemy.first);
+    frame.killedEnemies.emplace_back(enemy.second.left, enemy.second.top);
+    _score += pointsFor(enemy.first);
 }
 
 // The campaign has no score: points only exist in infinite mode.
@@ -203,6 +209,7 @@ void Game::loseLifeIfShip(engine::ecs::Entity entity)
             continue;
         _players[player] = engine::ecs::NullEntity;
         _shootCooldowns[player] = 0.f;
+        _weapons[player] = _arsenal.defaultWeapon; // a destroyed ship loses its bonus weapon
         _lives[player] = std::max(0, _lives[player] - 1);
         _respawnTimers[player] = _rules.respawnDelay;
     }

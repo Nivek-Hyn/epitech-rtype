@@ -9,6 +9,7 @@ add_executable(rtype_tests
     test_prefabs.cpp
     test_protocol.cpp
     test_game.cpp
+    test_weapons.cpp
     test_thread_safe_queue.cpp
     test_game_config.cpp
     ../client/src/ui/GameConfig.cpp
