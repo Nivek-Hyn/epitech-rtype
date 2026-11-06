@@ -1,5 +1,6 @@
 #include "EnemyShootSystem.hpp"
 #include "common/Components.hpp"
+#include "common/Constants.hpp"
 #include <cmath>
 
 namespace rtype::server {
@@ -39,7 +40,7 @@ void updateEnemyShooting(engine::ecs::Registry &registry, const std::function<en
     }
 
     // Traitement des trajectoires spéciales des tirs ennemis (ex: shoot zigzag)
-    registry.each<rtype::components::Position, rtype::components::Velocity, rtype::components::Kind, rtype::components::MovementPattern>([](engine::ecs::Entity /*entity*/, const rtype::components::Position &pos, rtype::components::Velocity &vel, const rtype::components::Kind &kind, const rtype::components::MovementPattern &pattern) {
+    registry.each<rtype::components::Position, rtype::components::Velocity, rtype::components::Kind, rtype::components::MovementPattern>([dt](engine::ecs::Entity /*entity*/, const rtype::components::Position &pos, rtype::components::Velocity &vel, const rtype::components::Kind &kind, const rtype::components::MovementPattern &pattern) {
             if (kind.type != protocol::EntityType::EnemyMissile)
                 return;
 
@@ -47,6 +48,9 @@ void updateEnemyShooting(engine::ecs::Registry &registry, const std::function<en
                 vel.y = (std::sin(pos.x * 0.02f) >= 0.f ? 180.f : -180.f);
             } else if (pattern.type == "sine_wave") {
                 vel.y = std::sin(pos.x * 0.02f) * 180.f;
+            } else if (pattern.type == "gravity_well") {
+                // Le tir se courbe vers la ligne du trou noir
+                vel.y += (WorldHeight / 2.f - pos.y) * 1.5f * dt;
             }
         });
 }

@@ -39,8 +39,20 @@ struct Health {
 
 struct MovementPattern {
     std::string type = "straight"; // straight, sine_wave, zigzag, dive, etc.
-    float amplitude = 150.f;
-    float frequency = 0.02f;
+    float amplitude = 0.f; // 0: default of the pattern
+    float frequency = 0.f; // 0: default of the pattern
+    float baseSpeed = 100.f; // horizontal speed used by the patterns that drive vel.x
+    float holdX = 0.f; // boss only: where it stops (0: keeps moving)
+    float age = 0.f; // seconds since spawn
+    float heldTravel = 0.f; // distance it would have travelled while stopped
+    bool ejected = false; // black_hole_orbit: thrown out by the black hole
+    float bounceSpeed = 0.f; // martian_bounce: set once, so that every jump has the same height
+};
+
+// Game rules specific to an enemy type.
+struct EnemyTraits {
+    std::uint32_t score = 100;
+    bool isBoss = false; // a boss survives contact with a player
 };
 
 struct AttackEntry {
