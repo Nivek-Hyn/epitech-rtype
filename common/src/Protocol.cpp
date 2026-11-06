@@ -56,6 +56,8 @@ void writePayload(engine::net::ByteWriter &writer, const Message &message)
                 writer.u32(value.tick);
                 writer.u8(static_cast<std::uint8_t>(value.state));
                 writer.u32(value.score);
+                for (const std::uint8_t lives : value.lives)
+                    writer.u8(lives);
                 writer.u16(static_cast<std::uint16_t>(value.entities.size()));
                 for (const EntityState &entity : value.entities) {
                     writer.u32(entity.netId);
@@ -170,6 +172,8 @@ std::optional<Packet> decode(std::span<const std::uint8_t> datagram)
                 return std::nullopt;
             snapshot.state = static_cast<GameState>(state);
             snapshot.score = reader.u32();
+            for (std::uint8_t &lives : snapshot.lives)
+                lives = reader.u8();
             const auto count = reader.u16();
             if (count > MaxEntitiesPerSnapshot || payloadSize != SnapshotFixedSize + count * EntityStateSize)
                 return std::nullopt;
