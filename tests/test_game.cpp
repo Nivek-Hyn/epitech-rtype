@@ -1,5 +1,6 @@
 #include "Game.hpp"
 #include "EnemyShootSystem.hpp"
+#include "MovementSystem.hpp"
 #include "common/Components.hpp"
 
 #include <gtest/gtest.h>
@@ -8,6 +9,28 @@
 
 using namespace rtype;
 using namespace rtype::server;
+
+namespace {
+
+// Rule tests use small dedicated levels, so that balancing the campaign does not break them.
+constexpr const char *TestEntities = "tests/data/entities.json";
+constexpr const char *OneGrunt = "tests/data/one_grunt.json";
+constexpr const char *OneBoss = "tests/data/one_boss.json";
+
+void run(Game &game, float seconds)
+{
+    for (int tick = 0; tick < static_cast<int>(seconds * 60.f); ++tick)
+        game.update(1.f / 60.f);
+}
+
+long countOf(Game &game, protocol::EntityType type)
+{
+    const auto snap = game.snapshot();
+    return std::count_if(snap.entities.begin(), snap.entities.end(),
+                         [type](const auto &entity) { return entity.type == type; });
+}
+
+} // namespace
 
 TEST(Game, PlayerJoinAppearsInSnapshot)
 {
@@ -88,6 +111,8 @@ TEST(Game, HoldingShootKeepsSnapshotsWithinDatagramLimit)
 TEST(Game, EnemiesAppearOnlyWhilePlayersAreConnected)
 {
     Game game;
+    game.loadEntitiesConfig(TestEntities);
+    game.loadLevel(OneGrunt);
     for (int tick = 0; tick < 240; tick++)
         game.update(1.f / 60.f);
     EXPECT_TRUE(game.snapshot().entities.empty());
@@ -105,6 +130,8 @@ TEST(Game, EnemiesAppearOnlyWhilePlayersAreConnected)
 TEST(Game, DeadPlayerCannotControlAReusedEntity)
 {
     Game game;
+    game.loadEntitiesConfig(TestEntities);
+    game.loadLevel(OneGrunt);
     game.onPlayerJoined(0);
     game.update(3.f);
     game.update(12.f); // The first configured enemy reaches the stationary player.
@@ -133,6 +160,9 @@ TEST(Game, DeadPlayerCannotControlAReusedEntity)
 TEST(Game, PlayerMissileDestroysEnemyAndScores)
 {
     Game game;
+    game.loadEntitiesConfig(TestEntities);
+    game.loadLevel(OneGrunt);
+    game.setGameMode(Game::GameMode::Infinite);
     game.onPlayerJoined(0); // ship at y = 300, level with the first enemy
     game.onInput(0, protocol::InputFlag::Shoot);
     game.onInput(0, 0);
@@ -206,6 +236,8 @@ TEST(Game, CampaignProgressionAdvancesLevelsAndFinishes)
     Game game;
     game.loadCampaign({"assets/levels/level1.json", "assets/levels/level2.json", "assets/levels/level3.json"});
     game.setGameMode(Game::GameMode::Campaign);
+    game.loadEntitiesConfig(TestEntities);
+    game.loadCampaign({OneGrunt, OneGrunt, OneGrunt});
     game.rules().intermissionDelay = 0.0f;
     game.onPlayerJoined(0);
 
@@ -234,7 +266,7 @@ TEST(Game, CampaignProgressionAdvancesLevelsAndFinishes)
     }
     EXPECT_EQ(game.currentLevelIndex(), 2u);
 
-    // Fast-forward level 3 (Boss stage)
+    // Fast-forward level 3 (last stage)
     for (int tick = 0; tick < 3600; ++tick) {
         game.update(0.1f);
         if (game.gameState() == protocol::GameState::Finished)
@@ -248,6 +280,8 @@ TEST(Game, InfiniteModeLoopsAndIncrementsLoopCount)
     Game game;
     game.loadCampaign({"assets/levels/level1.json", "assets/levels/level2.json", "assets/levels/level3.json"});
     game.setGameMode(Game::GameMode::Infinite);
+    game.loadEntitiesConfig(TestEntities);
+    game.loadCampaign({OneGrunt, OneGrunt, OneGrunt});
     game.rules().intermissionDelay = 0.0f;
     game.onPlayerJoined(0);
 
@@ -314,12 +348,320 @@ TEST(Game, EnemyMultipleAttacksShootSimultaneously)
     const auto *pos2 = registry.get<rtype::components::Position>(spawnedBullets[1]);
     const auto *kind2 = registry.get<rtype::components::Kind>(spawnedBullets[1]);
     const auto *pattern2 = registry.get<rtype::components::MovementPattern>(spawnedBullets[1]);
+    // (the patterns of worlds 2 and 3 are tested at the end of this file)
     ASSERT_NE(pos2, nullptr);
     ASSERT_NE(kind2, nullptr);
     ASSERT_NE(pattern2, nullptr);
     EXPECT_FLOAT_EQ(pos2->y, 230.f);
     EXPECT_EQ(kind2->variant, 0);
     EXPECT_EQ(pattern2->type, "zigzag");
+}
+
+TEST(Game, BossStopsAtItsPositionAndTheLevelWaitsForItsDeath)
+{
+    Game game;
+    game.loadEntitiesConfig(TestEntities);
+    game.loadLevel(OneBoss);
+    game.rules().intermissionDelay = 0.0f;
+    game.onPlayerJoined(0);
+    run(game, 60.f);
+
+    const auto snap = game.snapshot();
+    const auto boss = std::find_if(snap.entities.begin(), snap.entities.end(), [](const auto &entity) {
+        return entity.type == protocol::EntityType::Enemy;
+    });
+    ASSERT_NE(boss, snap.entities.end());
+    EXPECT_NEAR(boss->x, 300.f, 10.f);
+    EXPECT_EQ(game.gameState(), protocol::GameState::Playing);
+}
+
+TEST(Game, RammingKillsTheShipButNotTheBoss)
+{
+    Game game;
+    game.loadEntitiesConfig(TestEntities);
+    game.loadLevel(OneBoss);
+    game.onPlayerJoined(0);
+    game.onPlayerJoined(1); // stays alive, so that the level does not restart
+    run(game, 5.f);
+
+    for (int tick = 0; tick < 60; ++tick) {
+        game.onInput(0, protocol::InputFlag::Right);
+        game.update(1.f / 60.f);
+    }
+    EXPECT_EQ(countOf(game, protocol::EntityType::Player), 1);
+    EXPECT_EQ(countOf(game, protocol::EntityType::Enemy), 1);
+}
+
+TEST(Game, CampaignGivesNoScore)
+{
+    Game game;
+    game.loadEntitiesConfig(TestEntities);
+    game.loadLevel(OneGrunt);
+    game.setGameMode(Game::GameMode::Campaign);
+    game.onPlayerJoined(0);
+    game.onInput(0, protocol::InputFlag::Shoot);
+    game.onInput(0, 0);
+    run(game, 5.f);
+
+    EXPECT_EQ(countOf(game, protocol::EntityType::Enemy), 0); // it was shot down...
+    EXPECT_EQ(countOf(game, protocol::EntityType::Player), 1);
+    EXPECT_EQ(game.snapshot().score, 0u); // ...without any points
+}
+
+TEST(Game, ScoreOfAnEnemyComesFromItsDefinition)
+{
+    Game game;
+    game.loadEntitiesConfig(TestEntities);
+    game.loadLevel(OneBoss);
+    game.setGameMode(Game::GameMode::Infinite);
+    game.rules().intermissionDelay = 100.f; // the boss does not come back during the test
+    game.onPlayerJoined(0);
+    for (int tick = 0; tick < 300; ++tick) {
+        game.onInput(0, protocol::InputFlag::Shoot);
+        game.update(1.f / 60.f);
+    }
+    EXPECT_EQ(countOf(game, protocol::EntityType::Enemy), 0);
+    EXPECT_EQ(game.snapshot().score, 1000u);
+}
+
+TEST(Game, LevelRestartsCleanlyWhenNoPlayerIsLeft)
+{
+    Game game;
+    game.loadEntitiesConfig(TestEntities);
+    game.loadLevel(OneBoss);
+    game.onPlayerJoined(0);
+    run(game, 1.f);
+    ASSERT_EQ(countOf(game, protocol::EntityType::Enemy), 1);
+
+    game.onPlayerLeft(0);
+    run(game, 0.1f);
+    EXPECT_EQ(countOf(game, protocol::EntityType::Enemy), 0);
+
+    game.onPlayerJoined(0);
+    run(game, 1.f);
+    EXPECT_EQ(countOf(game, protocol::EntityType::Enemy), 1);
+}
+
+TEST(Game, PlayerStartsWithTheConfiguredLives)
+{
+    Game game;
+    game.rules().playerLives = 5;
+    game.onPlayerJoined(0);
+    EXPECT_EQ(game.playerLives(0), 5);
+}
+
+TEST(Game, DeadPlayerLosesALifeAndRespawnsAfterTheDelay)
+{
+    Game game;
+    game.loadEntitiesConfig(TestEntities);
+    game.loadLevel(OneBoss);
+    game.onPlayerJoined(0);
+    game.onPlayerJoined(1); // stays away from the boss
+    run(game, 5.f);
+    for (int tick = 0; tick < 60; ++tick) {
+        game.onInput(0, protocol::InputFlag::Right);
+        game.update(1.f / 60.f);
+    }
+    EXPECT_EQ(game.playerLives(0), 2);
+    EXPECT_EQ(game.playerLives(1), 3);
+    EXPECT_EQ(countOf(game, protocol::EntityType::Player), 1);
+
+    run(game, 2.5f);
+    EXPECT_EQ(countOf(game, protocol::EntityType::Player), 2);
+}
+
+TEST(Game, InvulnerabilityProtectsAndLevelRestartsWhenLivesRunOut)
+{
+    Game game;
+    game.loadEntitiesConfig(TestEntities);
+    game.loadLevel(OneBoss);
+    game.onPlayerJoined(0);
+
+    // The ship always stays in contact with the stopped boss, so it dies as soon as it can.
+    const float dt = 1.f / 60.f;
+    float elapsed = 0.f;
+    float lastDeath = -1.f;
+    int lives = game.playerLives(0);
+    bool restarted = false;
+    while (elapsed < 60.f && !restarted) {
+        const auto snap = game.snapshot();
+        for (const auto &entity : snap.entities) {
+            if (entity.type == protocol::EntityType::Player)
+                game.onInput(0, entity.x < 280.f ? protocol::InputFlag::Right : std::uint8_t{0});
+        }
+        game.update(dt);
+        elapsed += dt;
+        const int current = game.playerLives(0);
+        if (current < lives) {
+            if (lastDeath >= 0.f) // respawn delay + invulnerability
+                EXPECT_GE(elapsed - lastDeath, 3.9f);
+            lastDeath = elapsed;
+        }
+        restarted = current > lives;
+        lives = current;
+        if (lives == 0)
+            game.update(dt); // the last life was lost: the level restarts on the next tick
+        if (lives == 0 && game.playerLives(0) == 3) {
+            restarted = true;
+            lives = 3;
+        }
+    }
+    ASSERT_TRUE(restarted);
+    EXPECT_EQ(lives, 3);
+
+    // The boss has been replaced by a new one, back at the right of the screen.
+    const auto snap = game.snapshot();
+    const auto boss = std::find_if(snap.entities.begin(), snap.entities.end(), [](const auto &entity) {
+        return entity.type == protocol::EntityType::Enemy;
+    });
+    ASSERT_NE(boss, snap.entities.end());
+    EXPECT_GT(boss->x, 1000.f);
+}
+
+TEST(Movement, BackAndForthKeepsAdvancingAtItsConfiguredSpeed)
+{
+    engine::ecs::Registry registry;
+    const auto enemy = registry.spawn();
+    registry.emplace<rtype::components::Position>(enemy, 1000.f, 300.f);
+    registry.emplace<rtype::components::Velocity>(enemy, 0.f, 0.f);
+    registry.emplace<rtype::components::Kind>(enemy, protocol::EntityType::Enemy, 0);
+    registry.emplace<rtype::components::MovementPattern>(
+        enemy, rtype::components::MovementPattern{"back_and_forth", 0.f, 0.f, 62.f, 0.f, 0.f, 0.f});
+
+    for (int tick = 0; tick < 3600; ++tick) {
+        updateEnemyMovements(registry, 1.f / 60.f);
+        const auto *velocity = registry.get<rtype::components::Velocity>(enemy);
+        ASSERT_NE(velocity, nullptr);
+        ASSERT_LT(velocity->x, 0.f);
+        ASSERT_GE(velocity->x, -112.1f);
+    }
+}
+
+TEST(Movement, PatternDoesNotDependOnPreviousGames)
+{
+    const auto verticalSpeedAfterOneSecond = [] {
+        engine::ecs::Registry registry;
+        const auto enemy = registry.spawn();
+        registry.emplace<rtype::components::Position>(enemy, 1000.f, 300.f);
+        registry.emplace<rtype::components::Velocity>(enemy, 0.f, 0.f);
+        registry.emplace<rtype::components::Kind>(enemy, protocol::EntityType::Enemy, 0);
+        registry.emplace<rtype::components::MovementPattern>(
+            enemy, rtype::components::MovementPattern{"orbital", 0.f, 0.f, 100.f, 0.f, 0.f, 0.f});
+        for (int tick = 0; tick < 60; ++tick)
+            updateEnemyMovements(registry, 1.f / 60.f);
+        return registry.get<rtype::components::Velocity>(enemy)->y;
+    };
+
+    EXPECT_FLOAT_EQ(verticalSpeedAfterOneSecond(), verticalSpeedAfterOneSecond());
+}
+
+namespace {
+
+struct Flight {
+    float minX = 1e9f, minY = 1e9f, maxY = -1e9f;
+    float x = 0.f, y = 0.f, vy = 0.f;
+};
+
+// Moves one enemy with the real pattern code for some time, and records where it went.
+Flight fly(const std::string &pattern, float startX, float startY, float speed, float seconds)
+{
+    engine::ecs::Registry registry;
+    const auto enemy = registry.spawn();
+    registry.emplace<rtype::components::Position>(enemy, startX, startY);
+    registry.emplace<rtype::components::Velocity>(enemy, -speed, 0.f);
+    registry.emplace<rtype::components::Kind>(enemy, protocol::EntityType::Enemy, 0);
+    registry.emplace<rtype::components::MovementPattern>(
+        enemy, rtype::components::MovementPattern{pattern, 0.f, 0.f, speed, 0.f, 0.f, 0.f, false});
+
+    Flight flight;
+    const float dt = 1.f / 60.f;
+    for (int tick = 0; tick < static_cast<int>(seconds * 60.f); ++tick) {
+        updateEnemyMovements(registry, dt);
+        auto *position = registry.get<rtype::components::Position>(enemy);
+        const auto *velocity = registry.get<rtype::components::Velocity>(enemy);
+        position->x += velocity->x * dt;
+        position->y += velocity->y * dt;
+        flight.minX = std::min(flight.minX, position->x);
+        flight.minY = std::min(flight.minY, position->y);
+        flight.maxY = std::max(flight.maxY, position->y);
+        flight.x = position->x;
+        flight.y = position->y;
+        flight.vy = velocity->y;
+    }
+    return flight;
+}
+
+} // namespace
+
+TEST(Movement, MartianBounceKeepsJumpingBetweenSpawnHeightAndGround)
+{
+    // Over several minutes: the height of the jumps must not drift.
+    const Flight flight = fly("martian_bounce", 1920.f, 500.f, 120.f, 300.f);
+    EXPECT_NEAR(flight.minY, 500.f, 25.f);
+    EXPECT_NEAR(flight.maxY, 1008.f, 15.f);
+}
+
+TEST(Movement, GravityDiveFliesFlatThenFallsFasterAndFaster)
+{
+    EXPECT_FLOAT_EQ(fly("gravity_dive", 1920.f, 300.f, 150.f, 4.f).y, 300.f);
+    const float vySoon = fly("gravity_dive", 1920.f, 300.f, 150.f, 5.5f).vy;
+    const float vyLater = fly("gravity_dive", 1920.f, 300.f, 150.f, 6.5f).vy;
+    EXPECT_GT(vySoon, 0.f);
+    EXPECT_GT(vyLater, vySoon);
+}
+
+TEST(Movement, GravityPullKeepsCrossingTheCentralLine)
+{
+    const Flight flight = fly("gravity_pull", 1920.f, 200.f, 150.f, 13.f);
+    EXPECT_LT(flight.minY, 210.f);
+    EXPECT_GT(flight.maxY, 800.f); // symmetrical around y = 540
+    EXPECT_LT(flight.maxY, 1000.f);
+}
+
+TEST(Movement, BlackHoleOrbitSpiralsThenThrowsTheEnemyToTheLeft)
+{
+    const Flight flight = fly("black_hole_orbit", 1920.f, 300.f, 100.f, 60.f);
+    EXPECT_LT(flight.minX, -66.f);
+    EXPECT_GT(flight.minY, -72.f);
+    EXPECT_LT(flight.maxY, 1080.f);
+}
+
+TEST(Game, GravityWellBulletCurvesTowardTheCentralLine)
+{
+    engine::ecs::Registry registry;
+    const auto enemy = registry.spawn();
+    registry.emplace<rtype::components::Position>(enemy, 1500.f, 100.f);
+    registry.emplace<rtype::components::Kind>(enemy, protocol::EntityType::Enemy, 0);
+    registry.emplace<rtype::components::EnemyAttack>(enemy, 0.f, 0.5f, 300.f, 0, "gravity_well");
+
+    engine::ecs::Entity bullet = engine::ecs::NullEntity;
+    updateEnemyShooting(registry, [&](protocol::EntityType type, std::uint8_t variant, float x, float y) {
+        bullet = registry.spawn();
+        registry.emplace<rtype::components::Kind>(bullet, type, variant);
+        registry.emplace<rtype::components::Position>(bullet, x, y);
+        registry.emplace<rtype::components::Velocity>(bullet, 0.f, 0.f);
+        return bullet;
+    }, 0.6f);
+
+    ASSERT_NE(bullet, engine::ecs::NullEntity);
+    EXPECT_GT(registry.get<rtype::components::Velocity>(bullet)->y, 0.f); // pulled down, toward y = 540
+}
+
+TEST(Movement, StoppedBossNeverLeavesTheScreen)
+{
+    engine::ecs::Registry registry;
+    const auto boss = registry.spawn();
+    registry.emplace<rtype::components::Position>(boss, 1500.f, 1008.f);
+    registry.emplace<rtype::components::Velocity>(boss, 0.f, 0.f);
+    registry.emplace<rtype::components::Kind>(boss, protocol::EntityType::Enemy, 0);
+    registry.emplace<rtype::components::MovementPattern>(
+        boss, rtype::components::MovementPattern{"dive", 0.f, 0.f, 30.f, 1500.f, 0.f, 0.f});
+
+    updateEnemyMovements(registry, 1.f / 60.f);
+    const auto *velocity = registry.get<rtype::components::Velocity>(boss);
+    ASSERT_NE(velocity, nullptr);
+    EXPECT_FLOAT_EQ(velocity->x, 0.f);
+    EXPECT_FLOAT_EQ(velocity->y, 0.f);
 }
 
 

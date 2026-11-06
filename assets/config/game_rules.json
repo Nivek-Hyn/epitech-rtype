@@ -22,6 +22,11 @@
       "score_multiplier": 1.5
     }
   },
+  "player": {
+    "lives": 3,
+    "respawn_delay": 2.0,
+    "invulnerability": 2.0
+  },
   "infinite_mode": {
     "health_growth_per_loop": 0.2,
     "speed_growth_per_loop": 0.05,

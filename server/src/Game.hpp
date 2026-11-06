@@ -56,6 +56,9 @@ public:
             "assets/levels/level3.json"
         };
         float intermissionDelay = 2.0f;
+        int playerLives = 3;
+        float respawnDelay = 2.0f;
+        float invulnerability = 2.0f; // seconds without damage after a respawn
     };
 
     struct AttackDefinition {
@@ -71,6 +74,11 @@ public:
         int health = 1;
         float speed = 100.f;
         std::string pattern = "straight";
+        float amplitude = 0.f; // 0: default of the movement pattern
+        float frequency = 0.f; // 0: default of the movement pattern
+        std::uint32_t score = 100;
+        bool isBoss = false;
+        float holdX = 0.f; // boss only: where it stops and fights (0: keeps moving)
         bool hasAttack = false;
         std::vector<AttackDefinition> attacks;
     };
@@ -95,6 +103,7 @@ public:
     void loadLevel(const std::string &filepath);
     void loadCampaign(const std::vector<std::string> &levelPaths);
     void loadRules(const std::string &filepath);
+    void loadEntitiesConfig(const std::string &filepath);
 
     void setGameMode(GameMode mode) { _gameMode = mode; }
     GameMode gameMode() const { return _gameMode; }
@@ -108,6 +117,7 @@ public:
     std::size_t currentLevelIndex() const { return _currentLevelIndex; }
     const LevelConfig &currentLevel() const { return _currentLevel; }
     protocol::GameState gameState() const { return _state; }
+    int playerLives(PlayerId player) const { return player < MaxPlayers ? _lives[player] : 0; }
 
     const GameRules &rules() const { return _rules; }
     GameRules &rules() { return _rules; }
@@ -117,11 +127,18 @@ private:
     void spawnEnemies(float dt);
     void handleCollisions();
     void updateLevelProgression(float dt);
-    void loadEntitiesConfig(const std::string &filepath);
+    void clearEnemies();
+    void updatePlayerLives(float dt);
+    void resetWaves();
+    bool isInvulnerable(engine::ecs::Entity entity) const;
 
     engine::ecs::Registry _registry;
     std::array<engine::ecs::Entity, MaxPlayers> _players;
     std::array<float, MaxPlayers> _shootCooldowns{};
+    std::array<bool, MaxPlayers> _connected{};
+    std::array<int, MaxPlayers> _lives{};
+    std::array<float, MaxPlayers> _respawnTimers{};
+    std::array<float, MaxPlayers> _invulnerableTimers{};
     std::vector<protocol::Message> _events;
     std::uint32_t _tick = 0;
     std::uint32_t _nextNetId = 1;
