@@ -140,7 +140,7 @@
     },
     "martian_hopper": {
       "Kind": {"type": "enemy", "variant": 7},
-      "Hitbox": {"width": 66, "height": 72},
+      "Hitbox": {"width": 90, "height": 100},
       "Health": {"hp": 3},
       "Velocity": {"x": -120.0},
       "MovementPattern": {"type": "martian_bounce"},
