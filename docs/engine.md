@@ -7,6 +7,7 @@ For step-by-step guides, see the [how-to guides](how-to.md).
 | Part | Header | Namespace | Status |
 |---|---|---|---|
 | Entities and components | `engine/ecs/Entity.hpp`, `engine/ecs/SparseArray.hpp`, `engine/ecs/Registry.hpp` | `engine::ecs` | Implemented |
+| Prefabs (entities described by data) | `engine/ecs/Prefabs.hpp` | `engine::ecs` | Implemented |
 | Fixed timestep clock | `engine/core/FixedTimestep.hpp` | `engine::core` | Implemented |
 | Event bus | `engine/core/EventBus.hpp` | `engine::core` | Implemented |
 | Collision shapes | `engine/physics/Aabb.hpp` | `engine::physics` | Implemented |
@@ -124,6 +125,29 @@ The Registry finds the storage of a type with a `std::unordered_map<std::type_in
 killing its entity, destroying the Registry, or growing that component's vector can invalidate it,
 even within the same system. Read the pointer again after a storage-changing operation.
 
+### Prefabs: entities described by data
+
+A prefab is an entity template: a name and a list of (component name, component data). The game registers
+each component type under a name, with a function reading it from its own data format. The engine never
+reads files and does not know JSON: `Prefabs<Data>` works with any copyable `Data` type.
+
+```cpp
+engine::ecs::Prefabs<nlohmann::json> prefabs;
+prefabs.registerComponent<Health>("Health", [](const nlohmann::json &data) { return Health{data.value("hp", 1)}; });
+prefabs.add("grunt", {{"Health", {{"hp", 3}}}});           // data read now, errors reported here
+engine::ecs::Entity grunt = prefabs.spawn(registry, "grunt"); // new entity with a Health of 3
+prefabs.applyTo(registry, other, "grunt");                  // same components on an existing entity
+```
+
+| Operation | Result |
+|---|---|
+| `add` with an unregistered component name | Throws `std::invalid_argument`; the prefab is not added. |
+| `add` with data the reading function rejects | Throws what that function throws; the prefab is not added. |
+| `spawn` or `applyTo` with an unknown prefab | Throws `std::out_of_range`; `spawn` creates no entity. |
+
+R-Type reads its prefabs from `assets/config/entities.json` (see the [how-to guides](how-to.md#add-an-enemy-a-tile-or-a-bonus)).
+Components are read once, when the prefab is added, so spawning copies ready values.
+
 ### Failure behavior
 
 | Operation | Result |
@@ -226,12 +250,13 @@ These utilities are implemented in engine headers; they do not implement UDP or 
 ## 6. Tests
 
 ```sh
-ctest --test-dir build --output-on-failure -R '^(Registry|FixedTimestep|EventBus|Aabb|Movement)\.'
+ctest --test-dir build --output-on-failure -R '^(Registry|Prefabs|FixedTimestep|EventBus|Aabb|Movement)\.'
 ```
 
 | Test file | What it checks |
 |---|---|
 | `tests/test_registry.cpp` | Id reuse, components, `each`, systems |
+| `tests/test_prefabs.cpp` | Spawning from a prefab, replacing components, rejected names |
 | `tests/test_fixed_timestep.cpp` | Step duration, catch-up limit, waiting time, invalid settings |
 | `tests/test_event_bus.cpp` | Immediate and queued delivery, order, chained events |
 | `tests/test_aabb.cpp` | Overlap, separation, touching edges |

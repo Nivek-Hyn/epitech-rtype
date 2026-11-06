@@ -19,7 +19,7 @@ Design goals:
 Campaign and balancing rely on these files:
 
 - `assets/levels/level1.json` to `assets/levels/level9.json`: stage content and wave composition.
-- `assets/config/entities.json`: enemy archetypes (health, movement pattern, attacks).
+- `assets/config/entities.json`: prefabs, each entity described by its components (health, movement pattern, attacks...).
 - `assets/config/game_rules.json`: difficulty multipliers, infinite mode growth, campaign order.
 
 Runtime loading and scaling are implemented in:
@@ -119,12 +119,12 @@ Main archetypes:
 Spawn heights use the full 1080-unit world: `spawn_y` goes from about 100 to 900.
 Keep `gravity_diver` in the upper part, since it falls until it leaves the screen.
 
-Optional fields of an enemy in `entities.json`:
+Components of an enemy prefab in `entities.json` (the full list is in the [how-to guides](../how-to.md#add-an-enemy-a-tile-or-a-bonus)):
 
-- `score`: points given when it is destroyed, in infinite mode only (default 100). The campaign has no score.
-- `amplitude`, `frequency`: tune its movement pattern. A level can override them per enemy; 0 or nothing keeps the default of the pattern.
+- `EnemyTraits.score`: points given when it is destroyed, in infinite mode only (default 100). The campaign has no score.
+- `MovementPattern.amplitude`, `MovementPattern.frequency`: tune its movement pattern. A level can override them per enemy; 0 or nothing keeps the default of the pattern.
 
-`speed` is read from the level, or from `entities.json` when the level does not give one.
+The speed is read from the level, or from the `Velocity` of the prefab when the level does not give one.
 
 Meaning of `amplitude` and `frequency` in the world 2 and 3 patterns:
 
@@ -139,7 +139,7 @@ An enemy that goes below the screen is removed.
 
 ## Destructible tiles
 
-A wave can list tiles under `obstacles`, next to `enemies`, with a `type` and a `spawn_y` (from 0 to 1008). Types are defined in the `obstacles` section of `entities.json`: `variant` (appearance), `health` (shots to destroy it) and `speed`. A level can override `speed` and `health`.
+A wave can list tiles under `obstacles`, next to `enemies`, with a `type` and a `spawn_y` (from 0 to 1008). Types are prefabs of `entities.json` whose `Kind` type is `obstacle`: `Kind.variant` (appearance), `Health.hp` (shots to destroy it) and `Velocity.x` (negative: to the left). A level can override `speed` and `health`.
 
 | Type | World | Health | Speed |
 |---|---|---|---|
@@ -159,10 +159,10 @@ Always leave a gap of at least 200 units: tiles add to the entities sent in each
 
 ## Boss rules
 
-A boss is an enemy with these fields in `entities.json`:
+A boss is an enemy prefab with these fields in `entities.json`:
 
-- `is_boss`: touching the boss destroys the ship, not the boss.
-- `hold_x`: the boss stops at this position and fights there. It also never leaves the screen vertically.
+- `EnemyTraits.is_boss`: touching the boss destroys the ship, not the boss.
+- `MovementPattern.hold_x`: the boss stops at this position and fights there. It also never leaves the screen vertically.
 
 A boss therefore has to be shot down: its level does not end while it is alive.
 
@@ -217,5 +217,5 @@ When adding a new world:
 - Add 3 new stage files.
 - Keep stage N+2 as the world boss stage.
 - Add paths to `campaign.levels` in order.
-- Ensure new enemy archetypes exist in `entities.json`.
+- Ensure new enemy prefabs exist in `entities.json`.
 - Validate JSON syntax and run a full campaign pass.
