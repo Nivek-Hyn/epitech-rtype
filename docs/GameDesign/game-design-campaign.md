@@ -148,7 +148,9 @@ Configured in `assets/config/game_rules.json` under `player`:
 - `respawn_delay`: seconds before the ship comes back.
 - `invulnerability`: seconds without damage after a respawn.
 
-When every connected player is out of lives, the current level restarts with full lives. In infinite mode, the score is kept.
+Lives are per world: `levels_per_world` in the `campaign` section (3 by default) says how many levels form a world. At the start of a new world, every connected player is back to the full count, not added to what is left (2 lives left gives 3, not 5), and a player out of lives comes back.
+
+A player out of lives watches the others until the next world or the end of the game. When every connected player is out of lives, the game is over: enemies disappear and the game over screen is shown. Once all players have left, the next game starts again from the first level, with no score.
 
 ## Difficulty model
 

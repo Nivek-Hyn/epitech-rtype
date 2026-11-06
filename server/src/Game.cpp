@@ -166,6 +166,7 @@ void Game::loadRules(const std::string &filepath)
                     _rules.campaignLevels.push_back(lvl.get<std::string>());
                 }
             }
+            _rules.levelsPerWorld = std::max<std::size_t>(1, camp.value<std::size_t>("levels_per_world", 3));
             _rules.intermissionDelay = camp.value("intermission_delay", 2.0f);
         }
     } catch (const std::exception &e) {
@@ -208,6 +209,8 @@ void Game::onPlayerJoined(PlayerId player)
     _lives[player] = _rules.playerLives;
     _respawnTimers[player] = 0.f;
     _invulnerableTimers[player] = 0.f;
+    if (_state != protocol::GameState::Playing)
+        return; // the game has ended: no ship until it restarts
     engine::ecs::Entity entity =
         spawnNetworked(protocol::EntityType::Player, static_cast<std::uint8_t>(player), PlayerSpawnX, PlayerSpawnY);
     _players[player] = entity;
@@ -215,6 +218,8 @@ void Game::onPlayerJoined(PlayerId player)
 
 void Game::updatePlayerLives(float dt)
 {
+    if (_state != protocol::GameState::Playing)
+        return;
     for (std::size_t player = 0; player < _players.size(); player++) {
         _invulnerableTimers[player] = std::max(0.f, _invulnerableTimers[player] - dt);
         if (!_connected[player] || _players[player] != engine::ecs::NullEntity || _lives[player] <= 0)
@@ -244,6 +249,29 @@ void Game::resetWaves()
         wave.isSpawned = false;
 }
 
+void Game::restoreLivesOnNewWorld()
+{
+    if (_state != protocol::GameState::Playing || _currentLevelIndex % _rules.levelsPerWorld != 0)
+        return;
+    // Back to the full count, not added: a player out of lives comes back after the respawn delay.
+    for (std::size_t player = 0; player < _players.size(); player++) {
+        if (_connected[player])
+            _lives[player] = _rules.playerLives;
+    }
+}
+
+void Game::restartCampaign()
+{
+    clearEnemies();
+    _state = protocol::GameState::Playing;
+    _score = 0;
+    _infiniteLoopCount = 1;
+    _currentLevelIndex = 0;
+    if (!_campaignLevels.empty())
+        _currentLevel = loadLevelFromJson(_campaignLevels[0]);
+    resetWaves();
+}
+
 engine::ecs::Entity Game::spawnNetworked(protocol::EntityType type, std::uint8_t variant, float x, float y)
 {
     engine::ecs::Entity entity = _registry.spawn();
@@ -260,6 +288,10 @@ void Game::onPlayerLeft(PlayerId player)
         return;
     _connected[player] = false;
     _lives[player] = 0;
+    // A finished game restarts from the beginning for the next players.
+    const bool anyConnected = std::find(_connected.begin(), _connected.end(), true) != _connected.end();
+    if (!anyConnected && _state != protocol::GameState::Playing)
+        restartCampaign();
     if (_players[player] == engine::ecs::NullEntity)
         return;
     const engine::ecs::Entity entity = _players[player];
@@ -350,7 +382,7 @@ void Game::update(float dt)
 
 void Game::updateLevelProgression(float dt)
 {
-    if (_state == protocol::GameState::Finished)
+    if (_state != protocol::GameState::Playing)
         return;
 
     bool allWavesSpawned = !_currentLevel.waves.empty() && std::all_of(
@@ -397,6 +429,7 @@ void Game::updateLevelProgression(float dt)
                         wave.isSpawned = false;
                 }
             }
+            restoreLivesOnNewWorld();
         }
     } else {
         _transitionTimer = 0.f;
@@ -448,7 +481,7 @@ void Game::clearEnemies()
 
 void Game::spawnEnemies(float dt)
 {
-    if (_state == protocol::GameState::Finished)
+    if (_state != protocol::GameState::Playing)
         return;
 
     const bool anyConnected = std::find(_connected.begin(), _connected.end(), true) != _connected.end();
@@ -466,13 +499,8 @@ void Game::spawnEnemies(float dt)
     }
     if (!anyStillPlaying) {
         clearEnemies();
-        resetWaves();
-        for (std::size_t player = 0; player < _players.size(); player++) {
-            if (_connected[player]) {
-                _lives[player] = _rules.playerLives;
-                _respawnTimers[player] = _rules.respawnDelay;
-            }
-        }
+        _state = protocol::GameState::GameOver;
+        return;
     }
 
     _levelTimer += dt;
