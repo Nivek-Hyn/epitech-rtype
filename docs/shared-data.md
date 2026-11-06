@@ -61,12 +61,12 @@ The [protocol specification](protocol.md) gives message values and byte layout.
 - One EntityState is encoded as 14 bytes: network id, type, variant, x and y.
 - That wire size is not a promise about `sizeof(EntityState)`: C++ padding and alignment are separate.
 - Numeric fields are written in network byte order. Floats are converted to their 32-bit representation.
-- Snapshot carries tick, game state, score and the entity list. It does not carry health, damage animations,
+- Snapshot carries tick, game state, score, the lives of each player and the entity list. It does not carry health, damage animations,
   arbitrary component data or level names.
 - Game sets snapshot state to Playing, then Finished after the last campaign level or GameOver when every
   connected player is out of lives. Waiting exists in the enum but is not used yet.
 
-The current packet limit permits 84 entities in one snapshot. The encoder rejects a larger snapshot;
+The current packet limit permits 83 entities in one snapshot. The encoder rejects a larger snapshot;
 the current server/client do not provide complete snapshot fragmentation and reassembly. Header comments
 describing splitting are not proof that it exists. Coordinate the network change through #105 before
 assuming multiple packets with the same tick form a complete state.

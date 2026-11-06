@@ -1,8 +1,10 @@
 #pragma once
 
-// Binary protocol v2 between r-type_client and r-type_server, over UDP.
 // The reference description is docs/protocol.md: keep both in sync, and bump Version on any breaking change.
 
+#include "common/Constants.hpp"
+
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
@@ -13,7 +15,7 @@
 namespace rtype::protocol {
 
 inline constexpr std::uint16_t Magic = 0x5254; // "RT"
-inline constexpr std::uint8_t Version = 2;
+inline constexpr std::uint8_t Version = 3;
 inline constexpr std::size_t HeaderSize = 10;
 // Stay under the usual Internet MTU so datagrams are never fragmented.
 inline constexpr std::size_t MaxPacketSize = 1200;
@@ -79,7 +81,7 @@ struct EntityState {
     float y = 0.f;
 };
 inline constexpr std::size_t EntityStateSize = 14;
-inline constexpr std::size_t SnapshotFixedSize = 11;
+inline constexpr std::size_t SnapshotFixedSize = 15;
 inline constexpr std::size_t MaxEntitiesPerSnapshot =
     (MaxPacketSize - HeaderSize - SnapshotFixedSize) / EntityStateSize;
 
@@ -92,6 +94,7 @@ struct Snapshot {
     GameState state = GameState::Waiting;
     std::uint32_t score = 0;
     std::vector<EntityState> entities;
+    std::array<std::uint8_t, MaxPlayers> lives{}; // lives left of each player, by player id
 };
 struct EntityDestroyed {
     std::uint32_t netId = 0;

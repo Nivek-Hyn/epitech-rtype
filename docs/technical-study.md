@@ -163,8 +163,8 @@ keeping the fraction. Without this limit a slow server could accumulate an endle
 | **Snapshots every tick** | Delta snapshots, events only | A later received snapshot can replace lost state. The next datagram can also be lost or reordered; this does not make individual events reliable. |
 | **Binary protocol** ([ADR 0008](adr/0008-binary-protocol.md), [specification](protocol.md)) | JSON, text | Compact and fast to parse. One entity takes 14 bytes in binary, about 50 to 60 bytes in JSON. |
 
-Bandwidth estimate, worst case (a full snapshot packet: 10-byte header + 11 bytes + 84 entities × 14 bytes = 1,197 bytes):
-60 packets per second ≈ 72 KB/s ≈ 575 kbit/s per client, about 2.3 Mbit/s for 4 clients. This is a theoretical
+Bandwidth estimate, worst case (a full snapshot packet: 10-byte header + 15 bytes + 83 entities × 14 bytes = 1,187 bytes):
+60 packets per second ≈ 71 KB/s ≈ 570 kbit/s per client, about 2.3 Mbit/s for 4 clients. This is a theoretical
 payload estimate, not a measured bandwidth result. It excludes UDP/IP overhead and retransmitted connection
 attempts; the cross-play exercise did not measure this worst-case load. Delta snapshots and a lower send rate with
 client interpolation remain network-track work to assess separately.

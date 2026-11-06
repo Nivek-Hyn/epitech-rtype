@@ -442,6 +442,8 @@ protocol::Snapshot Game::snapshot()
     snap.tick = _tick;
     snap.state = _state;
     snap.score = _score;
+    for (std::size_t player = 0; player < _lives.size(); player++)
+        snap.lives[player] = static_cast<std::uint8_t>(std::clamp(_lives[player], 0, 255));
 
     _registry.each<rtype::components::Position, rtype::components::Kind, rtype::components::NetworkId>(
         [&snap](engine::ecs::Entity /*entity*/, const rtype::components::Position &pos,

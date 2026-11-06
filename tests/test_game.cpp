@@ -639,6 +639,21 @@ TEST(Game, GameRulesGiveThreeLevelsPerWorld)
     EXPECT_EQ(game.rules().playerLives, 3);
 }
 
+TEST(Game, SnapshotTellsTheLivesLeftOfEachPlayer)
+{
+    Game game;
+    game.loadEntitiesConfig(TestEntities);
+    game.loadLevel(OneBoss);
+    game.onPlayerJoined(0);
+    game.onPlayerJoined(1);
+    EXPECT_EQ(game.snapshot().lives[0], 3);
+    EXPECT_EQ(game.snapshot().lives[2], 0); // nobody there
+
+    ramTheBossUntilOutOfLives(game, 0);
+    EXPECT_EQ(game.snapshot().lives[0], 0);
+    EXPECT_EQ(game.snapshot().lives[1], 3);
+}
+
 TEST(Game, PlayerJoiningAFinishedGameGetsNoShip)
 {
     Game game;
