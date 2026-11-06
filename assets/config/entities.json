@@ -23,6 +23,9 @@
       }
     },
     "boss_heavy": {
+      "is_boss": true,
+      "hold_x": 1500.0,
+      "score": 1000,
       "health": 50,
       "speed": 40.0,
       "pattern": "straight",
@@ -99,6 +102,9 @@
       ]
     },
     "boss_orbital_carrier": {
+      "is_boss": true,
+      "hold_x": 1500.0,
+      "score": 1000,
       "health": 60,
       "speed": 30.0,
       "pattern": "orbital",
@@ -132,7 +138,7 @@
     "martian_hopper": {
       "health": 3,
       "speed": 120.0,
-      "pattern": "parabolic",
+      "pattern": "martian_bounce",
       "attack": {
         "fire_rate": 2.0,
         "bullet_speed": 340.0,
@@ -163,9 +169,13 @@
       }
     },
     "boss_mars_excavator": {
-      "health": 80,
+      "is_boss": true,
+      "hold_x": 1200.0,
+      "score": 1500,
+      "amplitude": 60.0,
+      "health": 50,
       "speed": 35.0,
-      "pattern": "parabolic",
+      "pattern": "martian_bounce",
       "attacks": [
         {
           "name": "gravitational_drill",
@@ -196,23 +206,23 @@
     "quantum_shifter": {
       "health": 4,
       "speed": 140.0,
-      "pattern": "quantum_erratic",
+      "pattern": "gravity_pull",
       "attack": {
         "fire_rate": 1.5,
         "bullet_speed": 360.0,
         "bullet_variant": 0,
-        "bullet_pattern": "zigzag"
+        "bullet_pattern": "gravity_well"
       }
     },
     "vortex_drone": {
       "health": 6,
       "speed": 100.0,
-      "pattern": "vortex_spiral",
+      "pattern": "black_hole_orbit",
       "attack": {
         "fire_rate": 1.4,
         "bullet_speed": 320.0,
         "bullet_variant": 0,
-        "bullet_pattern": "sine_wave"
+        "bullet_pattern": "gravity_well"
       }
     },
     "singularity_fragment": {
@@ -239,6 +249,9 @@
       ]
     },
     "boss_singularity_core": {
+      "is_boss": true,
+      "hold_x": 960.0,
+      "score": 2500,
       "health": 100,
       "speed": 25.0,
       "pattern": "vortex_spiral",
@@ -257,7 +270,7 @@
           "fire_rate": 1.4,
           "bullet_speed": 350.0,
           "bullet_variant": 0,
-          "bullet_pattern": "zigzag"
+          "bullet_pattern": "gravity_well"
         },
         {
           "name": "quantum_distortion_bottom",
@@ -265,7 +278,7 @@
           "fire_rate": 1.4,
           "bullet_speed": 350.0,
           "bullet_variant": 0,
-          "bullet_pattern": "zigzag"
+          "bullet_pattern": "gravity_well"
         }
       ]
     }

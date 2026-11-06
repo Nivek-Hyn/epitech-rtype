@@ -54,8 +54,10 @@ Fantasy:
 
 Gameplay identity:
 
-- Vertical dives and parabolic movement.
-- Faster punish windows and stronger cross-lane pressure.
+- Low gravity: enemies move like astronauts, with slow falls and bounces on the ground.
+- `martian_hopper` bounces between its `spawn_y` and the ground: `spawn_y` sets the height of its jumps.
+- `gravity_diver` flies flat, then falls faster and faster and leaves through the bottom of the screen.
+- The excavator boss slams the ground between its `spawn_y` and the bottom of the screen.
 
 Main archetypes:
 
@@ -72,8 +74,12 @@ Fantasy:
 
 Gameplay identity:
 
-- Erratic movement and spiral area denial.
-- Multi-layer pattern combinations that require anticipation.
+- A black hole at the center of the screen attracts everything: the middle is the dangerous place.
+- Everything stays predictable, so that the player can learn it. There is no random movement.
+- `quantum_shifter` keeps crossing the central line (`gravity_pull`).
+- `vortex_drone` spirals around the center, then is thrown to the left along the central line (`black_hole_orbit`).
+- `gravity_well` bullets curve toward the central line.
+- The core boss stops in the middle of the screen.
 
 Main archetypes:
 
@@ -98,9 +104,51 @@ Main archetypes:
 
 ### World 3
 
-- Stage 7 (`level7.json`): adaptation to erratic and spiral movement.
+- Stage 7 (`level7.json`): adaptation to the attraction of the black hole.
 - Stage 8 (`level8.json`): pattern stacking and spacing discipline.
 - Stage 9 (`level9.json`): final pre-boss stress, then singularity core boss.
+
+## Authoring rules
+
+Spawn heights use the full 1080-unit world: `spawn_y` goes from about 100 to 900.
+Keep `gravity_diver` in the upper part, since it falls until it leaves the screen.
+
+Optional fields of an enemy in `entities.json`:
+
+- `score`: points given when it is destroyed, in infinite mode only (default 100). The campaign has no score.
+- `amplitude`, `frequency`: tune its movement pattern. A level can override them per enemy; 0 or nothing keeps the default of the pattern.
+
+`speed` is read from the level, or from `entities.json` when the level does not give one.
+
+Meaning of `amplitude` and `frequency` in the world 2 and 3 patterns:
+
+| Pattern | `amplitude` (default) | `frequency` (default) |
+|---|---|---|
+| `martian_bounce` | gravity (150) | not used |
+| `gravity_dive` | gravity (300) | seconds before the fall (5) |
+| `gravity_pull` | strength of the attraction (1) | not used |
+| `black_hole_orbit` | rotation speed (220) | not used |
+
+An enemy that goes below the screen is removed.
+
+## Boss rules
+
+A boss is an enemy with these fields in `entities.json`:
+
+- `is_boss`: touching the boss destroys the ship, not the boss.
+- `hold_x`: the boss stops at this position and fights there. It also never leaves the screen vertically.
+
+A boss therefore has to be shot down: its level does not end while it is alive.
+
+## Lives
+
+Configured in `assets/config/game_rules.json` under `player`:
+
+- `lives`: lives of each player.
+- `respawn_delay`: seconds before the ship comes back.
+- `invulnerability`: seconds without damage after a respawn.
+
+When every connected player is out of lives, the current level restarts with full lives. In infinite mode, the score is kept.
 
 ## Difficulty model
 
@@ -115,7 +163,7 @@ Current multipliers:
 At spawn time, final combat stats are derived from base archetype values and level values.
 
 - Final health = base health x difficulty health multiplier x infinite health growth
-- Final speed = base speed x difficulty speed multiplier x infinite speed growth
+- Final speed = level speed (or base speed) x difficulty speed multiplier x infinite speed growth
 - Final attack cadence uses a lower bound with `min_fire_rate`
 - Final bullet speed uses an upper bound with `max_bullet_speed`
 

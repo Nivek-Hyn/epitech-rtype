@@ -1,0 +1,13 @@
+{
+  "stage": 1,
+  "level_name": "Test: one enemy level with the player spawn",
+  "waves": [
+    {
+      "wave_id": 1,
+      "delay_before_start": 1.0,
+      "enemies": [
+        { "type": "test_grunt", "spawn_y": 300.0, "speed": 120.0 }
+      ]
+    }
+  ]
+}

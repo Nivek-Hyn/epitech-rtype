@@ -1,0 +1,17 @@
+{
+  "enemies": {
+    "test_grunt": {
+      "health": 1,
+      "speed": 120.0,
+      "pattern": "straight"
+    },
+    "test_boss": {
+      "health": 2,
+      "speed": 400.0,
+      "pattern": "straight",
+      "is_boss": true,
+      "hold_x": 300.0,
+      "score": 1000
+    }
+  }
+}

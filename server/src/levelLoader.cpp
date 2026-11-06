@@ -37,7 +37,7 @@ LevelConfig loadLevelFromJson(const std::string &filepath)
                 EnemySpawnConfig enemy;
                 enemy.type = e.value("type", "standard");
                 enemy.spawn_y = e.value("spawn_y", 300.f);
-                enemy.speed = e.value("speed", 150.f);
+                enemy.speed = e.value("speed", 0.f); // 0: use the speed from entities.json
                 enemy.amplitude = e.value("amplitude", 0.f);
                 enemy.frequency = e.value("frequency", 0.f);
                 enemy.health = e.value("hp", e.value("health", 0));
