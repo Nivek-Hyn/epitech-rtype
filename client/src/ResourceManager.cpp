@@ -29,6 +29,7 @@ bool ResourceManager::loadDefaults()
     loadTexture("enemy_boss_heavy", "assets/r-typesheet28.gif");
     loadTexture("enemy_boss", "assets/r-typesheet38.gif");
     loadTexture("explosion_boss", "assets/r-typesheet44.gif");
+    loadTexture("obstacles", "assets/r-typesheet21.gif");
     if (!loadTexture("bullet", "assets/r-typesheet1.gif")) {
         std::cerr << "[ResourceManager] Failed to load assets/r-typesheet1.gif\n";
         success = false;

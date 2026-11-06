@@ -500,15 +500,55 @@ int main(int argc, char **argv)
                             window.draw(sprite);
                         }
                     } else if (entity.type == rtype::protocol::EntityType::Obstacle) {
-                        // Placeholder until the tiles have sprites: 0 debris, 1 Mars rock, 2 singularity shard.
-                        static const std::array<sf::Color, 3> tileColors = {
-                            sf::Color(120, 135, 150), sf::Color(165, 85, 50), sf::Color(120, 70, 190)};
-                        sf::RectangleShape tile({rtype::ObstacleSize - 4.f, rtype::ObstacleSize - 4.f});
-                        tile.setPosition({entity.x + 2.f, entity.y + 2.f});
-                        tile.setFillColor(tileColors[entity.variant % tileColors.size()]);
-                        tile.setOutlineColor(sf::Color(235, 235, 245));
-                        tile.setOutlineThickness(2.f);
-                        window.draw(tile);
+                        const float entityTime = totalTime + static_cast<float>(entity.netId % 13) * 0.31f;
+
+                        if (resources.hasTexture("obstacles")) {
+                            const auto &tex = resources.getTexture("obstacles");
+                            sf::Sprite sprite(tex);
+
+                            if (entity.variant == 0) {
+                                // Variant 0: Space tumbling debris chunk (r-typesheet21, Row 7: 16 frames, 32x32)
+                                const int animFrame = static_cast<int>(entityTime * 9.f) % 16;
+                                sprite.setTextureRect(sf::IntRect({1 + animFrame * 34, 363}, {32, 32}));
+                                constexpr float scale = rtype::ObstacleSize / 32.f;
+                                sprite.setScale({scale, scale});
+                                sprite.setPosition({entity.x, entity.y});
+                                window.draw(sprite);
+                            } else if (entity.variant == 1) {
+                                // Variant 1: Rotating Martian asteroid rock boulder (r-typesheet21, Row 2: 8 frames, 62x46)
+                                const int animFrame = static_cast<int>(entityTime * 6.f) % 8;
+                                sprite.setTextureRect(sf::IntRect({28 + animFrame * 65, 140}, {62, 46}));
+                                constexpr float scale = rtype::ObstacleSize / 52.f;
+                                sprite.setScale({scale, scale});
+                                sprite.setPosition({entity.x, entity.y});
+                                window.draw(sprite);
+                            } else if (entity.variant == 2) {
+                                // Variant 2: Rotating crystalline singularity shard (r-typesheet21, Row 4: 8 frames, 32x32)
+                                const int animFrame = static_cast<int>(entityTime * 8.f) % 8;
+                                sprite.setTextureRect(sf::IntRect({134 + animFrame * 34, 261}, {32, 32}));
+                                constexpr float scale = rtype::ObstacleSize / 32.f;
+                                sprite.setScale({scale, scale});
+                                sprite.setColor(sf::Color(220, 150, 255)); // violet / purple singularity glow
+                                sprite.setPosition({entity.x, entity.y});
+                                window.draw(sprite);
+                            } else {
+                                const int animFrame = static_cast<int>(entityTime * 9.f) % 16;
+                                sprite.setTextureRect(sf::IntRect({1 + animFrame * 34, 363}, {32, 32}));
+                                constexpr float scale = rtype::ObstacleSize / 32.f;
+                                sprite.setScale({scale, scale});
+                                sprite.setPosition({entity.x, entity.y});
+                                window.draw(sprite);
+                            }
+                        } else {
+                            static const std::array<sf::Color, 3> tileColors = {
+                                sf::Color(120, 135, 150), sf::Color(165, 85, 50), sf::Color(120, 70, 190)};
+                            sf::RectangleShape tile({rtype::ObstacleSize - 4.f, rtype::ObstacleSize - 4.f});
+                            tile.setPosition({entity.x + 2.f, entity.y + 2.f});
+                            tile.setFillColor(tileColors[entity.variant % tileColors.size()]);
+                            tile.setOutlineColor(sf::Color(235, 235, 245));
+                            tile.setOutlineThickness(2.f);
+                            window.draw(tile);
+                        }
                     } else if (entity.type == rtype::protocol::EntityType::Enemy) {
                         const float entityTime = totalTime + static_cast<float>(entity.netId % 11) * 0.23f;
                         const int animFrame = static_cast<int>(entityTime * 9.f);
