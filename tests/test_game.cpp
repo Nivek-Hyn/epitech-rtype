@@ -8,7 +8,9 @@
 #include <nlohmann/json.hpp>
 
 #include <algorithm>
+#include <array>
 #include <fstream>
+#include <string>
 
 using namespace rtype;
 using namespace rtype::server;
@@ -136,6 +138,7 @@ TEST(Game, DeadPlayerCannotControlAReusedEntity)
     Game game;
     game.loadEntitiesConfig(TestEntities);
     game.loadLevel(OneGrunt);
+    game.rules().intermissionDelay = 1000.f; // the game must still be running when the others join
     game.onPlayerJoined(0);
     game.update(3.f);
     game.update(12.f); // The first configured enemy reaches the stationary player.
@@ -474,52 +477,295 @@ TEST(Game, DeadPlayerLosesALifeAndRespawnsAfterTheDelay)
     EXPECT_EQ(countOf(game, protocol::EntityType::Player), 2);
 }
 
-TEST(Game, InvulnerabilityProtectsAndLevelRestartsWhenLivesRunOut)
+namespace {
+
+// Keeps one ship in contact with the stopped boss, so it dies as soon as it can. Returns the
+// shortest time between two deaths.
+float ramTheBossUntilOutOfLives(Game &game, std::uint8_t player)
+{
+    const float dt = 1.f / 60.f;
+    float shortestGap = 1e9f;
+    float lastDeath = -1.f;
+    int lives = game.playerLives(player);
+    for (float elapsed = 0.f; elapsed < 60.f && lives > 0; elapsed += dt) {
+        const auto snap = game.snapshot();
+        for (const auto &entity : snap.entities) {
+            if (entity.type == protocol::EntityType::Player && entity.variant == player)
+                game.onInput(player, entity.x < 280.f ? protocol::InputFlag::Right : std::uint8_t{0});
+        }
+        game.update(dt);
+        if (game.playerLives(player) < lives) {
+            if (lastDeath >= 0.f)
+                shortestGap = std::min(shortestGap, elapsed - lastDeath);
+            lastDeath = elapsed;
+            lives = game.playerLives(player);
+        }
+    }
+    game.update(dt); // the end of the game is decided on the next tick
+    return shortestGap;
+}
+
+} // namespace
+
+TEST(Game, InvulnerabilityProtectsAndGameIsOverWhenLivesRunOut)
 {
     Game game;
     game.loadEntitiesConfig(TestEntities);
     game.loadLevel(OneBoss);
     game.onPlayerJoined(0);
+    EXPECT_EQ(game.gameState(), protocol::GameState::Playing);
 
-    // The ship always stays in contact with the stopped boss, so it dies as soon as it can.
-    const float dt = 1.f / 60.f;
-    float elapsed = 0.f;
-    float lastDeath = -1.f;
-    int lives = game.playerLives(0);
-    bool restarted = false;
-    while (elapsed < 60.f && !restarted) {
-        const auto snap = game.snapshot();
-        for (const auto &entity : snap.entities) {
-            if (entity.type == protocol::EntityType::Player)
-                game.onInput(0, entity.x < 280.f ? protocol::InputFlag::Right : std::uint8_t{0});
-        }
-        game.update(dt);
-        elapsed += dt;
-        const int current = game.playerLives(0);
-        if (current < lives) {
-            if (lastDeath >= 0.f) // respawn delay + invulnerability
-                EXPECT_GE(elapsed - lastDeath, 3.9f);
-            lastDeath = elapsed;
-        }
-        restarted = current > lives;
-        lives = current;
-        if (lives == 0)
-            game.update(dt); // the last life was lost: the level restarts on the next tick
-        if (lives == 0 && game.playerLives(0) == 3) {
-            restarted = true;
-            lives = 3;
-        }
+    EXPECT_GE(ramTheBossUntilOutOfLives(game, 0), 3.9f); // respawn delay + invulnerability
+
+    EXPECT_EQ(game.playerLives(0), 0);
+    EXPECT_EQ(game.gameState(), protocol::GameState::GameOver);
+    EXPECT_EQ(game.snapshot().state, protocol::GameState::GameOver);
+    EXPECT_EQ(countOf(game, protocol::EntityType::Enemy), 0);
+
+    // It stays over: nothing comes back while the players look at the screen.
+    run(game, 10.f);
+    EXPECT_EQ(game.gameState(), protocol::GameState::GameOver);
+    EXPECT_EQ(countOf(game, protocol::EntityType::Enemy), 0);
+    EXPECT_EQ(countOf(game, protocol::EntityType::Player), 0);
+}
+
+TEST(Game, DeathWithLivesLeftIsNotGameOver)
+{
+    Game game;
+    game.loadEntitiesConfig(TestEntities);
+    game.loadLevel(OneBoss);
+    game.onPlayerJoined(0);
+    run(game, 5.f);
+    for (int tick = 0; tick < 60 && game.playerLives(0) == 3; ++tick) {
+        game.onInput(0, protocol::InputFlag::Right);
+        game.update(1.f / 60.f);
     }
-    ASSERT_TRUE(restarted);
-    EXPECT_EQ(lives, 3);
+    ASSERT_EQ(game.playerLives(0), 2);
+    EXPECT_EQ(countOf(game, protocol::EntityType::Player), 0); // waiting to come back: nobody on screen
+    run(game, 0.5f);
+    EXPECT_EQ(game.gameState(), protocol::GameState::Playing);
+}
 
-    // The boss has been replaced by a new one, back at the right of the screen.
-    const auto snap = game.snapshot();
-    const auto boss = std::find_if(snap.entities.begin(), snap.entities.end(), [](const auto &entity) {
-        return entity.type == protocol::EntityType::Enemy;
-    });
-    ASSERT_NE(boss, snap.entities.end());
-    EXPECT_GT(boss->x, 1000.f);
+TEST(Game, GameGoesOnWhileAnotherPlayerHasLives)
+{
+    Game game;
+    game.loadEntitiesConfig(TestEntities);
+    game.loadLevel(OneBoss);
+    game.onPlayerJoined(0);
+    game.onPlayerJoined(1);
+
+    ramTheBossUntilOutOfLives(game, 0);
+
+    EXPECT_EQ(game.playerLives(0), 0);
+    EXPECT_EQ(game.gameState(), protocol::GameState::Playing);
+    EXPECT_EQ(countOf(game, protocol::EntityType::Player), 1);
+}
+
+TEST(Game, NextPlayersStartAgainFromTheFirstLevelAfterAGameOver)
+{
+    Game game;
+    game.loadEntitiesConfig(TestEntities);
+    game.loadCampaign({OneGrunt, OneBoss});
+    game.rules().intermissionDelay = 0.f;
+    game.onPlayerJoined(0);
+    for (int tick = 0; tick < 60 * 60 && game.currentLevelIndex() == 0; ++tick)
+        game.update(1.f / 60.f);
+    ASSERT_EQ(game.currentLevelIndex(), 1u);
+
+    ramTheBossUntilOutOfLives(game, 0);
+    ASSERT_EQ(game.gameState(), protocol::GameState::GameOver);
+
+    game.onPlayerLeft(0);
+    EXPECT_EQ(game.gameState(), protocol::GameState::Playing);
+    EXPECT_EQ(game.currentLevelIndex(), 0u);
+
+    game.onPlayerJoined(0);
+    EXPECT_EQ(game.playerLives(0), 3);
+    EXPECT_EQ(countOf(game, protocol::EntityType::Player), 1);
+}
+
+namespace {
+
+// Waits for the campaign to reach a level. A stationary ship is rammed by the grunt of each level.
+void runUntilLevel(Game &game, std::size_t level)
+{
+    for (int tick = 0; tick < 60 * 60 && game.currentLevelIndex() != level; ++tick)
+        game.update(1.f / 60.f);
+    ASSERT_EQ(game.currentLevelIndex(), level);
+}
+
+} // namespace
+
+TEST(Game, LivesComeBackToTheFullCountOnlyWhenANewWorldStarts)
+{
+    Game game;
+    game.loadEntitiesConfig(TestEntities);
+    game.loadCampaign({OneGrunt, OneGrunt, OneGrunt});
+    game.rules().levelsPerWorld = 2;
+    game.rules().intermissionDelay = 0.f;
+    game.onPlayerJoined(0);
+
+    runUntilLevel(game, 1); // same world: the lost life stays lost
+    EXPECT_EQ(game.playerLives(0), 2);
+
+    runUntilLevel(game, 2); // new world: 1 life left gives 3, not 4
+    EXPECT_EQ(game.playerLives(0), 3);
+}
+
+TEST(Game, PlayerOutOfLivesComesBackInTheNextWorld)
+{
+    Game game;
+    game.loadEntitiesConfig(TestEntities);
+    game.loadCampaign({OneGrunt, OneGrunt});
+    game.rules().levelsPerWorld = 1;
+    game.rules().playerLives = 1;
+    game.rules().intermissionDelay = 0.f;
+    game.onPlayerJoined(0);
+    game.onPlayerJoined(1); // the grunt only rams one of the two ships
+    run(game, 10.f);
+    ASSERT_EQ(game.playerLives(0) + game.playerLives(1), 2);
+
+    runUntilLevel(game, 1);
+    EXPECT_EQ(game.playerLives(0), 1);
+    EXPECT_EQ(game.playerLives(1), 1);
+    EXPECT_EQ(game.gameState(), protocol::GameState::Playing);
+
+    run(game, 2.5f); // respawn delay
+    EXPECT_EQ(countOf(game, protocol::EntityType::Player), 2);
+}
+
+TEST(Game, GameRulesGiveThreeLevelsPerWorld)
+{
+    Game game;
+    EXPECT_EQ(game.rules().levelsPerWorld, 3u);
+    EXPECT_EQ(game.rules().playerLives, 3);
+}
+
+TEST(Game, SnapshotTellsTheLivesLeftOfEachPlayer)
+{
+    Game game;
+    game.loadEntitiesConfig(TestEntities);
+    game.loadLevel(OneBoss);
+    game.onPlayerJoined(0);
+    game.onPlayerJoined(1);
+    EXPECT_EQ(game.snapshot().lives[0], 3);
+    EXPECT_EQ(game.snapshot().lives[2], 0); // nobody there
+
+    ramTheBossUntilOutOfLives(game, 0);
+    EXPECT_EQ(game.snapshot().lives[0], 0);
+    EXPECT_EQ(game.snapshot().lives[1], 3);
+}
+
+TEST(Obstacle, CostsALifeOnContactAndStaysInPlace)
+{
+    Game game;
+    game.loadEntitiesConfig(TestEntities);
+    game.loadLevel("tests/data/one_tile.json");
+    game.rules().intermissionDelay = 1000.f;
+    game.onPlayerJoined(0);
+    run(game, 15.f); // the tile comes from the right edge at 120 units per second
+
+    EXPECT_EQ(game.playerLives(0), 2);
+    EXPECT_EQ(countOf(game, protocol::EntityType::Obstacle), 1);
+}
+
+TEST(Obstacle, ResistsAsManyShotsAsItsHealthAndGivesNoScore)
+{
+    Game game;
+    game.loadEntitiesConfig(TestEntities);
+    game.loadLevel("tests/data/one_tile.json");
+    game.setGameMode(Game::GameMode::Infinite);
+    game.rules().intermissionDelay = 1000.f;
+    game.onPlayerJoined(0);
+
+    game.onInput(0, protocol::InputFlag::Shoot);
+    game.onInput(0, 0);
+    run(game, 5.f);
+    EXPECT_EQ(countOf(game, protocol::EntityType::Obstacle), 1);
+    EXPECT_EQ(countOf(game, protocol::EntityType::PlayerMissile), 0);
+
+    game.onInput(0, protocol::InputFlag::Shoot);
+    game.onInput(0, 0);
+    run(game, 3.f);
+    EXPECT_EQ(countOf(game, protocol::EntityType::Obstacle), 0);
+    EXPECT_EQ(game.snapshot().score, 0u);
+}
+
+TEST(Obstacle, StopsEnemyFireWithoutBeingDamaged)
+{
+    Game game;
+    game.loadEntitiesConfig(TestEntities);
+    game.loadLevel("tests/data/tile_shield.json");
+    game.onPlayerJoined(0);
+    run(game, 8.f); // without the tile, the first shots would have reached the ship
+
+    EXPECT_EQ(game.playerLives(0), 3);
+    EXPECT_EQ(countOf(game, protocol::EntityType::Obstacle), 1); // health 1: any damage would destroy it
+}
+
+TEST(Obstacle, DoesNotHoldTheLevelBack)
+{
+    Game game;
+    game.loadEntitiesConfig(TestEntities);
+    game.loadLevel("tests/data/one_tile.json");
+    game.rules().intermissionDelay = 0.f;
+    game.onPlayerJoined(0);
+    run(game, 0.5f);
+
+    EXPECT_EQ(game.gameState(), protocol::GameState::Finished);
+}
+
+TEST(Obstacle, LeavesTheGameAtTheLeftOfTheScreen)
+{
+    Game game;
+    game.loadEntitiesConfig(TestEntities);
+    game.loadLevel("tests/data/one_tile.json");
+    game.rules().intermissionDelay = 1000.f;
+    game.onPlayerJoined(0);
+    game.onInput(0, protocol::InputFlag::Down); // out of its way
+    run(game, 25.f);
+
+    EXPECT_EQ(countOf(game, protocol::EntityType::Obstacle), 0);
+    EXPECT_EQ(game.playerLives(0), 3);
+}
+
+TEST(Obstacle, EveryTileOfTheCampaignExistsAndEveryWorldHasItsOwn)
+{
+    std::ifstream configFile("assets/config/entities.json");
+    ASSERT_TRUE(configFile.is_open());
+    const auto obstacles = nlohmann::json::parse(configFile).at("obstacles");
+
+    const std::array<std::string, 3> themes = {"satellite_debris", "mars_rock", "singularity_shard"};
+    for (int level = 1; level <= 9; ++level) {
+        std::ifstream levelFile("assets/levels/level" + std::to_string(level) + ".json");
+        ASSERT_TRUE(levelFile.is_open());
+        const auto config = nlohmann::json::parse(levelFile);
+        int tiles = 0;
+        for (const auto &wave : config.at("waves")) {
+            for (const auto &tile : wave.value("obstacles", nlohmann::json::array())) {
+                tiles++;
+                const auto type = tile.at("type").get<std::string>();
+                EXPECT_TRUE(obstacles.contains(type)) << type;
+                EXPECT_EQ(type, themes[static_cast<std::size_t>((level - 1) / 3)]) << "level " << level;
+            }
+        }
+        EXPECT_GT(tiles, 0) << "level " << level;
+    }
+}
+
+TEST(Game, PlayerJoiningAFinishedGameGetsNoShip)
+{
+    Game game;
+    game.loadEntitiesConfig(TestEntities);
+    game.loadLevel(OneBoss);
+    game.onPlayerJoined(0);
+    ramTheBossUntilOutOfLives(game, 0);
+    ASSERT_EQ(game.gameState(), protocol::GameState::GameOver);
+
+    game.onPlayerJoined(1);
+    run(game, 3.f);
+    EXPECT_EQ(countOf(game, protocol::EntityType::Player), 0);
+    EXPECT_EQ(game.gameState(), protocol::GameState::GameOver);
 }
 
 TEST(Movement, BackAndForthKeepsAdvancingAtItsConfiguredSpeed)

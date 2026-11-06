@@ -24,7 +24,13 @@ Campaign and balancing rely on these files:
 
 Runtime loading and scaling are implemented in:
 
-- `server/src/Game.cpp`
+- `server/src/GameConfigLoader.cpp`: reading the configuration files.
+- `server/src/GameLevels.cpp`: going from one level to the next.
+- `server/src/GameWaves.cpp`: making enemies and tiles appear.
+- `server/src/GameDifficulty.cpp`: difficulty and infinite mode scaling.
+- `server/src/GamePlayers.cpp`: controls, lives and respawn.
+- `server/src/GameCollisions.cpp`: what happens when a shot or a ship touches something.
+- `server/src/Game.cpp`: one step of the game.
 
 ## World pillars
 
@@ -131,6 +137,26 @@ Meaning of `amplitude` and `frequency` in the world 2 and 3 patterns:
 
 An enemy that goes below the screen is removed.
 
+## Destructible tiles
+
+A wave can list tiles under `obstacles`, next to `enemies`, with a `type` and a `spawn_y` (from 0 to 1008). Types are defined in the `obstacles` section of `entities.json`: `variant` (appearance), `health` (shots to destroy it) and `speed`. A level can override `speed` and `health`.
+
+| Type | World | Health | Speed |
+|---|---|---|---|
+| `satellite_debris` | 1 | 2 | 110 |
+| `mars_rock` | 2 | 4 | 90 |
+| `singularity_shard` | 3 | 3 | 140 |
+
+Rules:
+
+- A tile scrolls to the left and leaves the screen. Levels do not wait for tiles.
+- Touching a tile costs a life. The tile stays in place.
+- A player shot removes 1 health and gives no score.
+- A tile stops enemy shots without being damaged, so players can take cover behind it.
+- Difficulty and infinite mode scale the health and speed of tiles like those of enemies.
+
+Always leave a gap of at least 200 units: tiles add to the entities sent in each snapshot, and a wall must not force the player to shoot.
+
 ## Boss rules
 
 A boss is an enemy with these fields in `entities.json`:
@@ -148,7 +174,9 @@ Configured in `assets/config/game_rules.json` under `player`:
 - `respawn_delay`: seconds before the ship comes back.
 - `invulnerability`: seconds without damage after a respawn.
 
-When every connected player is out of lives, the current level restarts with full lives. In infinite mode, the score is kept.
+Lives are per world: `levels_per_world` in the `campaign` section (3 by default) says how many levels form a world. At the start of a new world, every connected player is back to the full count, not added to what is left (2 lives left gives 3, not 5), and a player out of lives comes back.
+
+A player out of lives watches the others until the next world or the end of the game. When every connected player is out of lives, the game is over: enemies disappear and the game over screen is shown. Once all players have left, the next game starts again from the first level, with no score.
 
 ## Difficulty model
 

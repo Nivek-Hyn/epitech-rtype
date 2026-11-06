@@ -13,6 +13,11 @@
     {
       "wave_id": 2,
       "delay_before_start": 10.0,
+      "obstacles": [
+        { "type": "singularity_shard", "spawn_y": 240.0 },
+        { "type": "singularity_shard", "spawn_y": 540.0 },
+        { "type": "singularity_shard", "spawn_y": 840.0 }
+      ],
       "enemies": [
         { "type": "vortex_drone", "spawn_y": 150.0, "speed": 108.0 },
         { "type": "quantum_shifter", "spawn_y": 360.0, "speed": 152.0 },
@@ -33,6 +38,10 @@
     {
       "wave_id": 4,
       "delay_before_start": 31.0,
+      "obstacles": [
+        { "type": "singularity_shard", "spawn_y": 120.0 },
+        { "type": "singularity_shard", "spawn_y": 900.0 }
+      ],
       "enemies": [
         { "type": "vortex_drone", "spawn_y": 135.0, "speed": 110.0 },
         { "type": "vortex_drone", "spawn_y": 330.0, "speed": 110.0 },

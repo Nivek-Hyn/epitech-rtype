@@ -48,6 +48,7 @@
       "assets/levels/level8.json",
       "assets/levels/level9.json"
     ],
+    "levels_per_world": 3,
     "intermission_delay": 2.0
   }
 }

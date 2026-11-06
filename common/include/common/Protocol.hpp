@@ -1,8 +1,10 @@
 #pragma once
 
-// Binary protocol v1 between r-type_client and r-type_server, over UDP.
 // The reference description is docs/protocol.md: keep both in sync, and bump Version on any breaking change.
 
+#include "common/Constants.hpp"
+
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
@@ -13,7 +15,7 @@
 namespace rtype::protocol {
 
 inline constexpr std::uint16_t Magic = 0x5254; // "RT"
-inline constexpr std::uint8_t Version = 1;
+inline constexpr std::uint8_t Version = 4;
 inline constexpr std::size_t HeaderSize = 10;
 // Stay under the usual Internet MTU so datagrams are never fragmented.
 inline constexpr std::size_t MaxPacketSize = 1200;
@@ -38,6 +40,7 @@ enum class EntityType : std::uint8_t {
     Enemy = 2,
     PlayerMissile = 3,
     EnemyMissile = 4,
+    Obstacle = 5,
 };
 
 // Bit flags of the Input message.
@@ -52,7 +55,7 @@ inline constexpr std::uint8_t Shoot = 1 << 4;
 enum class RejectReason : std::uint8_t { ServerFull = 1, VersionMismatch = 2 };
 enum class DestroyReason : std::uint8_t { Killed = 1, OutOfBounds = 2 };
 enum class LeaveReason : std::uint8_t { Disconnected = 1, TimedOut = 2 };
-enum class GameState : std::uint8_t { Waiting = 1, Playing = 2, Finished = 3 };
+enum class GameState : std::uint8_t { Waiting = 1, Playing = 2, Finished = 3, GameOver = 4 };
 
 // ---- client -> server ----
 struct Connect {};
@@ -79,19 +82,20 @@ struct EntityState {
     float y = 0.f;
 };
 inline constexpr std::size_t EntityStateSize = 14;
-inline constexpr std::size_t SnapshotFixedSize = 11;
+inline constexpr std::size_t SnapshotFixedSize = 15;
 inline constexpr std::size_t MaxEntitiesPerSnapshot =
     (MaxPacketSize - HeaderSize - SnapshotFixedSize) / EntityStateSize;
 
 // The whole game at a given server tick: game state, score and every entity.
-// Sent every tick, so losing one is harmless. The end of the game is state == Finished (no separate message
-// that could be lost). A tick with more than MaxEntitiesPerSnapshot entities is split into several
+// Sent every tick, so losing one is harmless. The end of the game is state == Finished (victory) or
+// GameOver (defeat), with no separate message that could be lost. A tick with more than MaxEntitiesPerSnapshot entities is split into several
 // Snapshot packets with the same tick.
 struct Snapshot {
     std::uint32_t tick = 0;
     GameState state = GameState::Waiting;
     std::uint32_t score = 0;
     std::vector<EntityState> entities;
+    std::array<std::uint8_t, MaxPlayers> lives{}; // lives left of each player, by player id
 };
 struct EntityDestroyed {
     std::uint32_t netId = 0;

@@ -159,7 +159,7 @@ Use the event bus when a system must trigger something it should not know about 
 
 ## Add an enemy type
 
-An enemy is an entity, not a class. Game.cpp currently spawns enemies and checks player-missile collisions;
+An enemy is an entity, not a class. GameWaves.cpp spawns enemies and GameCollisions.cpp checks player-missile collisions;
 the client displays an enemy sprite. A new subtype combines component values, a behavior and a rendering choice.
 Changing `Kind::variant` alone does not add a behavior or a new sprite mapping.
 

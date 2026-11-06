@@ -34,6 +34,40 @@ TEST(Protocol, RoundTripSnapshot)
     EXPECT_EQ(received.entities[1].type, EntityType::Enemy);
 }
 
+TEST(Protocol, SnapshotCarriesTheLivesOfEachPlayer)
+{
+    Snapshot sent{7, GameState::Playing, 0, {{1, EntityType::Player, 2, 10.5f, 20.f}}};
+    sent.lives = {3, 2, 0, 1};
+    const auto packet = decode(encode({1, sent}));
+    ASSERT_TRUE(packet);
+    const auto &received = std::get<Snapshot>(packet->message);
+    EXPECT_EQ(received.lives, sent.lives);
+    ASSERT_EQ(received.entities.size(), 1u); // the entities still come after the lives
+    EXPECT_EQ(received.entities[0].variant, 2);
+}
+
+TEST(Protocol, SnapshotCarriesObstaclesButNoUnknownEntityType)
+{
+    auto bytes = encode({1, Snapshot{1, GameState::Playing, 0, {{1, EntityType::Obstacle, 2, 500.f, 300.f}}}});
+    const auto packet = decode(bytes);
+    ASSERT_TRUE(packet);
+    EXPECT_EQ(std::get<Snapshot>(packet->message).entities[0].type, EntityType::Obstacle);
+
+    bytes[HeaderSize + SnapshotFixedSize + 4] = 6;
+    EXPECT_FALSE(decode(bytes));
+}
+
+TEST(Protocol, SnapshotCarriesTheGameOverStateButNoUnknownState)
+{
+    auto bytes = encode({1, Snapshot{1, GameState::GameOver, 0, {}}});
+    const auto packet = decode(bytes);
+    ASSERT_TRUE(packet);
+    EXPECT_EQ(std::get<Snapshot>(packet->message).state, GameState::GameOver);
+
+    bytes[HeaderSize + 4] = 5; // the state comes right after the u32 tick
+    EXPECT_FALSE(decode(bytes));
+}
+
 TEST(Protocol, RoundTripsEveryMessageType)
 {
     const std::vector<Message> messages = {Connect{},
@@ -89,7 +123,7 @@ TEST(Protocol, RejectsMalformedPackets)
 TEST(Protocol, RejectsSnapshotWithLyingCount)
 {
     auto bytes = encode({1, Snapshot{1, GameState::Playing, 0, {{1, EntityType::Player, 0, 0.f, 0.f}}}});
-    bytes[HeaderSize + 10] = 50; // count says 50 entities, payload only holds 1
+    bytes[HeaderSize + SnapshotFixedSize - 1] = 50; // count says 50 entities, payload only holds 1
     EXPECT_FALSE(decode(bytes));
 }
 

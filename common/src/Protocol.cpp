@@ -56,6 +56,8 @@ void writePayload(engine::net::ByteWriter &writer, const Message &message)
                 writer.u32(value.tick);
                 writer.u8(static_cast<std::uint8_t>(value.state));
                 writer.u32(value.score);
+                for (const std::uint8_t lives : value.lives)
+                    writer.u8(lives);
                 writer.u16(static_cast<std::uint16_t>(value.entities.size()));
                 for (const EntityState &entity : value.entities) {
                     writer.u32(entity.netId);
@@ -78,7 +80,7 @@ void writePayload(engine::net::ByteWriter &writer, const Message &message)
 bool validEntityType(std::uint8_t value)
 {
     return value >= static_cast<std::uint8_t>(EntityType::Player) &&
-           value <= static_cast<std::uint8_t>(EntityType::EnemyMissile);
+           value <= static_cast<std::uint8_t>(EntityType::Obstacle);
 }
 
 } // namespace
@@ -166,10 +168,12 @@ std::optional<Packet> decode(std::span<const std::uint8_t> datagram)
             snapshot.tick = reader.u32();
             const auto state = reader.u8();
             if (state < static_cast<std::uint8_t>(GameState::Waiting) ||
-                state > static_cast<std::uint8_t>(GameState::Finished))
+                state > static_cast<std::uint8_t>(GameState::GameOver))
                 return std::nullopt;
             snapshot.state = static_cast<GameState>(state);
             snapshot.score = reader.u32();
+            for (std::uint8_t &lives : snapshot.lives)
+                lives = reader.u8();
             const auto count = reader.u16();
             if (count > MaxEntitiesPerSnapshot || payloadSize != SnapshotFixedSize + count * EntityStateSize)
                 return std::nullopt;
