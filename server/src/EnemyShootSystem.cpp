@@ -16,7 +16,6 @@ void updateEnemyShooting(engine::ecs::Registry &registry, const std::function<en
     };
     std::vector<PendingShot> shots;
 
-    //Détection des ennemis qui doivent tirer
     registry.each<rtype::components::Position, rtype::components::Kind, rtype::components::EnemyAttack>([&shots, dt](engine::ecs::Entity /*entity*/, const rtype::components::Position &pos, const rtype::components::Kind &kind, rtype::components::EnemyAttack &enemyAttack) {
             if (kind.type != protocol::EntityType::Enemy)
                 return;
@@ -30,7 +29,6 @@ void updateEnemyShooting(engine::ecs::Registry &registry, const std::function<en
             }
         });
 
-    //Création des tirs après collecte
     for (const auto &shot : shots) {
         engine::ecs::Entity bullet = spawnFunc(protocol::EntityType::EnemyMissile, shot.variant, shot.x, shot.y);
         registry.emplace<rtype::components::Velocity>(bullet, -shot.speed, 0.0f);

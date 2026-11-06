@@ -16,8 +16,19 @@ bool ResourceManager::loadDefaults()
         std::cerr << "[ResourceManager] Failed to load assets/r-typesheet5.gif\n";
         success = false;
     }
+    loadTexture("enemy_standard", "assets/r-typesheet5.gif");
+    loadTexture("enemy_patrol", "assets/r-typesheet30a.gif");
+    loadTexture("enemy_sine", "assets/r-typesheet22.gif");
+    loadTexture("enemy_diver", "assets/r-typesheet8.gif");
+    loadTexture("enemy_tentacle", "assets/r-typesheet9.gif");
+    loadTexture("enemy_boss_heavy", "assets/r-typesheet44.gif");
+    loadTexture("enemy_boss", "assets/r-typesheet38.gif");
     if (!loadTexture("bullet", "assets/r-typesheet1.gif")) {
         std::cerr << "[ResourceManager] Failed to load assets/r-typesheet1.gif\n";
+        success = false;
+    }
+    if (!loadTexture("enemy_bullet", "assets/r-typesheet3.gif")) {
+        std::cerr << "[ResourceManager] Failed to load assets/r-typesheet3.gif\n";
         success = false;
     }
 
@@ -52,6 +63,11 @@ const sf::Texture &ResourceManager::getTexture(const std::string &id) const
     if (it == _textures.end())
         throw std::out_of_range("Texture not found: " + id);
     return it->second;
+}
+
+bool ResourceManager::hasTexture(const std::string &id) const
+{
+    return _textures.find(id) != _textures.end();
 }
 
 bool ResourceManager::loadFont(const std::string &id, const std::string &path)

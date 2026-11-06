@@ -506,6 +506,7 @@ void Game::spawnEnemies(float dt)
 
                 bool hasAttack = false;
                 std::vector<AttackDefinition> attacks;
+                std::uint8_t enemyVariant = 0;
 
                 if (_entityDefinitions.find(enemyConfig.type) != _entityDefinitions.end()) {
                     const auto &def = _entityDefinitions[enemyConfig.type];
@@ -540,7 +541,7 @@ void Game::spawnEnemies(float dt)
                 }
 
                 engine::ecs::Entity enemy =
-                    spawnNetworked(protocol::EntityType::Enemy, 0, WorldWidth, spawnY);
+                    spawnNetworked(protocol::EntityType::Enemy, enemyVariant, WorldWidth, spawnY);
                 
                 _registry.emplace<rtype::components::Velocity>(enemy, -finalSpeed, 0.f);
                 _registry.emplace<rtype::components::Health>(enemy, finalHp);
@@ -571,8 +572,36 @@ void Game::handleCollisions()
 
     std::vector<std::pair<engine::ecs::Entity, engine::physics::Aabb>> enemies;
     _registry.each<Position, Kind>([&enemies](engine::ecs::Entity entity, const Position &position, const Kind &kind) {
-        if (kind.type == protocol::EntityType::Enemy)
-            enemies.push_back({entity, {position.x, position.y, EnemyWidth, EnemyHeight}});
+        if (kind.type != protocol::EntityType::Enemy)
+            return;
+        float w = EnemyWidth;
+        float h = EnemyHeight;
+        float offsetY = 0.f;
+        if (kind.variant == 0) {
+            w = 66.f;
+            h = 72.f;
+        } else if (kind.variant == 1) {
+            w = 64.f;
+            h = 56.f;
+        } else if (kind.variant == 2) {
+            w = 64.f;
+            h = 56.f;
+        } else if (kind.variant == 3) {
+            w = 56.f;
+            h = 46.f;
+        } else if (kind.variant == 4) {
+            w = 72.f;
+            h = 83.f;
+        } else if (kind.variant == 5) {
+            w = 200.f;
+            h = 200.f;
+            offsetY = -15.f;
+        } else if (kind.variant == 6) {
+            w = 280.f;
+            h = 222.f;
+            offsetY = -60.f;
+        }
+        enemies.push_back({entity, {position.x, position.y + offsetY, w, h}});
     });
 
     std::vector<bool> enemyHit(enemies.size(), false);

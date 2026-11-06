@@ -25,6 +25,7 @@ public:
     // Textures
     bool loadTexture(const std::string &id, const std::string &path);
     const sf::Texture &getTexture(const std::string &id) const;
+    bool hasTexture(const std::string &id) const;
 
     // Fonts
     bool loadFont(const std::string &id, const std::string &path);
