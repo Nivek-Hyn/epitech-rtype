@@ -15,7 +15,7 @@
 namespace rtype::protocol {
 
 inline constexpr std::uint16_t Magic = 0x5254; // "RT"
-inline constexpr std::uint8_t Version = 6;
+inline constexpr std::uint8_t Version = 7;
 inline constexpr std::size_t HeaderSize = 10;
 // Stay under the usual Internet MTU so datagrams are never fragmented.
 inline constexpr std::size_t MaxPacketSize = 1200;
@@ -92,7 +92,15 @@ struct EntityState {
     float x = 0.f;
     float y = 0.f;
 };
-inline constexpr std::size_t EntityStateSize = 14;
+// A position travels as a u16 counting 1/16 of a world unit, from -1024 to +3071.94: the world is 1920 x 1080 and
+// entities appear or leave a few hundred units outside it. A value outside that range is clamped. The error is
+// at most 1/32 of a unit, far below a pixel, and an entity costs 10 bytes instead of 14.
+inline constexpr float PositionScale = 16.f;
+inline constexpr float PositionOffset = 1024.f;
+std::uint16_t quantizePosition(float value);
+float dequantizePosition(std::uint16_t quantized);
+
+inline constexpr std::size_t EntityStateSize = 10;
 inline constexpr std::size_t SnapshotFixedSize = 15;
 inline constexpr std::size_t MaxEntitiesPerSnapshot =
     (MaxPacketSize - HeaderSize - SnapshotFixedSize) / EntityStateSize;

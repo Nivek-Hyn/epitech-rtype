@@ -3,6 +3,7 @@
 #include "engine/net/ByteBuffer.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <stdexcept>
 #include <type_traits>
@@ -69,8 +70,8 @@ void writePayload(engine::net::ByteWriter &writer, const Message &message)
                     writer.u32(entity.netId);
                     writer.u8(static_cast<std::uint8_t>(entity.type));
                     writer.u8(entity.variant);
-                    writer.f32(entity.x);
-                    writer.f32(entity.y);
+                    writer.u16(quantizePosition(entity.x));
+                    writer.u16(quantizePosition(entity.y));
                 }
             } else if constexpr (std::is_same_v<T, EntityDestroyed>) {
                 writer.u32(value.netId);
@@ -90,6 +91,19 @@ bool validEntityType(std::uint8_t value)
 }
 
 } // namespace
+
+std::uint16_t quantizePosition(float value)
+{
+    const float scaled = std::round((value + PositionOffset) * PositionScale);
+    if (!(scaled >= 0.f)) // below the range, or not a number
+        return 0;
+    return static_cast<std::uint16_t>(std::min(scaled, 65535.f));
+}
+
+float dequantizePosition(std::uint16_t quantized)
+{
+    return static_cast<float>(quantized) / PositionScale - PositionOffset;
+}
 
 std::vector<std::uint8_t> encode(const Packet &packet, std::uint8_t version)
 {
@@ -238,8 +252,8 @@ std::optional<Packet> decode(std::span<const std::uint8_t> datagram)
                     return std::nullopt;
                 entity.type = static_cast<EntityType>(type);
                 entity.variant = reader.u8();
-                entity.x = reader.f32();
-                entity.y = reader.f32();
+                entity.x = dequantizePosition(reader.u16());
+                entity.y = dequantizePosition(reader.u16());
                 snapshot.entities.push_back(entity);
             }
             message = std::move(snapshot);

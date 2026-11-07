@@ -3,6 +3,10 @@
 
 #include <gtest/gtest.h>
 
+#include <array>
+#include <cmath>
+#include <limits>
+
 using namespace rtype::protocol;
 
 TEST(Protocol, RoundTripInput)
@@ -313,4 +317,81 @@ TEST(Protocol, RejectsAnotherProtocolVersion)
     auto bytes = encode({1, Connect{}});
     bytes[2] = Version - 1;
     EXPECT_FALSE(decode(bytes));
+}
+
+TEST(Quantization, ARoundTripIsWithinHalfAStepOfTheOriginalPosition)
+{
+    constexpr float HalfStep = 0.5f / PositionScale;
+    constexpr float FloatPrecisionNear3000 = 1e-3f; // a float cannot hold a value near 3000 better than that
+    for (float value = -1000.f; value < 3000.f; value += 0.37f)
+        EXPECT_LE(std::abs(dequantizePosition(quantizePosition(value)) - value), HalfStep + FloatPrecisionNear3000)
+            << value;
+}
+
+TEST(Quantization, PositionsOfTheWorldAreExactWhenTheyAreMultiplesOfOneSixteenth)
+{
+    for (float value : {0.f, 100.f, 1919.f, 1080.f, -71.f, 12.5f, 33.0625f})
+        EXPECT_FLOAT_EQ(dequantizePosition(quantizePosition(value)), value);
+}
+
+TEST(Quantization, ValuesOutsideTheRangeAreClampedAndNeverWrapAround)
+{
+    EXPECT_EQ(quantizePosition(-5000.f), 0);
+    EXPECT_EQ(quantizePosition(100000.f), 65535);
+    EXPECT_FLOAT_EQ(dequantizePosition(0), -PositionOffset);
+    EXPECT_GT(dequantizePosition(65535), 3071.f);
+    // A ship far outside the world is shown at the edge of the range, not on the other side of the screen.
+    EXPECT_LT(dequantizePosition(quantizePosition(-2000.f)), -1000.f);
+    EXPECT_GT(dequantizePosition(quantizePosition(5000.f)), 3000.f);
+}
+
+TEST(Quantization, ANotANumberPositionDoesNotBreakTheEncoder)
+{
+    const float nan = std::numeric_limits<float>::quiet_NaN();
+    EXPECT_EQ(quantizePosition(nan), 0);
+    EXPECT_EQ(quantizePosition(std::numeric_limits<float>::infinity()), 65535);
+    EXPECT_EQ(quantizePosition(-std::numeric_limits<float>::infinity()), 0);
+}
+
+TEST(Quantization, AnEntityCostsTenBytesInASnapshot)
+{
+    EXPECT_EQ(EntityStateSize, 10u);
+    Snapshot snapshot{1, GameState::Playing, 0, {}, {}};
+    const auto empty = encode({1, snapshot}).size();
+    for (std::uint32_t i = 1; i <= 7; ++i)
+        snapshot.entities.push_back({i, EntityType::Enemy, 0, 100.f, 200.f});
+    EXPECT_EQ(encode({1, snapshot}).size(), empty + 7 * 10);
+}
+
+TEST(Quantization, AFullDatagramHoldsMoreEntitiesThanBefore)
+{
+    EXPECT_EQ(MaxEntitiesPerSnapshot, (MaxPacketSize - HeaderSize - SnapshotFixedSize) / 10);
+    EXPECT_GE(MaxEntitiesPerSnapshot, 110u);
+
+    Snapshot snapshot{1, GameState::Playing, 0, {}, {}};
+    for (std::uint32_t i = 0; i < MaxEntitiesPerSnapshot; ++i)
+        snapshot.entities.push_back({i, EntityType::PlayerMissile, 0, 1.f * static_cast<float>(i), 2.f});
+    const auto bytes = encode({1, snapshot});
+    EXPECT_LE(bytes.size(), MaxPacketSize);
+    const auto decoded = decode(bytes);
+    ASSERT_TRUE(decoded);
+    EXPECT_EQ(std::get<Snapshot>(decoded->message).entities.size(), MaxEntitiesPerSnapshot);
+}
+
+TEST(Quantization, TheDecodedSnapshotKeepsEveryOtherFieldExactly)
+{
+    Snapshot sent{4242, GameState::Finished, 987654, {{70000, EntityType::Bonus, 3, 640.25f, 360.75f}}, {3, 0, 2, 1}};
+    const auto decoded = decode(encode({1, sent}));
+    ASSERT_TRUE(decoded);
+    const auto &received = std::get<Snapshot>(decoded->message);
+    EXPECT_EQ(received.tick, 4242u);
+    EXPECT_EQ(received.state, GameState::Finished);
+    EXPECT_EQ(received.score, 987654u);
+    EXPECT_EQ(received.lives, (std::array<std::uint8_t, 4>{3, 0, 2, 1}));
+    ASSERT_EQ(received.entities.size(), 1u);
+    EXPECT_EQ(received.entities[0].netId, 70000u);
+    EXPECT_EQ(received.entities[0].type, EntityType::Bonus);
+    EXPECT_EQ(received.entities[0].variant, 3);
+    EXPECT_FLOAT_EQ(received.entities[0].x, 640.25f);
+    EXPECT_FLOAT_EQ(received.entities[0].y, 360.75f);
 }

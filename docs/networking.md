@@ -138,8 +138,8 @@ to that thread.
 
 ## 6. Packet handling and safety
 
-The wire format is version 1 of the binary protocol. Integers are big-endian, floats are sent as IEEE-754
-32-bit values, and a datagram is limited to 1200 bytes. The receiver uses a fixed-size buffer and passes each
+The wire format is version 7 of the binary protocol. Integers are big-endian, positions are 16-bit quantized values
+(1/16 of a world unit), and a datagram is limited to 1200 bytes. The receiver uses a fixed-size buffer and passes each
 datagram to `protocol::decode()` before handling it.
 
 The decoder rejects truncated or oversized datagrams, incorrect magic/version, unknown message types, payload
@@ -189,7 +189,7 @@ server-owned player positions.
   implemented.
 - When a player leaves or times out, the server broadcasts `EntityDestroyed` for its ship and sends `PlayerLeft`
   to the remaining clients, both reliably. Reliable messages are not ordered between themselves.
-- The protocol limit is 84 entities per snapshot. The server splits larger snapshots into several packets with
+- The protocol limit is 117 entities per snapshot. The server splits larger snapshots into several packets with
   the same tick, and the client merges them with `SnapshotAssembler`, ignoring older ticks and duplicates. If a
   packet of a tick is lost, that tick is displayed incomplete until the next one.
 - A server answers a `Connect` of another protocol version with `ConnectRejected(VersionMismatch)`, written in the
@@ -248,6 +248,55 @@ outdated ones are mostly `Input` packets that the jitter delivered after a newer
 
 These figures are the baseline for the improvements planned next (acknowledgements, delta snapshots,
 interpolation): measure again after each one.
+
+### Bandwidth of a snapshot
+
+Quantizing positions to 16 bits (see [protocol.md](protocol.md) §4.2) was measured with a scripted client that
+held the fire key and moved up and down for 40 seconds against a local server (a campaign game: 27.8 entities per
+snapshot on average, 60 snapshots per second). Both runs had the same average number of entities.
+
+| Protocol | Entity | Average snapshot packet | Downstream per client |
+|---|---|---|---|
+| Version 6, two 32-bit floats | 14 bytes | 415 bytes | 24.3 KB/s |
+| Version 7, two 16-bit quantized positions | 10 bytes | 303 bytes | 17.8 KB/s (−27 %) |
+
+## 10. Reliable messages
+
+Most of the traffic is deliberately **not** reliable: an `Input` or a `Snapshot` is replaced 16 ms later, so sending
+it again would only waste bandwidth. A few messages cannot be replaced, so they are sent reliably:
+`EntityDestroyed`, `PlayerLeft` (server to client) and `Disconnect` (client to server).
+
+How it works (the byte layout is in [protocol.md](protocol.md) §3.2):
+
+1. The sender numbers the message and keeps it in an `engine::net::ReliableQueue` for that peer.
+2. The receiver answers with a small `Ack` carrying the number, for the first copy and for every repeat.
+3. Until the `Ack` arrives, a timer (every 50 ms) sends the message again. The delay adapts to the measured
+   round-trip time and doubles after each repeat; after 12 sends the message is dropped, the peer is probably gone.
+4. A message already handled is not handled twice: the receiver remembers the last 32 numbers.
+
+Where it lives: `ReliableQueue.hpp` (engine, no socket, tested with a simulated clock), `AsioNetworkServer` (one queue
+per client, `sendReliable`/`broadcastReliable`) and `AsioNetworkClient` (`sendReliable`). The server main loop
+sends the game events with `broadcastReliable`. When the player closes the window, `disconnect()` sends a reliable
+`Disconnect` and waits up to 500 ms for the `Ack`, so the server removes the ship at once instead of after its 5
+second timeout. Both `--stats` and F3 show how many messages were **resent**. The decision is recorded in
+[ADR 0009](adr/0009-reliable-messages-over-udp.md).
+
+### Example of a measurement
+
+A scripted client held the fire key for 10 seconds, then kept acknowledging for 6 more seconds without firing.
+Every `EntityDestroyed` of the server is a reliable message; the table counts the reliable numbers the client
+received, against the highest number it saw. The network was degraded with `scripts/netsim.py` (loss in each
+direction, 40 ms delay, 20 ms jitter).
+
+| Network | Reliable messages received | Missing at the end | Repeats ignored by the client | Resent by the server |
+|---|---|---|---|---|
+| Healthy | 39 of 39 | 0 | 0 | 0 |
+| 30 % loss each way (seed 5) | 48 of 48 | 0 | 22 | 54 |
+| 30 % loss each way (seed 9) | 50 of 50 | 0 | 19 | 43 |
+| 50 % loss each way (seed 2) | 47 of 48 | 1 | 45 | 120 |
+
+At 50 % loss one message was still on its way when the run ended: with the delay doubling after each repeat, a
+message needs several seconds to get through at that loss rate. These are single runs, not a benchmark.
 
 ---
 
@@ -377,8 +426,9 @@ travail à effectuer.
 
 ## 6. Paquets et sécurité
 
-Le format transmis sur le réseau est la version 1 du protocole binaire. Les entiers sont en big-endian, les
-flottants sont des valeurs IEEE-754 sur 32 bits et chaque datagramme est limité à 1 200 octets. Le récepteur
+Le format transmis sur le réseau est la version 7 du protocole binaire. Les entiers sont en big-endian, les
+positions sont des valeurs quantifiées sur 16 bits (1/16 d’unité du monde) et chaque datagramme est limité à
+1 200 octets. Le récepteur
 utilise un buffer de taille fixe et passe chaque datagramme à `protocol::decode()` avant de le traiter.
 
 Le décodeur rejette les datagrammes tronqués ou trop volumineux, les signatures ou versions incorrectes, les
@@ -431,7 +481,7 @@ des joueurs calculées par le serveur.
   réconciliation ne sont pas implémentées.
 - Lorsqu’un joueur part ou expire, le serveur diffuse `EntityDestroyed` pour son vaisseau et envoie `PlayerLeft`
   aux clients restants, tous deux de façon fiable. Les messages fiables ne sont pas ordonnés entre eux.
-- Un snapshot est limité à 84 entités. Le serveur découpe les snapshots plus grands en plusieurs paquets de même
+- Un snapshot est limité à 117 entités. Le serveur découpe les snapshots plus grands en plusieurs paquets de même
   tick, et le client les fusionne avec `SnapshotAssembler` en ignorant les ticks plus anciens et les doublons. Si
   un paquet d’un tick est perdu, ce tick s’affiche incomplet jusqu’au suivant.
 - Un serveur répond à un `Connect` d’une autre version du protocole par `ConnectRejected(VersionMismatch)`, écrit
@@ -492,6 +542,18 @@ plus récent ; la partie s’est déroulée normalement.
 
 Ces valeurs servent de référence pour les améliorations prévues (acquittements, snapshots différentiels,
 interpolation) : il faudra mesurer à nouveau après chacune.
+
+### Débit d’un snapshot
+
+La quantification des positions sur 16 bits (voir [protocol.md](protocol.md) §4.2) a été mesurée avec un client
+scripté qui maintenait le tir et montait et descendait pendant 40 secondes contre un serveur local (une partie de
+campagne : 27,8 entités par snapshot en moyenne, 60 snapshots par seconde). Les deux essais avaient le même nombre
+moyen d’entités.
+
+| Protocole | Entité | Paquet snapshot moyen | Débit descendant par client |
+|---|---|---|---|
+| Version 6, deux flottants de 32 bits | 14 octets | 415 octets | 24,3 Ko/s |
+| Version 7, deux positions quantifiées sur 16 bits | 10 octets | 303 octets | 17,8 Ko/s (−27 %) |
 
 ## 10. Messages fiables
 

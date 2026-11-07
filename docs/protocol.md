@@ -8,7 +8,7 @@ the protocol specification; runtime gaps are listed in the [networking implement
 
 - All game communication uses **UDP**. Default server port: **4242**.
 - One datagram contains exactly one packet. Maximum datagram size: **1200 bytes**.
-- All integers are **unsigned, big-endian**. `f32` is an IEEE-754 single-precision float sent as its 32-bit pattern, big-endian.
+- All integers are **unsigned, big-endian**. There is no floating-point field: a position is a `u16` count of 1/16 of a world unit (§4.2).
 
 ## 2. Packet header (10 bytes)
 
@@ -124,8 +124,8 @@ Input flags: `0x01` up, `0x02` down, `0x04` left, `0x08` right, `0x10` shoot.
 | u8 | state: `1` waiting for players, `2` playing, `3` finished (victory), `4` game over (defeat) |
 | u32 | score |
 | 4 × u8 | lives left of each player, by `player_id` (`0` if nobody has this id) |
-| u16 | count (max 83) |
-| count × 14 bytes | entities |
+| u16 | count (max 117) |
+| count × 10 bytes | entities |
 
 Each entity:
 
@@ -134,10 +134,16 @@ Each entity:
 | u32 | net_id | Network id of the entity, unique for the whole game |
 | u8 | type | `1` player, `2` enemy, `3` player missile, `4` enemy missile, `5` obstacle, `6` bonus |
 | u8 | variant | Player index (0–3) for players, subtype for other types |
-| f32 | x | World position (world is 1920 × 1080, origin top-left) |
-| f32 | y | |
+| u16 | x | World position, quantized (see below) |
+| u16 | y | |
 
-A tick with more than 83 entities is sent as several Snapshot packets with the same `tick`.
+**Position quantization.** A position `p` in world units is sent as `q = round((p + 1024) × 16)` and read back as
+`p = q / 16 − 1024`. The world is 1920 × 1080 with its origin at the top-left; the range −1024 to +3071.94 leaves
+room for entities that appear or leave outside the screen, and a value outside it is clamped to the nearest end (it
+never wraps around). The error is at most 1/32 of a unit, far below one pixel, and an entity takes 10 bytes instead
+of the 14 it took with two 32-bit floats. A receiver must treat `NaN` and infinities as the ends of the range.
+
+A tick with more than 117 entities is sent as several Snapshot packets with the same `tick`.
 
 The end of the game is not a separate message: the client sees `state = 3` or `state = 4` in the snapshots, with the final score.
 Since a snapshot is sent every tick, this information cannot be lost.
