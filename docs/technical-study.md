@@ -158,17 +158,17 @@ keeping the fraction. Without this limit a slow server could accumulate an endle
 
 | Choice | Alternatives | Why |
 |---|---|---|
-| **UDP** | TCP | Required by the subject for in-game traffic. UDP does not retransmit lost packets; ordering and stale-state rejection remain application responsibilities. |
+| **UDP** | TCP | Required by the subject for in-game traffic. UDP does not retransmit lost packets; ordering and stale-state rejection remain application responsibilities. We do them ourselves, for the few messages that need them ([ADR 0009](adr/0009-reliable-messages-over-udp.md)). |
 | **Authoritative server**, clients send inputs only ([ADR 0007](adr/0007-authoritative-snapshots.md)) | Peer-to-peer, client authority | The server decides everything: a modified client cannot move faster or teleport, it can only send key presses. |
-| **Snapshots every tick** | Delta snapshots, events only | A later received snapshot can replace lost state. The next datagram can also be lost or reordered; this does not make individual events reliable. |
-| **Full snapshots every tick** | Delta snapshots, events only | A lost snapshot is replaced by the next one about 16.7 ms later. One-off events are not acknowledged or retransmitted in the current prototype. |
-| **Binary protocol** ([ADR 0008](adr/0008-binary-protocol.md), [specification](protocol.md)) | JSON, text | Compact and fast to parse. One entity takes 14 bytes in binary, about 50 to 60 bytes in JSON. |
+| **Full snapshots, 30 per second**, smoothed by the client ([ADR 0010](adr/0010-snapshot-rate-and-interpolation.md)) | 60 per second, delta snapshots ([ADR 0011](adr/0011-delta-snapshots-not-adopted.md)), events only | A lost snapshot is replaced by the next one about 33 ms later and the client hides the gap by interpolation. Measured on a real game: 98 % of the entities move at every tick, so sending only what changed would save almost nothing. |
+| **Reliable messages** for `EntityDestroyed`, `PlayerLeft` and `Disconnect` ([ADR 0009](adr/0009-reliable-messages-over-udp.md)) | A TCP channel, everything reliable | Only what nothing replaces is acknowledged and repeated, with a delay that follows the measured round-trip time. Snapshots and inputs stay unreliable: a newer one replaces them. |
+| **Binary protocol** ([ADR 0008](adr/0008-binary-protocol.md), [specification](protocol.md)) | JSON, text | Compact and fast to parse. One entity takes 10 bytes in binary (two quantized 16-bit positions), about 50 to 60 bytes in JSON. |
 
-Bandwidth estimate, worst case (a full snapshot packet: 10-byte header + 15 bytes + 83 entities × 14 bytes = 1,187 bytes):
-60 packets per second ≈ 71 KB/s ≈ 570 kbit/s per client, about 2.3 Mbit/s for 4 clients. This is a theoretical
-payload estimate, not a measured bandwidth result. It excludes UDP/IP overhead and retransmitted connection
-attempts; the cross-play exercise did not measure this worst-case load. Delta snapshots and a lower send rate with
-client interpolation remain network-track work to assess separately.
+Bandwidth, worst case (a full snapshot packet: 10-byte header + 15 bytes + 117 entities × 10 bytes = 1,195 bytes):
+30 packets per second ≈ 36 KB/s ≈ 287 kbit/s per client, about 1.15 Mbit/s for 4 clients. This is a payload
+estimate: it excludes UDP/IP overhead. Measured on a campaign game with 27 to 28 entities per snapshot, one client
+receives 8.4 KB/s, against 24.3 KB/s with the first protocol (14-byte entities, 60 snapshots per second): the
+measurements and how they were made are in [networking.md](networking.md) §9 to §11.
 
 The 1,200-byte payload cap reduces fragmentation risk; it does not guarantee that every network path can carry
 the resulting IP packet without fragmentation. Path MTU and encapsulation still matter. See the

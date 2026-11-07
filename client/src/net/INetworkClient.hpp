@@ -23,7 +23,7 @@ enum class ConnectionState : std::uint8_t {
 struct NetworkStats {
     engine::net::TrafficStats traffic;
     std::optional<double> rttMs; ///< Smoothed round-trip time; empty until a Pong was received.
-    double lossPercent = 0.0;    ///< Share of server ticks whose snapshot never reached us (or came too late).
+    double lossPercent = 0.0;    ///< Share of the packets from the server that never reached us, from gaps in their numbers.
 };
 
 // Contract between the client network layer and the rest of the client.

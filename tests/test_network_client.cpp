@@ -86,7 +86,7 @@ TEST(NetworkClient, ConnectsMeasuresLatencyAndCountsTraffic)
     EXPECT_TRUE(waitUntil([&] { return server.clientCount() == 0u; }));
 }
 
-TEST(NetworkClient, EstimatesTheLossOfServerSnapshots)
+TEST(NetworkClient, SeesNoLossWhenTheServerSendsASnapshotEveryOtherTick)
 {
     rtype::server::AsioNetworkServer server;
     const std::uint16_t port = findAvailablePort();
@@ -97,13 +97,14 @@ TEST(NetworkClient, EstimatesTheLossOfServerSnapshots)
     client.connect("127.0.0.1", port);
     ASSERT_TRUE(waitUntil([&] { return client.connected(); }));
 
-    // Ticks 4 and 7 never get sent: 2 snapshots missing out of 8.
-    for (std::uint32_t tick : {1u, 2u, 3u, 5u, 6u, 8u}) {
+    // The ticks of the snapshots are 2, 4, 6...: loss is judged on packet numbers, not on missing tick numbers.
+    for (std::uint32_t tick = 2; tick <= 20; tick += 2) {
         server.broadcast(snapshotOfTick(tick));
         std::this_thread::sleep_for(2ms);
     }
-    ASSERT_TRUE(waitUntil([&] { return client.stats().lossPercent > 0.0; }));
-    EXPECT_DOUBLE_EQ(client.stats().lossPercent, 25.0);
+    ASSERT_TRUE(waitUntil([&] { return client.stats().traffic.totals.packetsReceived >= 10; }));
+    std::this_thread::sleep_for(150ms); // one more round of statistics
+    EXPECT_DOUBLE_EQ(client.stats().lossPercent, 0.0);
 }
 
 TEST(NetworkClient, KeepsTheSessionAliveWithPingsWhenNothingElseIsSent)
@@ -373,4 +374,22 @@ TEST(NetworkClient, DisconnectRepeatsItselfThenGivesUpWhenNobodyAcknowledges)
 
     EXPECT_GE(disconnects, 2) << "the Disconnect is sent again while no Ack comes";
     EXPECT_EQ(client.state(), ConnectionState::Idle);
+}
+
+TEST(NetworkClient, EstimatesTheLossFromGapsInThePacketNumbers)
+{
+    FakeServer server;
+    AsioNetworkClient client;
+    client.setOptions(fastOptions());
+    client.connect("127.0.0.1", server.port);
+    ASSERT_TRUE(server.accept()); // packet number 0
+
+    // Numbers 1 and 4 are never sent: 2 packets missing out of the 8 numbered 0 to 7.
+    for (std::uint32_t number : {2u, 3u, 5u, 6u, 7u}) {
+        server.nextSequence = number;
+        server.send(snapshotOfTick(number));
+    }
+    ASSERT_TRUE(waitUntil([&] { return client.stats().traffic.totals.packetsReceived >= 6; }));
+    ASSERT_TRUE(waitUntil([&] { return client.stats().lossPercent > 0.0; }));
+    EXPECT_DOUBLE_EQ(client.stats().lossPercent, 25.0);
 }

@@ -23,4 +23,6 @@ The server must have the final authority on the game. UDP may lose, duplicate or
 ## Consequences
 - The server game logic (`server/src/Game`) does not know about sockets: `main` feeds it network events
   and sends what it produces. It can be unit tested alone.
-- Part 2 candidates: delta snapshots, lower send rate + interpolation, client-side prediction.
+- Part 2 candidates: delta snapshots, lower send rate + interpolation, client-side prediction. Outcome: a lower send rate
+  with interpolation was adopted ([0010](0010-snapshot-rate-and-interpolation.md)); delta snapshots were evaluated and not
+  adopted ([0011](0011-delta-snapshots-not-adopted.md)); prediction was not done.

@@ -213,9 +213,9 @@ bandwidth once per second (`engine::net::RateMeter`).
 The client measures:
 
 - **Ping** from its `Ping`/`Pong` exchange, smoothed so one late packet does not make the figure jump.
-- **Loss** as the share of server ticks whose snapshot never arrived. The server sends one snapshot per tick, so a
-  hole in the tick numbers is a lost packet (`engine::net::LossTracker`). A snapshot that arrives after a newer
-  one, and a duplicated one, do not count as received: they would not be displayed anyway.
+- **Loss** as the share of the server's packets that never arrived. The server numbers the packets it sends to a
+  client one by one (§8), so a hole in the numbers is a lost packet (`engine::net::LossTracker`). A packet that
+  arrives after a newer one, and a duplicated one, do not count as received.
 
 ### Simulating a bad network
 
@@ -241,6 +241,9 @@ to a local server. This is a single run on the loopback interface, not a benchma
 |---|---|---|---|
 | Healthy | 0.0 % (420 of 420 ticks) | under 1 ms | 12.7 KB/s |
 | 20 % loss, 60 ms delay, 20 ms jitter, 3 % duplicates, each way | 20.9 % (302 of 382 ticks) | 139 ms (3 pongs) | 11.6 KB/s |
+
+This table was measured when the server sent one snapshot per tick and loss was counted in ticks; that is the same
+thing as counting packets, which is how it is counted now.
 
 Per-client sequence numbers (§8) were checked with the same bot through `netsim.py --dup 10 --delay 30
 --jitter 40` for 6 seconds: the server's `--stats` line ended with `dropped: 31 duplicate, 133 outdated`. The
@@ -297,6 +300,64 @@ direction, 40 ms delay, 20 ms jitter).
 
 At 50 % loss one message was still on its way when the run ended: with the delay doubling after each repeat, a
 message needs several seconds to get through at that loss rate. These are single runs, not a benchmark.
+
+## 11. Snapshot rate and interpolation
+
+**What changed.** The server still simulates 60 ticks per second, but it sends a snapshot only every 2 ticks (30 per
+second). The client shows the world slightly in the past and moves each entity along the straight line between two
+snapshots, so the motion on screen stays smooth at 60 frames per second. `r-type_server --snapshot-every N` changes
+the interval (the startup line shows it); the default is `SnapshotEveryTicks` in `common/Constants.hpp`. The decision
+is recorded in [ADR 0010](adr/0010-snapshot-rate-and-interpolation.md).
+
+**How the client does it** (`common/SnapshotInterpolator.hpp`, used by `client/src/main.cpp`):
+
+1. The packets of a tick are merged by the `SnapshotAssembler`, then handed to the interpolator.
+2. The interpolator shows the world `InterpolationDelaySnapshots` (2) snapshot intervals behind the newest snapshot, so
+   that it always has a snapshot on each side of the time being shown. A single lost snapshot is invisible.
+3. Time is counted in server ticks. The client estimates the offset between its clock and the server's with the packet
+   that arrived with the least delay, and lets that estimate creep up slowly to follow a drift of the clocks.
+4. Each snapshot is **handled** (sounds, explosions, score, lives, game over) when its time comes, and the entities
+   drawn are the blend of the current snapshot and the next one. What you hear and what you see therefore match.
+5. Nothing is extrapolated: without a newer snapshot, the last one is held (the entities pause).
+
+**What it costs.** The world is drawn about 2 intervals (66 ms) plus up to one interval (33 ms) after it happened,
+instead of 16 ms. For a shooter this is noticeable; `--snapshot-every 1` brings the delay back to 33 + 16 ms at the
+price of twice the bandwidth. The client does not predict the movement of its own ship (see the limitations).
+
+### Bandwidth
+
+Scripted client holding the fire key and moving up and down for 30 seconds against a local server, campaign game,
+about 27 entities per snapshot, protocol version 7:
+
+| Snapshots | Snapshots per second | Average packet | Downstream per client |
+|---|---|---|---|
+| Every tick (`--snapshot-every 1`) | 60 | 300 bytes | 17.6 KB/s |
+| Every 2 ticks (default) | 30 | 287 bytes | 8.4 KB/s |
+| Every 3 ticks (`--snapshot-every 3`) | 20 | 298 bytes | 5.8 KB/s |
+
+With the two changes together (16-bit positions and 30 snapshots per second) a client receives **8.4 KB/s instead of
+24.3 KB/s (−65 %)**. These are single runs of a game with random enemy spawns, not a benchmark.
+
+### Smoothness
+
+A moving entity (400 units per second, so 6.67 units per tick) is sent every 2 ticks; the network delays each snapshot
+by 40 ms plus a random jitter. The screen is drawn 60 times per second. The table compares the largest jump of the
+entity from one frame to the next when each snapshot is drawn on arrival, and with the interpolator (it should be 6.67):
+
+| Jitter | Largest jump per frame, drawn on arrival | Largest jump per frame, interpolated |
+|---|---|---|
+| 0 ms | 13.3 | 6.7 |
+| 15 ms | 13.3 | 7.1 |
+| 30 ms | 26.7 | 8.4 |
+
+The average distance from the real speed drops from 6.85 to 0.09 at 30 ms of jitter. This simulation is also a unit
+test (`test_snapshot_interpolator.cpp`).
+
+### Delta snapshots: why not
+
+Sending only what changed since the last snapshot the client acknowledged was evaluated and not adopted: on a real
+game 98 % of the entities move at every tick, and with the round-trip delay of a real network the movement since the
+acknowledged snapshot no longer fits in a small number. See [ADR 0011](adr/0011-delta-snapshots-not-adopted.md).
 
 ---
 
@@ -506,9 +567,9 @@ fois par seconde (`engine::net::RateMeter`).
 Le client mesure :
 
 - le **ping**, grâce à l’échange `Ping`/`Pong`, lissé pour qu’un paquet en retard ne fasse pas sauter la valeur ;
-- les **pertes**, c’est-à-dire la part des ticks du serveur dont le snapshot n’est jamais arrivé. Le serveur envoie
-  un snapshot par tick : un trou dans les numéros de tick est un paquet perdu (`engine::net::LossTracker`). Un
-  snapshot arrivé après un plus récent, ou dupliqué, n’est pas compté comme reçu : il ne serait pas affiché.
+- les **pertes**, c’est-à-dire la part des paquets du serveur qui ne sont jamais arrivés. Le serveur numérote un à un
+  les paquets qu’il envoie à un client (§8) : un trou dans les numéros est un paquet perdu
+  (`engine::net::LossTracker`). Un paquet arrivé après un plus récent, ou dupliqué, n’est pas compté comme reçu.
 
 ### Simuler un mauvais réseau
 
@@ -592,3 +653,68 @@ par le client, par rapport au plus haut numéro vu.
 
 À 50 % de perte, un message était encore en route à la fin de l’essai : comme le délai double à chaque répétition,
 un message met plusieurs secondes à passer à ce taux de perte. Ce sont des essais uniques, pas un benchmark.
+
+## 11. Fréquence des snapshots et interpolation
+
+**Ce qui change.** Le serveur simule toujours 60 ticks par seconde, mais il n’envoie un snapshot que tous les 2 ticks
+(30 par seconde). Le client affiche le monde légèrement dans le passé et déplace chaque entité en ligne droite entre
+deux snapshots, si bien que le mouvement reste fluide à 60 images par seconde. `r-type_server --snapshot-every N`
+change l’intervalle (la ligne de démarrage l’affiche) ; la valeur par défaut est `SnapshotEveryTicks` dans
+`common/Constants.hpp`. La décision est consignée dans l’[ADR 0010](adr/0010-snapshot-rate-and-interpolation.md).
+
+**Comment le client procède** (`common/SnapshotInterpolator.hpp`, utilisé par `client/src/main.cpp`) :
+
+1. Les paquets d’un tick sont fusionnés par le `SnapshotAssembler`, puis confiés à l’interpolateur.
+2. L’interpolateur affiche le monde `InterpolationDelaySnapshots` (2) intervalles de snapshot derrière le snapshot le
+   plus récent, pour avoir toujours un snapshot de chaque côté de l’instant affiché. Un snapshot perdu seul est
+   invisible.
+3. Le temps est compté en ticks du serveur. Le client estime l’écart entre son horloge et celle du serveur avec le
+   paquet arrivé avec le moins de retard, et laisse cette estimation remonter lentement pour suivre une dérive des
+   horloges.
+4. Chaque snapshot est **traité** (sons, explosions, score, vies, fin de partie) quand son heure arrive, et les
+   entités dessinées sont le mélange du snapshot courant et du suivant. Ce que l’on entend et ce que l’on voit
+   concordent donc.
+5. Rien n’est extrapolé : sans snapshot plus récent, le dernier est conservé (les entités marquent une pause).
+
+**Ce que cela coûte.** Le monde est dessiné environ 2 intervalles (66 ms) plus jusqu’à un intervalle (33 ms) après
+l’événement, au lieu de 16 ms. Pour un jeu de tir c’est perceptible ; `--snapshot-every 1` ramène le retard à
+33 + 16 ms au prix d’une bande passante double. Le client ne prédit pas le mouvement de son propre vaisseau (voir les
+limites).
+
+### Bande passante
+
+Client scripté qui maintient le tir et monte et descend pendant 30 secondes contre un serveur local, partie de
+campagne, environ 27 entités par snapshot, protocole version 7 :
+
+| Snapshots | Snapshots par seconde | Paquet moyen | Débit descendant par client |
+|---|---|---|---|
+| À chaque tick (`--snapshot-every 1`) | 60 | 300 octets | 17,6 Ko/s |
+| Tous les 2 ticks (défaut) | 30 | 287 octets | 8,4 Ko/s |
+| Tous les 3 ticks (`--snapshot-every 3`) | 20 | 298 octets | 5,8 Ko/s |
+
+Avec les deux changements ensemble (positions sur 16 bits et 30 snapshots par seconde), un client reçoit **8,4 Ko/s
+au lieu de 24,3 Ko/s (−65 %)**. Ce sont des essais uniques d’une partie aux apparitions d’ennemis aléatoires, pas un
+benchmark.
+
+### Fluidité
+
+Une entité en mouvement (400 unités par seconde, soit 6,67 unités par tick) est envoyée tous les 2 ticks ; le réseau
+retarde chaque snapshot de 40 ms plus une gigue aléatoire. L’écran est dessiné 60 fois par seconde. Le tableau compare
+le plus grand saut de l’entité d’une image à la suivante quand chaque snapshot est dessiné dès son arrivée, et avec
+l’interpolateur (il devrait être de 6,67) :
+
+| Gigue | Plus grand saut par image, dessin à l’arrivée | Plus grand saut par image, interpolé |
+|---|---|---|
+| 0 ms | 13,3 | 6,7 |
+| 15 ms | 13,3 | 7,1 |
+| 30 ms | 26,7 | 8,4 |
+
+L’écart moyen à la vitesse réelle passe de 6,85 à 0,09 avec 30 ms de gigue. Cette simulation est aussi un test
+unitaire (`test_snapshot_interpolator.cpp`).
+
+### Snapshots différentiels : pourquoi pas
+
+Envoyer seulement ce qui a changé depuis le dernier snapshot acquitté par le client a été évalué et n’a pas été
+retenu : dans une vraie partie 98 % des entités bougent à chaque tick, et avec le temps d’aller-retour d’un vrai
+réseau le mouvement depuis le snapshot acquitté ne tient plus dans un petit nombre. Voir l’[ADR
+0011](adr/0011-delta-snapshots-not-adopted.md).

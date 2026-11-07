@@ -23,6 +23,15 @@ inline constexpr std::size_t MaxPlayers = 4;
 // A client that sent nothing for this long is considered disconnected.
 inline constexpr auto ClientTimeout = std::chrono::seconds(5);
 
+// The simulation runs 60 ticks per second but the server sends a snapshot only every this many ticks (30 per second):
+// the client fills the gaps by interpolation. Fewer snapshots means less bandwidth, at the price of a longer delay
+// before the client shows what happened. `r-type_server --snapshot-every N` changes it.
+inline constexpr int SnapshotEveryTicks = 2;
+
+// The client shows the world this many snapshot intervals in the past, to always have a snapshot on each side of
+// the time being shown. Two keeps a single lost snapshot invisible.
+inline constexpr double InterpolationDelaySnapshots = 2.0;
+
 // The client sends Connect this often, and gives up (connection failed) after this many unanswered attempts.
 inline constexpr auto ConnectRetryInterval = std::chrono::milliseconds(500);
 inline constexpr int MaxConnectAttempts = 10;

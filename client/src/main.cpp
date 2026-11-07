@@ -2,6 +2,7 @@
 #include "common/Constants.hpp"
 #include "common/Protocol.hpp"
 #include "common/SnapshotAssembler.hpp"
+#include "common/SnapshotInterpolator.hpp"
 #include "net/AsioNetworkClient.hpp"
 #include "ui/MainMenu.hpp"
 #include "ui/Starfield.hpp"
@@ -131,6 +132,7 @@ int main(int argc, char **argv)
     std::vector<rtype::protocol::EntityState> entities;
     std::vector<Explosion> explosions;
     rtype::protocol::SnapshotAssembler world; // rebuilds the world of a tick from its (possibly split) snapshots
+    rtype::protocol::SnapshotInterpolator interpolator{rtype::InterpolationDelaySnapshots}; // shows it, smoothed
     bool showStats = false;
     std::string rejectionReason = "the server refused the connection";
     bool reportedConnected = false;
@@ -178,6 +180,7 @@ int main(int argc, char **argv)
         playerTiltMap.clear();
         entities.clear();
         world.reset();
+        interpolator.reset();
         explosions.clear();
         reportedConnected = false;
     };
@@ -303,6 +306,7 @@ int main(int argc, char **argv)
                 if (const auto *accepted = std::get_if<rtype::protocol::ConnectAccepted>(&*message)) {
                     localPlayerId = accepted->playerId;
                     world.reset(); // a new session: the server's ticks may start again from zero
+                    interpolator.reset();
                     newSession = true;
                     gotSnapshot = false;
                 } else if (const auto *snapshot = std::get_if<rtype::protocol::Snapshot>(&*message)) {
@@ -318,11 +322,16 @@ int main(int argc, char **argv)
             if (newSession)
                 entities.clear();
 
-            // The packets of a split tick are complete only once the batch is drained: handle the world once.
-            if (gotSnapshot) {
-                const rtype::protocol::Snapshot merged{world.tick(), world.state(), world.score(), world.entities(),
-                                                       world.lives()};
-                const auto *snapshot = &merged;
+            // The packets of a split tick are complete only once the batch is drained: hand the world over once.
+            const auto snapshotNow = rtype::protocol::SnapshotInterpolator::Clock::now();
+            if (gotSnapshot)
+                interpolator.push({world.tick(), world.state(), world.score(), world.entities(), world.lives()},
+                                  snapshotNow);
+
+            // The world is shown a little in the past (see SnapshotInterpolator). Each snapshot is handled when its
+            // time comes, so that the sounds, explosions and HUD match what is drawn.
+            while (const auto due = interpolator.popDue(snapshotNow)) {
+                const rtype::protocol::Snapshot *snapshot = &*due;
                 lastScore = snapshot->score;
                 playerLives = snapshot->lives;
 
@@ -462,12 +471,13 @@ int main(int argc, char **argv)
             menu.draw(window);
         } else if (appState == AppState::Playing) {
             starfield.draw(window);
+            const auto shown = interpolator.sample(rtype::protocol::SnapshotInterpolator::Clock::now());
 
-            if (!reportedConnected || entities.empty()) {
+            if (!reportedConnected || shown.empty()) {
                 window.draw(waitingText);
             }
 
-            for (const auto &entity : entities) {
+            for (const auto &entity : shown) {
                 if (hasAssets) {
                     if (entity.type == rtype::protocol::EntityType::Player) {
                         float tilt = 0.0f;
@@ -770,7 +780,7 @@ int main(int argc, char **argv)
 
             // Boss Alert banner if boss is present
             bool bossPresent = false;
-            for (const auto &ent : entities) {
+            for (const auto &ent : shown) {
                 if (ent.type == rtype::protocol::EntityType::Enemy && ent.variant == 5) {
                     bossPresent = true;
                     break;
@@ -805,7 +815,7 @@ int main(int argc, char **argv)
                 };
 
                 std::array<bool, 4> playerActive{false, false, false, false};
-                for (const auto &ent : entities) {
+                for (const auto &ent : shown) {
                     if (ent.type == rtype::protocol::EntityType::Player && ent.variant < 4) {
                         playerActive[ent.variant] = true;
                     }

@@ -145,13 +145,22 @@ of the 14 it took with two 32-bit floats. A receiver must treat `NaN` and infini
 
 A tick with more than 117 entities is sent as several Snapshot packets with the same `tick`.
 
+### 4.3 Snapshot rate
+
+The server simulates 60 ticks per second but sends a snapshot only every **2 ticks** by default (30 per second;
+`r-type_server --snapshot-every N` changes it). The `tick` of two consecutive snapshots therefore differs by the
+sending interval, and a receiver must not expect consecutive tick numbers. Each snapshot is complete, so a lost one
+costs nothing more than the wait for the next. A client should show the world slightly in the past and blend two
+snapshots (the reference client shows it 2 sending intervals late), as described in [networking.md](networking.md)
+§11. Losses are counted from the gaps in the packet numbers of §3.1, not from the tick numbers.
+
 The end of the game is not a separate message: the client sees `state = 3` or `state = 4` in the snapshots, with the final score.
-Since a snapshot is sent every tick, this information cannot be lost.
+Since snapshots keep being sent (§4.3), this information cannot be lost.
 
 ## 5. Session
 
 1. The client sends **Connect** until it receives **ConnectAccepted** or **ConnectRejected**.
-2. The client sends **Input** every tick. The server sends **Snapshot** every tick to every client.
+2. The client sends **Input** every tick. The server sends **Snapshot** to every client every 2 ticks by default (30 per second).
 3. The client keeps the entities of the newest tick it has received: the Snapshot packets of one tick are merged
    (duplicates are ignored), a Snapshot of a newer tick replaces them, and one of an older tick is dropped. An
    entity missing from the newest tick therefore disappears, even if its **EntityDestroyed** was lost. The client

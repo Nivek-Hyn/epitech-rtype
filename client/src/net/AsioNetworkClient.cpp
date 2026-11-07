@@ -215,6 +215,10 @@ void AsioNetworkClient::handlePacket(const protocol::Packet &packet, Clock::time
         }
     }
 
+    // The server numbers the packets it sends to this client one by one, whatever they carry and however often it
+    // sends snapshots, so a hole in the numbers is a packet that never arrived.
+    _loss.record(packet.sequence);
+
     // Rejected, TimedOut and Lost are final: a late datagram must not bring a dead session back.
     const bool connecting = _state == ConnectionState::Connecting;
 
@@ -224,13 +228,12 @@ void AsioNetworkClient::handlePacket(const protocol::Packet &packet, Clock::time
     } else if (std::holds_alternative<protocol::ConnectRejected>(packet.message)) {
         if (connecting)
             _state = ConnectionState::Rejected;
-    } else if (const auto *snapshot = std::get_if<protocol::Snapshot>(&packet.message)) {
+    } else if (std::holds_alternative<protocol::Snapshot>(packet.message)) {
         // A snapshot is the whole game at one tick: one that arrives after a newer one would only go back in time.
         if (verdict == engine::net::SequenceVerdict::Late) {
             _traffic.addOutdated();
             return;
         }
-        _loss.record(snapshot->tick);
     } else if (const auto *pong = std::get_if<protocol::Pong>(&packet.message)) {
         const double sample = static_cast<double>(static_cast<std::uint32_t>(nowMs() - pong->timestampMs));
         const double previous = _rttMs;

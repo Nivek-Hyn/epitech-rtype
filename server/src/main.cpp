@@ -49,11 +49,13 @@ int main(int argc, char **argv)
 {
     std::uint16_t port = rtype::DefaultPort;
     bool showTraffic = false;
+    int snapshotEvery = rtype::SnapshotEveryTicks;
     std::string modeStr = "campaign";
     std::string diffStr = "normal";
     std::string levelPath;
     const std::string usage =
-        " [port] [level_path] [--mode campaign|infinite] [--difficulty easy|normal|hard] [--level path] [--stats]\n";
+        " [port] [level_path] [--mode campaign|infinite] [--difficulty easy|normal|hard] [--level path] [--stats]"
+        " [--snapshot-every ticks]\n";
 
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
@@ -63,6 +65,17 @@ int main(int argc, char **argv)
             diffStr = argv[++i];
         } else if (arg == "--level" && i + 1 < argc) {
             levelPath = argv[++i];
+        } else if (arg == "--snapshot-every" && i + 1 < argc) {
+            try {
+                snapshotEvery = std::stoi(argv[++i]);
+            } catch (const std::exception &) {
+                snapshotEvery = 0;
+            }
+            if (snapshotEvery < 1 || snapshotEvery > static_cast<int>(rtype::TickRate)) {
+                std::cerr << "--snapshot-every expects a number of ticks between 1 and " << static_cast<int>(rtype::TickRate)
+                          << '\n';
+                return 84;
+            }
         } else if (arg == "--stats") {
             showTraffic = true;
         } else if (arg == "-h" || arg == "--help") {
@@ -117,7 +130,8 @@ int main(int argc, char **argv)
 
     std::cout << "r-type_server: listening on UDP port " << port
               << " [Mode: " << (game.gameMode() == rtype::server::Game::GameMode::Infinite ? "Infinite" : "Campaign")
-              << ", Difficulty: " << diffStr << "]\n";
+              << ", Difficulty: " << diffStr << ", snapshots: every " << snapshotEvery << " tick(s) = "
+              << static_cast<int>(rtype::TickRate) / snapshotEvery << " per second]\n";
 
     engine::core::FixedTimestep clock(rtype::TickRate);
     auto nextReport = std::chrono::steady_clock::now() + std::chrono::seconds(2);
@@ -141,7 +155,8 @@ int main(int argc, char **argv)
                     *event);
             }
             game.update(clock.step());
-            network.broadcast(game.snapshot());
+            if (game.tick() % static_cast<std::uint32_t>(snapshotEvery) == 0)
+                network.broadcast(game.snapshot());
             for (const auto &message : game.takeEvents())
                 network.broadcastReliable(message);
         }
