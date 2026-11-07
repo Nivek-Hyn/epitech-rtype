@@ -36,23 +36,23 @@ and sends the resulting state back to every connected client.
 
 For example, trace what happens when a player holds the Right arrow:
 
-1. **Read the key.** In [`client/src/main.cpp`](../client/src/main.cpp), the SFML loop checks
+1. **Read the key.** In [`client/src/main.cpp`](https://github.com/EpitechPGE3-2026/G-ING-500-MAR-5-1-rtype-5/blob/main/client/src/main.cpp), the SFML loop checks
   `sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Right)` (or `D`) and adds `InputFlag::Right` to `inputFlags`.
   When connected, it calls `network.send(Input{inputFlags})`. Keyboard state is currently read globally, without
   a window-focus check.
-2. **Queue the send.** [`AsioNetworkClient::send()`](../client/src/net/AsioNetworkClient.cpp) posts the work to
+2. **Queue the send.** [`AsioNetworkClient::send()`](https://github.com/EpitechPGE3-2026/G-ING-500-MAR-5-1-rtype-5/blob/main/client/src/net/AsioNetworkClient.cpp) posts the work to
   Asio's I/O thread. `sendDatagram()` assigns a sequence number, calls `protocol::encode()`, and sends the
   resulting bytes to the server with `async_send_to()`.
-3. **Encode the packet.** [`Protocol.cpp`](../common/src/Protocol.cpp) maps the `Input` variant to its message
-  type and writes the header and payload. [`ByteBuffer.hpp`](../engine/include/engine/net/ByteBuffer.hpp)
+3. **Encode the packet.** [`Protocol.cpp`](https://github.com/EpitechPGE3-2026/G-ING-500-MAR-5-1-rtype-5/blob/main/common/src/Protocol.cpp) maps the `Input` variant to its message
+  type and writes the header and payload. [`ByteBuffer.hpp`](https://github.com/EpitechPGE3-2026/G-ING-500-MAR-5-1-rtype-5/blob/main/engine/include/engine/net/ByteBuffer.hpp)
   writes the fields in big-endian order.
 4. **Receive and validate it.** On the server, `receive()` schedules an asynchronous UDP receive.
   `handleDatagram()` decodes the bytes and drops the datagram if validation fails. The sender's UDP endpoint
   is mapped to its player id with `findClient()`.
 5. **Pass the input to the game.** For an `Input` message, the server pushes a `PlayerInput` event to its
-  `ThreadSafeQueue`. In [`server/src/main.cpp`](../server/src/main.cpp), the game thread drains that queue
+  `ThreadSafeQueue`. In [`server/src/main.cpp`](https://github.com/EpitechPGE3-2026/G-ING-500-MAR-5-1-rtype-5/blob/main/server/src/main.cpp), the game thread drains that queue
   and calls `Game::onInput()` for the player.
-6. **Update the authoritative position.** [`Game::onInput()`](../server/src/Game.cpp) translates the Right
+6. **Update the authoritative position.** [`Game::onInput()`](https://github.com/EpitechPGE3-2026/G-ING-500-MAR-5-1-rtype-5/blob/main/server/src/Game.cpp) translates the Right
   flag into horizontal velocity. The fixed-timestep loop then calls `Game::update()` at 60 ticks per second;
   the movement system applies that velocity to the player's position.
 7. **Broadcast the result.** `Game::snapshot()` gathers the networked entities and their current positions.
@@ -69,17 +69,17 @@ renders the same server-produced snapshot. The client never tells the server, "m
 
 | Responsibility | Code |
 |---|---|
-| Message types and packet API | [`Protocol.hpp`](../common/include/common/Protocol.hpp) |
-| Binary encode/decode and validation | [`Protocol.cpp`](../common/src/Protocol.cpp) |
-| Big-endian byte reader/writer | [`ByteBuffer.hpp`](../engine/include/engine/net/ByteBuffer.hpp) |
-| Thread-safe FIFO queues | [`ThreadSafeQueue.hpp`](../engine/include/engine/core/ThreadSafeQueue.hpp) |
-| Server network contract | [`INetworkServer.hpp`](../server/src/net/INetworkServer.hpp) |
-| Asio server implementation | [`AsioNetworkServer.cpp`](../server/src/net/AsioNetworkServer.cpp) |
-| Client network contract | [`INetworkClient.hpp`](../client/src/net/INetworkClient.hpp) |
-| Asio client implementation | [`AsioNetworkClient.cpp`](../client/src/net/AsioNetworkClient.cpp) |
-| Texture loading and caching | [`ResourceManager.cpp`](../client/src/ResourceManager.cpp) |
-| Server/network/game integration | [`server/src/main.cpp`](../server/src/main.cpp) |
-| Client input and snapshot rendering | [`client/src/main.cpp`](../client/src/main.cpp) |
+| Message types and packet API | [`Protocol.hpp`](https://github.com/EpitechPGE3-2026/G-ING-500-MAR-5-1-rtype-5/blob/main/common/include/common/Protocol.hpp) |
+| Binary encode/decode and validation | [`Protocol.cpp`](https://github.com/EpitechPGE3-2026/G-ING-500-MAR-5-1-rtype-5/blob/main/common/src/Protocol.cpp) |
+| Big-endian byte reader/writer | [`ByteBuffer.hpp`](https://github.com/EpitechPGE3-2026/G-ING-500-MAR-5-1-rtype-5/blob/main/engine/include/engine/net/ByteBuffer.hpp) |
+| Thread-safe FIFO queues | [`ThreadSafeQueue.hpp`](https://github.com/EpitechPGE3-2026/G-ING-500-MAR-5-1-rtype-5/blob/main/engine/include/engine/core/ThreadSafeQueue.hpp) |
+| Server network contract | [`INetworkServer.hpp`](https://github.com/EpitechPGE3-2026/G-ING-500-MAR-5-1-rtype-5/blob/main/server/src/net/INetworkServer.hpp) |
+| Asio server implementation | [`AsioNetworkServer.cpp`](https://github.com/EpitechPGE3-2026/G-ING-500-MAR-5-1-rtype-5/blob/main/server/src/net/AsioNetworkServer.cpp) |
+| Client network contract | [`INetworkClient.hpp`](https://github.com/EpitechPGE3-2026/G-ING-500-MAR-5-1-rtype-5/blob/main/client/src/net/INetworkClient.hpp) |
+| Asio client implementation | [`AsioNetworkClient.cpp`](https://github.com/EpitechPGE3-2026/G-ING-500-MAR-5-1-rtype-5/blob/main/client/src/net/AsioNetworkClient.cpp) |
+| Texture loading and caching | [`ResourceManager.cpp`](https://github.com/EpitechPGE3-2026/G-ING-500-MAR-5-1-rtype-5/blob/main/client/src/ResourceManager.cpp) |
+| Server/network/game integration | [`server/src/main.cpp`](https://github.com/EpitechPGE3-2026/G-ING-500-MAR-5-1-rtype-5/blob/main/server/src/main.cpp) |
+| Client input and snapshot rendering | [`client/src/main.cpp`](https://github.com/EpitechPGE3-2026/G-ING-500-MAR-5-1-rtype-5/blob/main/client/src/main.cpp) |
 
 The interfaces (`INetworkServer` and `INetworkClient`) keep the game loop and renderer independent of Asio.
 The concrete classes own sockets, timers, packet sequences, and their network I/O threads.
@@ -178,10 +178,10 @@ Run the automated tests with:
 ctest --test-dir build --output-on-failure
 ```
 
-Protocol round trips and malformed-packet cases are tested in [`test_protocol.cpp`](../tests/test_protocol.cpp).
-Game/player lifecycle and movement are tested in [`test_game.cpp`](../tests/test_game.cpp), and queue behavior is
-tested in [`test_thread_safe_queue.cpp`](../tests/test_thread_safe_queue.cpp). The UDP integration test in
-[`test_network_integration.cpp`](../tests/test_network_integration.cpp) checks the four-player limit and fifth
+Protocol round trips and malformed-packet cases are tested in [`test_protocol.cpp`](https://github.com/EpitechPGE3-2026/G-ING-500-MAR-5-1-rtype-5/blob/main/tests/test_protocol.cpp).
+Game/player lifecycle and movement are tested in [`test_game.cpp`](https://github.com/EpitechPGE3-2026/G-ING-500-MAR-5-1-rtype-5/blob/main/tests/test_game.cpp), and queue behavior is
+tested in [`test_thread_safe_queue.cpp`](https://github.com/EpitechPGE3-2026/G-ING-500-MAR-5-1-rtype-5/blob/main/tests/test_thread_safe_queue.cpp). The UDP integration test in
+[`test_network_integration.cpp`](https://github.com/EpitechPGE3-2026/G-ING-500-MAR-5-1-rtype-5/blob/main/tests/test_network_integration.cpp) checks the four-player limit and fifth
 client rejection. A local two-client session is also useful for manually checking that each client sees the same
 server-owned player positions.
 
@@ -225,7 +225,7 @@ The client measures:
 
 ### Simulating a bad network
 
-[`scripts/netsim.py`](../scripts/netsim.py) is a UDP proxy that sits between the clients and the server and drops,
+[`scripts/netsim.py`](https://github.com/EpitechPGE3-2026/G-ING-500-MAR-5-1-rtype-5/blob/main/scripts/netsim.py) is a UDP proxy that sits between the clients and the server and drops,
 delays and duplicates datagrams in both directions. It needs no privileges and runs on Linux and Windows. The
 jitter gives each datagram a random delay, which also reorders them.
 
@@ -392,23 +392,23 @@ vitesse, fait avancer la simulation et renvoie le résultat aux clients connect�
 
 Voici le trajet d’un joueur qui maintient la flèche droite :
 
-1. **Lecture de la touche.** Dans [`client/src/main.cpp`](../client/src/main.cpp), la boucle SFML vérifie
+1. **Lecture de la touche.** Dans [`client/src/main.cpp`](https://github.com/EpitechPGE3-2026/G-ING-500-MAR-5-1-rtype-5/blob/main/client/src/main.cpp), la boucle SFML vérifie
   `sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Right)` (ou `D`) et ajoute `InputFlag::Right` à `inputFlags`. Si le
   client est connecté, il appelle `network.send(Input{inputFlags})`. Actuellement, l’état du clavier est lu
   globalement, sans vérifier quelle fenêtre a le focus.
-2. **Mise en file de l’envoi.** [`AsioNetworkClient::send()`](../client/src/net/AsioNetworkClient.cpp) poste le
+2. **Mise en file de l’envoi.** [`AsioNetworkClient::send()`](https://github.com/EpitechPGE3-2026/G-ING-500-MAR-5-1-rtype-5/blob/main/client/src/net/AsioNetworkClient.cpp) poste le
   travail au thread d’E/S d’Asio. `sendDatagram()` attribue un numéro de séquence, appelle
   `protocol::encode()`, puis envoie les octets au serveur avec `async_send_to()`.
-3. **Encodage du paquet.** [`Protocol.cpp`](../common/src/Protocol.cpp) associe la variante `Input` à son type
-  de message et écrit l’en-tête et le contenu. [`ByteBuffer.hpp`](../engine/include/engine/net/ByteBuffer.hpp)
+3. **Encodage du paquet.** [`Protocol.cpp`](https://github.com/EpitechPGE3-2026/G-ING-500-MAR-5-1-rtype-5/blob/main/common/src/Protocol.cpp) associe la variante `Input` à son type
+  de message et écrit l’en-tête et le contenu. [`ByteBuffer.hpp`](https://github.com/EpitechPGE3-2026/G-ING-500-MAR-5-1-rtype-5/blob/main/engine/include/engine/net/ByteBuffer.hpp)
   écrit les champs en big-endian.
 4. **Réception et validation.** Côté serveur, `receive()` programme une réception UDP asynchrone.
   `handleDatagram()` décode les octets et ignore le datagramme si la validation échoue. `findClient()` associe
   l’adresse UDP de l’expéditeur à son identifiant de joueur.
 5. **Transmission au jeu.** Pour un message `Input`, le serveur ajoute un événement `PlayerInput` à sa
-  `ThreadSafeQueue`. Dans [`server/src/main.cpp`](../server/src/main.cpp), le thread du jeu vide cette file et
+  `ThreadSafeQueue`. Dans [`server/src/main.cpp`](https://github.com/EpitechPGE3-2026/G-ING-500-MAR-5-1-rtype-5/blob/main/server/src/main.cpp), le thread du jeu vide cette file et
   appelle `Game::onInput()` pour le joueur concerné.
-6. **Mise à jour de la position autoritaire.** [`Game::onInput()`](../server/src/Game.cpp) transforme le flag
+6. **Mise à jour de la position autoritaire.** [`Game::onInput()`](https://github.com/EpitechPGE3-2026/G-ING-500-MAR-5-1-rtype-5/blob/main/server/src/Game.cpp) transforme le flag
   `Right` en vitesse horizontale. La boucle à pas fixe appelle ensuite `Game::update()` 60 fois par seconde ;
   le système de déplacement applique cette vitesse à la position du joueur.
 7. **Diffusion du résultat.** `Game::snapshot()` rassemble les entités réseau et leurs positions actuelles. La
@@ -426,17 +426,17 @@ maintenant à x = 200 ».
 
 | Responsabilité | Fichier |
 |---|---|
-| Types de messages et API des paquets | [`Protocol.hpp`](../common/include/common/Protocol.hpp) |
-| Encodage, décodage et validation binaire | [`Protocol.cpp`](../common/src/Protocol.cpp) |
-| Lecture et écriture big-endian | [`ByteBuffer.hpp`](../engine/include/engine/net/ByteBuffer.hpp) |
-| Files FIFO thread-safe | [`ThreadSafeQueue.hpp`](../engine/include/engine/core/ThreadSafeQueue.hpp) |
-| Contrat réseau serveur | [`INetworkServer.hpp`](../server/src/net/INetworkServer.hpp) |
-| Implémentation serveur avec Asio | [`AsioNetworkServer.cpp`](../server/src/net/AsioNetworkServer.cpp) |
-| Contrat réseau client | [`INetworkClient.hpp`](../client/src/net/INetworkClient.hpp) |
-| Implémentation client avec Asio | [`AsioNetworkClient.cpp`](../client/src/net/AsioNetworkClient.cpp) |
-| Chargement et cache des textures | [`ResourceManager.cpp`](../client/src/ResourceManager.cpp) |
-| Intégration réseau et jeu côté serveur | [`server/src/main.cpp`](../server/src/main.cpp) |
-| Entrées client et affichage des snapshots | [`client/src/main.cpp`](../client/src/main.cpp) |
+| Types de messages et API des paquets | [`Protocol.hpp`](https://github.com/EpitechPGE3-2026/G-ING-500-MAR-5-1-rtype-5/blob/main/common/include/common/Protocol.hpp) |
+| Encodage, décodage et validation binaire | [`Protocol.cpp`](https://github.com/EpitechPGE3-2026/G-ING-500-MAR-5-1-rtype-5/blob/main/common/src/Protocol.cpp) |
+| Lecture et écriture big-endian | [`ByteBuffer.hpp`](https://github.com/EpitechPGE3-2026/G-ING-500-MAR-5-1-rtype-5/blob/main/engine/include/engine/net/ByteBuffer.hpp) |
+| Files FIFO thread-safe | [`ThreadSafeQueue.hpp`](https://github.com/EpitechPGE3-2026/G-ING-500-MAR-5-1-rtype-5/blob/main/engine/include/engine/core/ThreadSafeQueue.hpp) |
+| Contrat réseau serveur | [`INetworkServer.hpp`](https://github.com/EpitechPGE3-2026/G-ING-500-MAR-5-1-rtype-5/blob/main/server/src/net/INetworkServer.hpp) |
+| Implémentation serveur avec Asio | [`AsioNetworkServer.cpp`](https://github.com/EpitechPGE3-2026/G-ING-500-MAR-5-1-rtype-5/blob/main/server/src/net/AsioNetworkServer.cpp) |
+| Contrat réseau client | [`INetworkClient.hpp`](https://github.com/EpitechPGE3-2026/G-ING-500-MAR-5-1-rtype-5/blob/main/client/src/net/INetworkClient.hpp) |
+| Implémentation client avec Asio | [`AsioNetworkClient.cpp`](https://github.com/EpitechPGE3-2026/G-ING-500-MAR-5-1-rtype-5/blob/main/client/src/net/AsioNetworkClient.cpp) |
+| Chargement et cache des textures | [`ResourceManager.cpp`](https://github.com/EpitechPGE3-2026/G-ING-500-MAR-5-1-rtype-5/blob/main/client/src/ResourceManager.cpp) |
+| Intégration réseau et jeu côté serveur | [`server/src/main.cpp`](https://github.com/EpitechPGE3-2026/G-ING-500-MAR-5-1-rtype-5/blob/main/server/src/main.cpp) |
+| Entrées client et affichage des snapshots | [`client/src/main.cpp`](https://github.com/EpitechPGE3-2026/G-ING-500-MAR-5-1-rtype-5/blob/main/client/src/main.cpp) |
 
 Les interfaces `INetworkServer` et `INetworkClient` séparent le jeu et le rendu de la bibliothèque Asio. Les
 classes concrètes gèrent les sockets, les timers, les numéros de séquence et leurs threads réseau.
@@ -541,10 +541,10 @@ ctest --test-dir build --output-on-failure
 ```
 
 Les échanges aller-retour du protocole et les paquets malformés sont testés dans
-[`test_protocol.cpp`](../tests/test_protocol.cpp). Le cycle de vie des joueurs et le déplacement sont testés
-dans [`test_game.cpp`](../tests/test_game.cpp), et la file dans
-[`test_thread_safe_queue.cpp`](../tests/test_thread_safe_queue.cpp). Le test UDP d’intégration dans
-[`test_network_integration.cpp`](../tests/test_network_integration.cpp) vérifie la limite de quatre joueurs et le
+[`test_protocol.cpp`](https://github.com/EpitechPGE3-2026/G-ING-500-MAR-5-1-rtype-5/blob/main/tests/test_protocol.cpp). Le cycle de vie des joueurs et le déplacement sont testés
+dans [`test_game.cpp`](https://github.com/EpitechPGE3-2026/G-ING-500-MAR-5-1-rtype-5/blob/main/tests/test_game.cpp), et la file dans
+[`test_thread_safe_queue.cpp`](https://github.com/EpitechPGE3-2026/G-ING-500-MAR-5-1-rtype-5/blob/main/tests/test_thread_safe_queue.cpp). Le test UDP d’intégration dans
+[`test_network_integration.cpp`](https://github.com/EpitechPGE3-2026/G-ING-500-MAR-5-1-rtype-5/blob/main/tests/test_network_integration.cpp) vérifie la limite de quatre joueurs et le
 refus du cinquième. Une session locale avec deux clients permet aussi de vérifier que chacun voit les positions
 des joueurs calculées par le serveur.
 
@@ -590,7 +590,7 @@ Le client mesure :
 
 ### Simuler un mauvais réseau
 
-[`scripts/netsim.py`](../scripts/netsim.py) est un proxy UDP placé entre les clients et le serveur : il perd,
+[`scripts/netsim.py`](https://github.com/EpitechPGE3-2026/G-ING-500-MAR-5-1-rtype-5/blob/main/scripts/netsim.py) est un proxy UDP placé entre les clients et le serveur : il perd,
 retarde et duplique des datagrammes dans les deux sens. Il ne demande aucun privilège et fonctionne sous Linux et
 Windows. La gigue donne un délai aléatoire à chaque datagramme, ce qui les désordonne aussi.
 
