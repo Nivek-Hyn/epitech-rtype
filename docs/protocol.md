@@ -83,6 +83,14 @@ The messages sent reliably are `EntityDestroyed` and `PlayerLeft` (server to cli
 server). A server that receives a repeated reliable packet from an address it no longer knows (a client that was
 removed after its `Disconnect`) still answers `Ack`, so that the sender stops repeating it.
 
+### 3.3 Another protocol version
+
+A datagram whose `version` differs from the receiver's cannot be decoded, and is dropped. One exception keeps a
+client of another version from retrying forever: when a **server** drops a `Connect` (type `0x01`, which no
+version has changed) for that reason, it answers `ConnectRejected` with reason `2`, written with **the version byte
+of the client** so that the client can read it. The client then knows that the versions differ. A client of this
+version that talks to an older server gets no answer and gives up after its connection attempts.
+
 ## 4. Messages
 
 ### 4.1 Client → server
@@ -102,7 +110,7 @@ Input flags: `0x01` up, `0x02` down, `0x04` left, `0x08` right, `0x10` shoot.
 | Type | Name | Payload | Description |
 |---|---|---|---|
 | `0x81` | ConnectAccepted | `u8 player_id` | `player_id` in 0–3. |
-| `0x82` | ConnectRejected | `u8 reason` | `1` server full, `2` version mismatch. |
+| `0x82` | ConnectRejected | `u8 reason` | `1` server full, `2` version mismatch (see §3.3). |
 | `0x83` | Snapshot | see below | Game state, score and entities at a server tick. |
 | `0x84` | EntityDestroyed | `u32 net_id`, `u8 reason` | `1` killed, `2` out of bounds, `3` collected (bonus picked up, no explosion). Sent reliably. |
 | `0x85` | PlayerLeft | `u8 player_id`, `u8 reason` | `1` disconnected, `2` timed out. Sent reliably. |
@@ -147,8 +155,6 @@ Since a snapshot is sent every tick, this information cannot be lost.
 
 ## 6. Runtime conformance notes
 
-The protocol defines the intended wire format and message set. The current runtime does not yet implement every
-specified behavior: it does not reject a version mismatch with `ConnectRejected` (a datagram with another
-version is silently dropped), and it sends reliably only the three messages listed in §3.2: `Connect` is
+The runtime implements every behavior described above. Only three messages are sent reliably (§3.2): `Connect` is
 repeated by the client until it gets an answer, which is a separate mechanism. See the
 [networking implementation guide](networking.md) for the current behavior and limitations.

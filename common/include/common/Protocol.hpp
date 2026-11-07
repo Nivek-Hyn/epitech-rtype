@@ -129,7 +129,13 @@ struct Packet {
     std::optional<std::uint32_t> reliableId; // set for a message the receiver must acknowledge
 };
 
-std::vector<std::uint8_t> encode(const Packet &packet);
+// `version` is only meant for answering a peer that speaks another version (see otherVersionConnect).
+std::vector<std::uint8_t> encode(const Packet &packet, std::uint8_t version = Version);
+
+// A Connect written for another protocol version cannot be decoded, but its sender deserves an answer instead of
+// silence. Returns that version when the datagram has our magic, a different version and the Connect type byte
+// (which no version has changed), and nothing otherwise.
+std::optional<std::uint8_t> otherVersionConnect(std::span<const std::uint8_t> datagram);
 
 // Cuts a snapshot into one or more snapshots that each fit in a datagram (at most MaxEntitiesPerSnapshot entities).
 // Every part keeps the tick, state and score; there is always at least one part, even without entities.

@@ -55,7 +55,7 @@ private:
     void resendReliable(PlayerId player);
     void updateRates();
     void sendTo(const Udp::endpoint &endpoint, std::uint32_t sequence, protocol::Message message,
-                std::optional<std::uint32_t> reliableId = std::nullopt);
+                std::optional<std::uint32_t> reliableId = std::nullopt, std::uint8_t version = protocol::Version);
     void sendToPlayer(PlayerId player, protocol::Message message);
     std::optional<PlayerId> findClient(const Udp::endpoint &endpoint) const;
     void removeClient(PlayerId player, protocol::LeaveReason reason);

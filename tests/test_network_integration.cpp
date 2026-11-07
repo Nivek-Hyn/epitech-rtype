@@ -424,3 +424,39 @@ TEST(NetworkIntegration, TheGameSeesAReliableInputOnlyOnce)
         ackCount += std::holds_alternative<rtype::protocol::Ack>(packet.message);
     EXPECT_EQ(ackCount, 2) << "every copy is acknowledged, in case the previous Ack was lost";
 }
+
+TEST(NetworkIntegration, AnswersAClientOfAnotherVersionInItsOwnVersion)
+{
+    rtype::server::AsioNetworkServer server;
+    const std::uint16_t serverPort = findAvailablePort();
+    server.start(serverPort);
+
+    asio::io_context io;
+    Udp::socket client(io, Udp::endpoint(Udp::v4(), 0));
+    client.non_blocking(true);
+    auto connect = rtype::protocol::encode({1, rtype::protocol::Connect{}});
+    constexpr std::uint8_t OtherVersion = 1;
+    connect[2] = OtherVersion;
+    client.send_to(asio::buffer(connect), Udp::endpoint(asio::ip::address_v4::loopback(), serverPort));
+
+    std::array<std::uint8_t, rtype::protocol::MaxPacketSize> buffer{};
+    Udp::endpoint sender;
+    std::size_t size = 0;
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(500);
+    while (size == 0 && std::chrono::steady_clock::now() < deadline) {
+        asio::error_code error;
+        size = client.receive_from(asio::buffer(buffer), sender, 0, error);
+        if (error)
+            std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    }
+    ASSERT_GT(size, 0u) << "the server must answer instead of ignoring the client";
+
+    EXPECT_EQ(buffer[2], OtherVersion) << "the answer is written in the version of the client, which can read it";
+    buffer[2] = rtype::protocol::Version; // so that our decoder accepts it
+    const auto answer = rtype::protocol::decode(std::span(buffer).first(size));
+    ASSERT_TRUE(answer);
+    const auto *rejected = std::get_if<rtype::protocol::ConnectRejected>(&answer->message);
+    ASSERT_NE(rejected, nullptr);
+    EXPECT_EQ(rejected->reason, rtype::protocol::RejectReason::VersionMismatch);
+    EXPECT_EQ(server.clientCount(), 0u) << "a client of another version never takes a slot";
+}

@@ -117,9 +117,15 @@ void AsioNetworkServer::receive()
 void AsioNetworkServer::handleDatagram(std::size_t size)
 {
     _traffic.addReceived(size);
-    const auto packet = protocol::decode(std::span(_receiveBuffer).first(size));
-    if (!packet)
+    const auto datagram = std::span(_receiveBuffer).first(size);
+    const auto packet = protocol::decode(datagram);
+    if (!packet) {
+        // A client of another version would retry Connect forever. Answer in its own version so it can read it.
+        if (const auto version = protocol::otherVersionConnect(datagram))
+            sendTo(_sender, _nextSequence.fetch_add(1), protocol::ConnectRejected{protocol::RejectReason::VersionMismatch},
+                   std::nullopt, *version);
         return;
+    }
 
     const auto player = findClient(_sender);
 
@@ -256,10 +262,10 @@ void AsioNetworkServer::updateRates()
 }
 
 void AsioNetworkServer::sendTo(const Udp::endpoint &endpoint, std::uint32_t sequence, protocol::Message message,
-                               std::optional<std::uint32_t> reliableId)
+                               std::optional<std::uint32_t> reliableId, std::uint8_t version)
 {
-    auto bytes =
-        std::make_shared<std::vector<std::uint8_t>>(protocol::encode({sequence, std::move(message), reliableId}));
+    auto bytes = std::make_shared<std::vector<std::uint8_t>>(
+        protocol::encode({sequence, std::move(message), reliableId}, version));
     _traffic.addSent(bytes->size());
     _socket.async_send_to(asio::buffer(*bytes), endpoint, [bytes](const asio::error_code &, std::size_t) {});
 }

@@ -275,6 +275,39 @@ TEST(Protocol, RejectsAReliablePacketTooShortToHoldItsNumber)
     EXPECT_FALSE(decode(bytes));
 }
 
+TEST(Protocol, RecognisesAConnectWrittenForAnotherVersion)
+{
+    auto bytes = encode({1, Connect{}});
+    EXPECT_FALSE(otherVersionConnect(bytes)) << "same version: a normal Connect";
+
+    bytes[2] = Version + 3;
+    ASSERT_TRUE(otherVersionConnect(bytes));
+    EXPECT_EQ(*otherVersionConnect(bytes), Version + 3);
+    EXPECT_FALSE(decode(bytes));
+}
+
+TEST(Protocol, OnlyAConnectOfAnotherVersionGetsAnAnswer)
+{
+    auto input = encode({1, Input{0}});
+    input[2] = Version + 1;
+    EXPECT_FALSE(otherVersionConnect(input));
+
+    auto badMagic = encode({1, Connect{}});
+    badMagic[2] = Version + 1;
+    badMagic[0] = 0;
+    EXPECT_FALSE(otherVersionConnect(badMagic));
+    EXPECT_FALSE(otherVersionConnect(std::vector<std::uint8_t>{0x52, 0x54}));
+}
+
+TEST(Protocol, EncodeCanWriteTheVersionOfTheSenderBeingAnswered)
+{
+    const auto bytes = encode({4, ConnectRejected{RejectReason::VersionMismatch}}, 3);
+    EXPECT_EQ(bytes[2], 3);
+    auto asOurs = bytes;
+    asOurs[2] = Version;
+    EXPECT_TRUE(decode(asOurs));
+}
+
 TEST(Protocol, RejectsAnotherProtocolVersion)
 {
     auto bytes = encode({1, Connect{}});

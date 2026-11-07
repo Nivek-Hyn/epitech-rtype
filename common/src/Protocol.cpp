@@ -91,7 +91,7 @@ bool validEntityType(std::uint8_t value)
 
 } // namespace
 
-std::vector<std::uint8_t> encode(const Packet &packet)
+std::vector<std::uint8_t> encode(const Packet &packet, std::uint8_t version)
 {
     engine::net::ByteWriter payload;
     if (packet.reliableId)
@@ -100,7 +100,7 @@ std::vector<std::uint8_t> encode(const Packet &packet)
 
     engine::net::ByteWriter writer;
     writer.u16(Magic);
-    writer.u8(Version);
+    writer.u8(version);
     writer.u8(static_cast<std::uint8_t>(typeOf(packet.message)) | (packet.reliableId ? ReliableFlag : 0));
     writer.u32(packet.sequence);
     writer.u16(static_cast<std::uint16_t>(payload.size()));
@@ -120,6 +120,19 @@ std::vector<Snapshot> splitSnapshot(const Snapshot &snapshot)
         offset += count;
     } while (offset < snapshot.entities.size());
     return parts;
+}
+
+std::optional<std::uint8_t> otherVersionConnect(std::span<const std::uint8_t> datagram)
+{
+    if (datagram.size() < HeaderSize || datagram.size() > MaxPacketSize)
+        return std::nullopt;
+    engine::net::ByteReader header(datagram.first(HeaderSize));
+    const auto magic = header.u16();
+    const auto version = header.u8();
+    const auto type = header.u8();
+    if (magic != Magic || version == Version || type != static_cast<std::uint8_t>(MessageType::Connect))
+        return std::nullopt;
+    return version;
 }
 
 std::optional<Packet> decode(std::span<const std::uint8_t> datagram)
@@ -185,7 +198,7 @@ std::optional<Packet> decode(std::span<const std::uint8_t> datagram)
             if (bodySize != 1)
                 return std::nullopt;
             const auto playerId = reader.u8();
-            if (playerId >= 4)
+            if (playerId >= MaxPlayers)
                 return std::nullopt;
             message = ConnectAccepted{playerId};
             break;
@@ -248,7 +261,7 @@ std::optional<Packet> decode(std::span<const std::uint8_t> datagram)
                 return std::nullopt;
             const auto playerId = reader.u8();
             const auto reason = reader.u8();
-            if (playerId >= 4 || reason < static_cast<std::uint8_t>(LeaveReason::Disconnected) ||
+            if (playerId >= MaxPlayers || reason < static_cast<std::uint8_t>(LeaveReason::Disconnected) ||
                 reason > static_cast<std::uint8_t>(LeaveReason::TimedOut))
                 return std::nullopt;
             message = PlayerLeft{playerId, static_cast<LeaveReason>(reason)};

@@ -192,8 +192,9 @@ server-owned player positions.
 - The protocol limit is 84 entities per snapshot. The server splits larger snapshots into several packets with
   the same tick, and the client merges them with `SnapshotAssembler`, ignoring older ticks and duplicates. If a
   packet of a tick is lost, that tick is displayed incomplete until the next one.
-- The protocol specification describes `VersionMismatch` rejection; it is not implemented: a datagram with
-  another version is dropped without answer, so such a client retries `Connect` forever.
+- A server answers a `Connect` of another protocol version with `ConnectRejected(VersionMismatch)`, written in the
+  client's own version (see [protocol.md](protocol.md) §3.3). A client of this version that talks to an older server
+  gets no answer and ends in `TimedOut`.
 
 These are follow-up improvements, not prerequisites for the current local multiplayer prototype.
 
@@ -433,8 +434,9 @@ des joueurs calculées par le serveur.
 - Un snapshot est limité à 84 entités. Le serveur découpe les snapshots plus grands en plusieurs paquets de même
   tick, et le client les fusionne avec `SnapshotAssembler` en ignorant les ticks plus anciens et les doublons. Si
   un paquet d’un tick est perdu, ce tick s’affiche incomplet jusqu’au suivant.
-- La spécification décrit le refus `VersionMismatch` ; il n’est pas implémenté : un datagramme d’une autre
-  version est ignoré sans réponse, donc ce client réessaie `Connect` indéfiniment.
+- Un serveur répond à un `Connect` d’une autre version du protocole par `ConnectRejected(VersionMismatch)`, écrit
+  dans la version du client (voir [protocol.md](protocol.md) §3.3). Un client de cette version qui parle à un
+  serveur plus ancien n’obtient pas de réponse et finit en `TimedOut`.
 
 Ces améliorations pourront être faites plus tard ; elles ne sont pas nécessaires au prototype multijoueur local
 actuel.
