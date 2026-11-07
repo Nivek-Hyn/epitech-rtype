@@ -49,7 +49,4 @@ inline constexpr int MaxConnectAttempts = 10;
 // While connected, the client pings the server this often: it measures the latency and keeps the session alive.
 inline constexpr auto PingInterval = std::chrono::seconds(1);
 
-// Client removes an entity that wasn't in any snapshot for this long (in case EntityDestroyed was lost).
-inline constexpr auto EntityStaleTimeout = std::chrono::milliseconds(500);
-
 } // namespace rtype

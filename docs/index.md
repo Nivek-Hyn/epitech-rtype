@@ -14,7 +14,8 @@ and how to extend it. Build and run instructions are in the
 | Build, run, install or package the game | [Build and run](build-and-run.md) |
 | Understand the big picture | [Architecture overview](architecture.md) |
 | Check Linux/Windows build status and instructions | [Cross-platform support](cross-platform.md) |
-| Understand how networking works in the current implementation | [Networking implementation](networking.md) |
+| Understand the whole network, from the bytes to the screen | [Network guide, from A to Z](network-guide.md) |
+| See the networking code map, limits and measurements | [Networking implementation](networking.md) |
 | Use or extend the engine (ECS, game loop, events) | [Engine](engine.md) |
 | Know why we chose each technology | [Technical and comparative study](technical-study.md) and the [decision records](adr/README.md) |
 | Write a new client or inspect packet fields | [Network protocol](protocol.md) |

@@ -2,7 +2,8 @@
 
 This page explains how the current client/server networking implementation works. It focuses on the runtime
 flow and the code that owns each responsibility. For exact byte offsets and message payloads, see the
-[protocol specification](protocol.md). The broader subsystem map is in the [architecture overview](architecture.md).
+[protocol specification](protocol.md). The broader subsystem map is in the [architecture overview](architecture.md). For
+a complete explanation of the network from the bytes to the screen, read the [network guide](network-guide.md).
 
 ## 1. Overview
 

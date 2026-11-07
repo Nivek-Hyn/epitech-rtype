@@ -17,8 +17,9 @@ The server must have the final authority on the game. UDP may lose, duplicate or
   the score and every networked entity, plus event messages (`EntityDestroyed`, `PlayerLeft`) for things
   the client must react to immediately.
 - Anything that must not be lost (like the end of the game) goes in the snapshot rather than in a one-time message.
-- The client creates an entity the first time it sees its `NetworkId` in a snapshot, and removes it on
-  `EntityDestroyed` or when it hasn't appeared in any snapshot for `EntityStaleTimeout`.
+- The client creates an entity the first time it sees its `NetworkId` in a snapshot. The entity is gone as soon as a
+  snapshot no longer contains it: the client shows exactly the entities of the snapshot it displays, so a lost
+  `EntityDestroyed` costs nothing.
 
 ## Consequences
 - The server game logic (`server/src/Game`) does not know about sockets: `main` feeds it network events
