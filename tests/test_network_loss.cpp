@@ -68,33 +68,35 @@ private:
 
     void receiveFromClient()
     {
-        _front.async_receive_from(asio::buffer(_clientBuffer), _client, [this](const asio::error_code &error, std::size_t size) {
-            if (!error) {
-                _clientKnown = true;
-                if (lost()) {
-                    ++_dropped;
-                } else {
-                    ++_forwarded;
-                    _back.send_to(asio::buffer(_clientBuffer.data(), size), _server);
-                }
-            }
-            receiveFromClient();
-        });
+        _front.async_receive_from(asio::buffer(_clientBuffer), _client,
+                                  [this](const asio::error_code &error, std::size_t size) {
+                                      if (!error) {
+                                          _clientKnown = true;
+                                          if (lost()) {
+                                              ++_dropped;
+                                          } else {
+                                              ++_forwarded;
+                                              _back.send_to(asio::buffer(_clientBuffer.data(), size), _server);
+                                          }
+                                      }
+                                      receiveFromClient();
+                                  });
     }
 
     void receiveFromServer()
     {
-        _back.async_receive_from(asio::buffer(_serverBuffer), _sender, [this](const asio::error_code &error, std::size_t size) {
-            if (!error && _clientKnown) {
-                if (lost()) {
-                    ++_dropped;
-                } else {
-                    ++_forwarded;
-                    _front.send_to(asio::buffer(_serverBuffer.data(), size), _client);
-                }
-            }
-            receiveFromServer();
-        });
+        _back.async_receive_from(asio::buffer(_serverBuffer), _sender,
+                                 [this](const asio::error_code &error, std::size_t size) {
+                                     if (!error && _clientKnown) {
+                                         if (lost()) {
+                                             ++_dropped;
+                                         } else {
+                                             ++_forwarded;
+                                             _front.send_to(asio::buffer(_serverBuffer.data(), size), _client);
+                                         }
+                                     }
+                                     receiveFromServer();
+                                 });
     }
 
     asio::io_context _io;

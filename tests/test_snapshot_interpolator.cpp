@@ -158,7 +158,7 @@ TEST(SnapshotInterpolator, OldAndRepeatedSnapshotsAreIgnoredButACompleterOneRepl
 {
     SnapshotInterpolator interpolator;
     interpolator.push(snapshotOf(4, {{1, 1.f, 0.f}}), atTick(4));
-    interpolator.push(snapshotOf(2, {{1, 99.f, 0.f}}), atTick(4.5)); // older than the newest known
+    interpolator.push(snapshotOf(2, {{1, 99.f, 0.f}}), atTick(4.5));               // older than the newest known
     interpolator.push(snapshotOf(4, {{1, 1.f, 0.f}, {2, 2.f, 0.f}}), atTick(4.6)); // more complete: replaces
 
     const auto released = interpolator.popDue(atTick(5));
@@ -196,7 +196,8 @@ TEST(SnapshotInterpolator, MovementIsSmootherThanDrawingEachSnapshotWhenItArrive
     std::vector<Arrival> arrivals;
     for (std::uint32_t tick = 2; tick < 400; tick += 2)
         arrivals.push_back({static_cast<double>(tick) / 60.0 + 0.040 + jitter(random), tick});
-    std::stable_sort(arrivals.begin(), arrivals.end(), [](const Arrival &a, const Arrival &b) { return a.time < b.time; });
+    std::stable_sort(arrivals.begin(), arrivals.end(),
+                     [](const Arrival &a, const Arrival &b) { return a.time < b.time; });
     const auto positionAt = [](std::uint32_t tick) { return 400.f * static_cast<float>(tick) / 60.f; };
 
     SnapshotInterpolator interpolator;
@@ -220,7 +221,7 @@ TEST(SnapshotInterpolator, MovementIsSmootherThanDrawingEachSnapshotWhenItArrive
         }
         const auto smooth = interpolator.sample(now);
         if (smooth.empty())
-            continue; // nothing has arrived yet
+            continue;                             // nothing has arrived yet
         const float raw = positionAt(newestTick); // what drawing each snapshot on arrival shows
         if (time > 0.6) {
             largestRawStep = std::max(largestRawStep, raw - previousRaw);

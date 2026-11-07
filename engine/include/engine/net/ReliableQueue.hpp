@@ -57,7 +57,8 @@ public:
     /// @return false when the number is not pending (already acknowledged: a late copy of the acknowledgement).
     bool acknowledge(std::uint32_t id, Clock::time_point now)
     {
-        const auto found = std::find_if(_entries.begin(), _entries.end(), [id](const Entry &entry) { return entry.id == id; });
+        const auto found =
+            std::find_if(_entries.begin(), _entries.end(), [id](const Entry &entry) { return entry.id == id; });
         if (found == _entries.end())
             return false;
         // A message sent several times could be answered by any of its copies: such a sample would be wrong.

@@ -304,7 +304,8 @@ TEST(NetworkClient, AcknowledgesReliableMessagesAndHandsThemToTheGameOnce)
     client.connect("127.0.0.1", server.port);
     ASSERT_TRUE(server.accept());
 
-    const rtype::protocol::Message destroyed = rtype::protocol::EntityDestroyed{7, rtype::protocol::DestroyReason::Killed};
+    const rtype::protocol::Message destroyed =
+        rtype::protocol::EntityDestroyed{7, rtype::protocol::DestroyReason::Killed};
     server.send(destroyed, 4u);
     server.send(destroyed, 4u); // the server sent it again because it never saw our Ack
 

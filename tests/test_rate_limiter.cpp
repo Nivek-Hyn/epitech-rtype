@@ -45,8 +45,8 @@ TEST(RateLimiter, ALongRunOfFloodingLetsThroughOnlyTheSteadyRate)
 {
     RateLimiter limiter(100.0, 20.0);
     int allowed = 0;
-    for (int millisecond = 0; millisecond < 10000; ++millisecond)          // 10 seconds
-        for (int packet = 0; packet < 20; ++packet)                         // 20000 packets per second
+    for (int millisecond = 0; millisecond < 10000; ++millisecond) // 10 seconds
+        for (int packet = 0; packet < 20; ++packet)               // 20000 packets per second
             allowed += limiter.allow(Start + milliseconds(millisecond));
     EXPECT_NEAR(allowed, 100 * 10 + 20, 5);
 }

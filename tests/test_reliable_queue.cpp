@@ -21,9 +21,8 @@ struct Sent {
 std::vector<Sent> due(Queue &queue, Clock::time_point now, std::size_t *retransmissions = nullptr)
 {
     std::vector<Sent> sent;
-    const auto count = queue.resendDue(now, [&sent](std::uint32_t id, const std::string &message) {
-        sent.push_back({id, message});
-    });
+    const auto count =
+        queue.resendDue(now, [&sent](std::uint32_t id, const std::string &message) { sent.push_back({id, message}); });
     if (retransmissions)
         *retransmissions = count;
     return sent;
@@ -65,7 +64,7 @@ TEST(ReliableQueue, TheWaitDoublesAfterEachUnansweredSend)
 {
     Queue queue;
     queue.push("a");
-    due(queue, Start);                                     // sent at 0
+    due(queue, Start);                                           // sent at 0
     EXPECT_EQ(due(queue, Start + milliseconds(200)).size(), 1u); // second send at 200: wait 400 next
     EXPECT_TRUE(due(queue, Start + milliseconds(599)).empty());
     EXPECT_EQ(due(queue, Start + milliseconds(600)).size(), 1u); // third send at 600: wait 800 next

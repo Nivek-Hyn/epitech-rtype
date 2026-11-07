@@ -43,8 +43,8 @@ TEST(SequenceWindow, TheWindowCoversTheLast32Numbers)
 {
     SequenceWindow window;
     window.receive(100);
-    EXPECT_EQ(window.receive(69), SequenceVerdict::Late);    // 31 behind: inside
-    EXPECT_EQ(window.receive(68), SequenceVerdict::TooOld);  // 32 behind: outside
+    EXPECT_EQ(window.receive(69), SequenceVerdict::Late);   // 31 behind: inside
+    EXPECT_EQ(window.receive(68), SequenceVerdict::TooOld); // 32 behind: outside
     EXPECT_EQ(window.receive(1), SequenceVerdict::TooOld);
 }
 

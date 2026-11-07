@@ -41,10 +41,10 @@ private:
         bool active = false;
         Udp::endpoint endpoint;
         Clock::time_point lastSeen{};
-        std::uint32_t nextSequence = 0;        // numbers the packets sent to this client
+        std::uint32_t nextSequence = 0;       // numbers the packets sent to this client
         engine::net::SequenceWindow incoming; // spots duplicated and reordered packets from this client
-        engine::net::ReliableQueue<protocol::Message> reliable;  // messages to this client awaiting an Ack
-        engine::net::SequenceWindow incomingReliable;            // reliable numbers already received from it
+        engine::net::ReliableQueue<protocol::Message> reliable; // messages to this client awaiting an Ack
+        engine::net::SequenceWindow incomingReliable;           // reliable numbers already received from it
         engine::net::RateLimiter limiter{ClientPacketsPerSecond, ClientPacketBurst}; // datagrams allowed from it
     };
 
@@ -73,7 +73,7 @@ private:
     std::atomic<std::uint32_t> _nextSequence{0};
     engine::net::TrafficCounter _traffic;
     engine::net::RateLimiter _unknownSenders{UnknownSenderRepliesPerSecond, UnknownSenderReplyBurst}; // I/O thread only
-    engine::net::RateMeter _rateMeter; // I/O thread only
+    engine::net::RateMeter _rateMeter;                                                                // I/O thread only
     std::atomic<double> _sentRate{0.0};
     std::atomic<double> _receivedRate{0.0};
     std::atomic<std::size_t> _clientCount{0};

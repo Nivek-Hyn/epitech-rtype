@@ -59,10 +59,8 @@ TEST(NetworkIntegration, AcceptsFourUdpClientsAndRejectsTheFifth)
     }
 
     for (std::size_t i = 0; i < clients.size(); ++i) {
-        const auto request = rtype::protocol::encode(
-            {static_cast<std::uint32_t>(i + 1), rtype::protocol::Connect{}});
-        clients[i].send_to(asio::buffer(request),
-                           Udp::endpoint(asio::ip::address_v4::loopback(), serverPort));
+        const auto request = rtype::protocol::encode({static_cast<std::uint32_t>(i + 1), rtype::protocol::Connect{}});
+        clients[i].send_to(asio::buffer(request), Udp::endpoint(asio::ip::address_v4::loopback(), serverPort));
 
         Udp::endpoint sender;
         const auto response = receivePacket(clients[i], sender);
@@ -99,7 +97,8 @@ TEST(NetworkIntegration, SplitsSnapshotsLargerThanOneDatagramAndStaysAlive)
     constexpr std::size_t EntityCount = rtype::protocol::MaxEntitiesPerSnapshot * 2 + 10;
     rtype::protocol::Snapshot big{12, rtype::protocol::GameState::Playing, 0, {}};
     for (std::size_t i = 0; i < EntityCount; ++i)
-        big.entities.push_back({static_cast<std::uint32_t>(i + 1), rtype::protocol::EntityType::EnemyMissile, 0, 0.f, 0.f});
+        big.entities.push_back(
+            {static_cast<std::uint32_t>(i + 1), rtype::protocol::EntityType::EnemyMissile, 0, 0.f, 0.f});
     server.broadcast(big);
 
     std::size_t received = 0;
@@ -236,11 +235,11 @@ TEST(NetworkIntegration, IgnoresDuplicatedStaleAndTooOldInputs)
     using rtype::protocol::Input;
     namespace Flag = rtype::protocol::InputFlag;
     sendFrom(client, serverPort, 10, Input{Flag::Up});
-    sendFrom(client, serverPort, 9, Input{Flag::Left});    // arrives after number 10: obsolete
-    sendFrom(client, serverPort, 10, Input{Flag::Up});     // a copy of the first
+    sendFrom(client, serverPort, 9, Input{Flag::Left}); // arrives after number 10: obsolete
+    sendFrom(client, serverPort, 10, Input{Flag::Up});  // a copy of the first
     sendFrom(client, serverPort, 11, Input{Flag::Right});
     sendFrom(client, serverPort, 60, Input{Flag::Down});
-    sendFrom(client, serverPort, 20, Input{Flag::Left});   // 40 numbers behind the highest: too old
+    sendFrom(client, serverPort, 20, Input{Flag::Left}); // 40 numbers behind the highest: too old
     waitForDatagrams(server, 7);
 
     EXPECT_EQ(drainInputs(server), (std::vector<std::uint8_t>{Flag::Up, Flag::Right, Flag::Down}));

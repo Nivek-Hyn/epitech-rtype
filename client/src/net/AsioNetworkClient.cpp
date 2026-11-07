@@ -19,7 +19,9 @@ constexpr double RttSmoothing = 0.2; // weight of the newest sample in the smoot
 
 } // namespace
 
-AsioNetworkClient::AsioNetworkClient() : _socket(_io), _connectTimer(_io), _housekeepingTimer(_io), _reliableTimer(_io) {}
+AsioNetworkClient::AsioNetworkClient() : _socket(_io), _connectTimer(_io), _housekeepingTimer(_io), _reliableTimer(_io)
+{
+}
 
 AsioNetworkClient::~AsioNetworkClient()
 {
@@ -171,16 +173,16 @@ NetworkStats AsioNetworkClient::stats() const
 
 void AsioNetworkClient::receive()
 {
-    _socket.async_receive_from(
-        asio::buffer(_receiveBuffer), _sender, [this](const asio::error_code &error, std::size_t size) {
-            if (!error && _sender == _server) {
-                _traffic.addReceived(size);
-                if (const auto packet = protocol::decode(std::span(_receiveBuffer).first(size)))
-                    handlePacket(*packet, Clock::now());
-            }
-            if (_running)
-                receive();
-        });
+    _socket.async_receive_from(asio::buffer(_receiveBuffer), _sender,
+                               [this](const asio::error_code &error, std::size_t size) {
+                                   if (!error && _sender == _server) {
+                                       _traffic.addReceived(size);
+                                       if (const auto packet = protocol::decode(std::span(_receiveBuffer).first(size)))
+                                           handlePacket(*packet, Clock::now());
+                                   }
+                                   if (_running)
+                                       receive();
+                               });
 }
 
 void AsioNetworkClient::handlePacket(const protocol::Packet &packet, Clock::time_point now)
@@ -261,9 +263,9 @@ void AsioNetworkClient::scheduleConnectRetry()
 void AsioNetworkClient::scheduleHousekeeping()
 {
     // Often enough to notice a silent server quickly, but at most once per second in the game.
-    const auto interval = std::clamp(std::min({std::chrono::milliseconds(1000), _options.serverTimeout / 4,
-                                               _options.pingInterval}),
-                                     std::chrono::milliseconds(5), std::chrono::milliseconds(1000));
+    const auto interval =
+        std::clamp(std::min({std::chrono::milliseconds(1000), _options.serverTimeout / 4, _options.pingInterval}),
+                   std::chrono::milliseconds(5), std::chrono::milliseconds(1000));
     _housekeepingTimer.expires_after(interval);
     _housekeepingTimer.async_wait([this](const asio::error_code &error) {
         if (error || !_running)
@@ -276,8 +278,8 @@ void AsioNetworkClient::scheduleHousekeeping()
 void AsioNetworkClient::housekeep()
 {
     const auto now = Clock::now();
-    const auto rates = _rateMeter.sample(
-        _traffic.totals(), std::chrono::duration<double>(now.time_since_epoch()).count());
+    const auto rates =
+        _rateMeter.sample(_traffic.totals(), std::chrono::duration<double>(now.time_since_epoch()).count());
     _sentRate = rates.sentBytesPerSecond;
     _receivedRate = rates.receivedBytesPerSecond;
     _lossPercent = _loss.lossPercent();

@@ -24,9 +24,12 @@ public:
     struct Options {
         std::chrono::milliseconds connectRetryInterval = rtype::ConnectRetryInterval;
         int maxConnectAttempts = rtype::MaxConnectAttempts;
-        std::chrono::milliseconds serverTimeout = std::chrono::duration_cast<std::chrono::milliseconds>(rtype::ClientTimeout);
-        std::chrono::milliseconds pingInterval = std::chrono::duration_cast<std::chrono::milliseconds>(rtype::PingInterval);
-        std::chrono::milliseconds closeTimeout{500}; ///< How long disconnect() waits for the Disconnect to be acknowledged.
+        std::chrono::milliseconds serverTimeout =
+            std::chrono::duration_cast<std::chrono::milliseconds>(rtype::ClientTimeout);
+        std::chrono::milliseconds pingInterval =
+            std::chrono::duration_cast<std::chrono::milliseconds>(rtype::PingInterval);
+        std::chrono::milliseconds closeTimeout{
+            500}; ///< How long disconnect() waits for the Disconnect to be acknowledged.
     };
 
     AsioNetworkClient();
@@ -79,8 +82,8 @@ private:
     int _connectAttempts = 0; // I/O thread only
 
     engine::net::TrafficCounter _traffic;
-    engine::net::RateMeter _rateMeter;  // I/O thread only
-    engine::net::LossTracker _loss;     // I/O thread only
+    engine::net::RateMeter _rateMeter;     // I/O thread only
+    engine::net::LossTracker _loss;        // I/O thread only
     engine::net::SequenceWindow _incoming; // I/O thread only: spots duplicated and reordered server packets
     engine::net::ReliableQueue<protocol::Message> _reliable; // I/O thread only: messages awaiting the server's Ack
     engine::net::SequenceWindow _incomingReliable;           // I/O thread only: reliable numbers already received

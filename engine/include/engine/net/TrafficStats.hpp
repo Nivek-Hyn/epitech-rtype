@@ -52,10 +52,10 @@ public:
 
     TrafficTotals totals() const
     {
-        return {_bytesSent.load(std::memory_order_relaxed),        _bytesReceived.load(std::memory_order_relaxed),
-                _packetsSent.load(std::memory_order_relaxed),      _packetsReceived.load(std::memory_order_relaxed),
+        return {_bytesSent.load(std::memory_order_relaxed),         _bytesReceived.load(std::memory_order_relaxed),
+                _packetsSent.load(std::memory_order_relaxed),       _packetsReceived.load(std::memory_order_relaxed),
                 _duplicatesDropped.load(std::memory_order_relaxed), _outdatedDropped.load(std::memory_order_relaxed),
-                _retransmissions.load(std::memory_order_relaxed), _rateLimited.load(std::memory_order_relaxed)};
+                _retransmissions.load(std::memory_order_relaxed),   _rateLimited.load(std::memory_order_relaxed)};
     }
 
     void reset()

@@ -73,8 +73,8 @@ int main(int argc, char **argv)
                 snapshotEvery = 0;
             }
             if (snapshotEvery < 1 || snapshotEvery > static_cast<int>(rtype::TickRate)) {
-                std::cerr << "--snapshot-every expects a number of ticks between 1 and " << static_cast<int>(rtype::TickRate)
-                          << '\n';
+                std::cerr << "--snapshot-every expects a number of ticks between 1 and "
+                          << static_cast<int>(rtype::TickRate) << '\n';
                 return 84;
             }
         } else if (arg == "--stats") {
@@ -131,8 +131,8 @@ int main(int argc, char **argv)
 
     std::cout << "r-type_server: listening on UDP port " << port
               << " [Mode: " << (game.gameMode() == rtype::server::Game::GameMode::Infinite ? "Infinite" : "Campaign")
-              << ", Difficulty: " << diffStr << ", snapshots: every " << snapshotEvery << " tick(s) = "
-              << static_cast<int>(rtype::TickRate) / snapshotEvery << " per second]\n";
+              << ", Difficulty: " << diffStr << ", snapshots: every " << snapshotEvery
+              << " tick(s) = " << static_cast<int>(rtype::TickRate) / snapshotEvery << " per second]\n";
 
     engine::core::FixedTimestep clock(rtype::TickRate);
     auto nextReport = std::chrono::steady_clock::now() + std::chrono::seconds(2);

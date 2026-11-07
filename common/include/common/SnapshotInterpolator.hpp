@@ -45,7 +45,8 @@ public:
             _pending.back() = snapshot;
             return;
         }
-        if ((_current && snapshot.tick <= _current->tick) || (!_pending.empty() && snapshot.tick < _pending.back().tick))
+        if ((_current && snapshot.tick <= _current->tick) ||
+            (!_pending.empty() && snapshot.tick < _pending.back().tick))
             return;
 
         if (_lastPushedTick && snapshot.tick > *_lastPushedTick) {
@@ -120,10 +121,7 @@ public:
     void reset() { *this = SnapshotInterpolator(_delaySnapshots); }
 
     /// @return The tick being shown at `now`, as a fraction (it lags behind the newest snapshot).
-    double renderTick(Clock::time_point now) const
-    {
-        return (seconds(now) - _offset) * rtype::TickRate - delayTicks();
-    }
+    double renderTick(Clock::time_point now) const { return (seconds(now) - _offset) * rtype::TickRate - delayTicks(); }
 
     /// @return How many ticks the world is shown behind the newest snapshot.
     double delayTicks() const { return _delaySnapshots * _intervalTicks; }
@@ -142,7 +140,8 @@ private:
 
     static float lerp(float from, float to, double progress)
     {
-        return static_cast<float>(static_cast<double>(from) + (static_cast<double>(to) - static_cast<double>(from)) * progress);
+        return static_cast<float>(static_cast<double>(from) +
+                                  (static_cast<double>(to) - static_cast<double>(from)) * progress);
     }
 
     double _delaySnapshots;

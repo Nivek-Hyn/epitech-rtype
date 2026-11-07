@@ -258,8 +258,8 @@ void AsioNetworkServer::resendReliable(PlayerId player)
     Client &client = _clients[player];
     if (!client.active)
         return;
-    const auto retransmissions = client.reliable.resendDue(
-        Clock::now(), [this, &client](std::uint32_t id, const protocol::Message &message) {
+    const auto retransmissions =
+        client.reliable.resendDue(Clock::now(), [this, &client](std::uint32_t id, const protocol::Message &message) {
             sendTo(client.endpoint, client.nextSequence++, message, id);
         });
     _traffic.addRetransmissions(retransmissions);
@@ -267,8 +267,8 @@ void AsioNetworkServer::resendReliable(PlayerId player)
 
 void AsioNetworkServer::updateRates()
 {
-    const auto rates = _rateMeter.sample(
-        _traffic.totals(), std::chrono::duration<double>(Clock::now().time_since_epoch()).count());
+    const auto rates =
+        _rateMeter.sample(_traffic.totals(), std::chrono::duration<double>(Clock::now().time_since_epoch()).count());
     _sentRate = rates.sentBytesPerSecond;
     _receivedRate = rates.receivedBytesPerSecond;
 }
