@@ -2,6 +2,8 @@
 build*/
 r-type_server
 r-type_client
+r-type_level_editor
+/brickrush
 *.exe
 .cache/
 compile_commands.json
@@ -12,3 +14,4 @@ compile_commands.json
 site/
 docs/html/
 .venv/
+config.json

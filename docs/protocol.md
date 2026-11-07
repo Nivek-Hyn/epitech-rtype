@@ -1,4 +1,4 @@
-# R-Type Network Protocol — version 2
+# R-Type Network Protocol — version 6
 
 This document describes every message exchanged between `r-type_client` and `r-type_server`.
 It should be enough to write a new client. The reference implementation is `common/src/Protocol.cpp`. This is
@@ -15,7 +15,7 @@ the protocol specification; runtime gaps are listed in the [networking implement
 | Offset | Size | Field | Description |
 |---|---|---|---|
 | 0 | u16 | magic | Always `0x5254` ("RT") |
-| 2 | u8 | version | Protocol version, currently `2` |
+| 2 | u8 | version | Protocol version, currently `6` |
 | 3 | u8 | type | Message type (see §4); bit `0x40` set means a reliable message (§3.2) |
 | 4 | u32 | sequence | Number of the packet for this peer, see §3.1 |
 | 8 | u16 | payload_size | Number of bytes after the header |
@@ -104,7 +104,7 @@ Input flags: `0x01` up, `0x02` down, `0x04` left, `0x08` right, `0x10` shoot.
 | `0x81` | ConnectAccepted | `u8 player_id` | `player_id` in 0–3. |
 | `0x82` | ConnectRejected | `u8 reason` | `1` server full, `2` version mismatch. |
 | `0x83` | Snapshot | see below | Game state, score and entities at a server tick. |
-| `0x84` | EntityDestroyed | `u32 net_id`, `u8 reason` | `1` killed, `2` out of bounds. Sent reliably. |
+| `0x84` | EntityDestroyed | `u32 net_id`, `u8 reason` | `1` killed, `2` out of bounds, `3` collected (bonus picked up, no explosion). Sent reliably. |
 | `0x85` | PlayerLeft | `u8 player_id`, `u8 reason` | `1` disconnected, `2` timed out. Sent reliably. |
 | `0x86` | Pong | `u32 timestamp_ms` | Same value as the Ping. |
 
@@ -113,9 +113,10 @@ Input flags: `0x01` up, `0x02` down, `0x04` left, `0x08` right, `0x10` shoot.
 | Size | Field |
 |---|---|
 | u32 | tick |
-| u8 | state: `1` waiting for players, `2` playing, `3` finished |
+| u8 | state: `1` waiting for players, `2` playing, `3` finished (victory), `4` game over (defeat) |
 | u32 | score |
-| u16 | count (max 84) |
+| 4 × u8 | lives left of each player, by `player_id` (`0` if nobody has this id) |
+| u16 | count (max 83) |
 | count × 14 bytes | entities |
 
 Each entity:
@@ -123,14 +124,14 @@ Each entity:
 | Size | Field | Description |
 |---|---|---|
 | u32 | net_id | Network id of the entity, unique for the whole game |
-| u8 | type | `1` player, `2` enemy, `3` player missile, `4` enemy missile |
+| u8 | type | `1` player, `2` enemy, `3` player missile, `4` enemy missile, `5` obstacle, `6` bonus |
 | u8 | variant | Player index (0–3) for players, subtype for other types |
 | f32 | x | World position (world is 1920 × 1080, origin top-left) |
 | f32 | y | |
 
-A tick with more than 84 entities is sent as several Snapshot packets with the same `tick`.
+A tick with more than 83 entities is sent as several Snapshot packets with the same `tick`.
 
-The end of the game is not a separate message: the client sees `state = 3` in the snapshots, with the final score.
+The end of the game is not a separate message: the client sees `state = 3` or `state = 4` in the snapshots, with the final score.
 Since a snapshot is sent every tick, this information cannot be lost.
 
 ## 5. Session

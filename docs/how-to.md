@@ -157,57 +157,74 @@ Use the event bus when a system must trigger something it should not know about 
    bus.dispatch();
    ```
 
-## Add an enemy type
+## Add an enemy, a tile or a bonus
 
-An enemy is an entity, not a class. Game.cpp currently spawns enemies and checks player-missile collisions;
-the client displays an enemy sprite. A new subtype combines component values, a behavior and a rendering choice.
-Changing `Kind::variant` alone does not add a behavior or a new sprite mapping.
-An enemy is an entity, not a class: a new enemy type is a new combination of components and a new value of
-`Kind::variant`. The current prototype already spawns a basic enemy on a timer, moves it left, and lets player
-missiles destroy it. The game loop and renderer are in place; extending enemy behavior still requires server and
-client changes.
+Game entities are **prefabs**: `assets/config/entities.json` lists each entity with its components.
+The server creates the entity from that list; its systems produce the game. No C++ is needed when the new
+entity only combines existing components.
 
-1. **Pick a variant number.** `Kind{EntityType::Enemy, variant}` identifies the enemy type for the client.
-   Keep the list of variants in one place (a comment or an enum in `common/`), so the server and the client
-   agree on it.
+```json
+"armored_scout": {
+  "Kind": {"type": "enemy", "variant": 1},
+  "Hitbox": {"width": 64, "height": 56},
+  "Health": {"hp": 4},
+  "Velocity": {"x": -90.0},
+  "MovementPattern": {"type": "sine_wave", "amplitude": 120},
+  "EnemyAttack": [{"fire_rate": 1.5, "bullet_speed": 380.0, "bullet_pattern": "zigzag"}],
+  "EnemyTraits": {"score": 150}
+}
+```
 
-2. **Spawn it on the server** with the components every networked entity needs, plus its own behavior. The
-   current implementation is in `Game::spawnEnemies()` and `Game::spawnNetworked()`:
+| Component | Fields | Used by |
+|---|---|---|
+| `Kind` | `type` (`player`, `enemy`, `player_missile`, `enemy_missile`, `obstacle`, `bonus`), `variant` | Snapshot: the client chooses the sprite from both |
+| `Hitbox` | `width`, `height`, `offset_y` | Collisions and screen limits; no Hitbox means no collision |
+| `Health` | `hp` | Damage from missiles |
+| `Velocity` | `x`, `y` (world units per second; negative x goes left) | Movement |
+| `MovementPattern` | `type`, `amplitude`, `frequency`, `hold_x` | Enemy movement patterns (`server/src/MovementSystem.cpp`) |
+| `EnemyAttack` | list of `fire_rate`, `bullet_speed`, `bullet_variant`, `bullet_pattern`, `offset_y` | Enemy shooting |
+| `EnemyTraits` | `score`, `is_boss` | Score in infinite mode; a boss survives contact with a ship |
+| `MissileDamage` | `damage` | Health a player missile removes |
+| `BonusEffect` | `weapon`, `lives` | What a player gets by touching the bonus |
+| `PlayerControl` | `speed` | Speed of a ship moved by inputs |
+
+Then use the name in a level (`"type": "armored_scout"`) and restart the server.
+A prefab with an unknown component or invalid data is skipped with a warning at startup.
+A new `variant` also needs its sprite in the client; reusing an existing variant needs nothing.
+
+### Add a component usable in prefabs
+
+1. Define the struct (see [Add a component](#add-a-component)).
+2. Register it under a name in `registerGameComponents` (`server/src/Prefabs.cpp`), with a function reading it
+   from JSON:
 
    ```cpp
-   const std::uint8_t variant = 1;
-   engine::ecs::Entity enemy =
-       spawnNetworked(protocol::EntityType::Enemy, variant, rtype::WorldWidth - EnemyWidth, 300.f);
-   _registry.emplace<rtype::components::Velocity>(enemy, -200.f, 0.f);
-   // + server-only components: health, hitbox, movement pattern, shooting...
+   prefabs.registerComponent<Shield>("Shield", [](const Json &json) { return Shield{json.value("hits", 1)}; });
    ```
 
-   This snippet belongs inside a Game method: `spawnNetworked` is private, not a free function callable by
-   arbitrary code. It already gives the entity NetworkId, Kind, Position and a zero Velocity; the example
-   replaces Velocity. The snapshot sends NetworkId, Kind and Position, not every component automatically.
-   `spawnNetworked` gives the entity a `NetworkId`, `Kind`, `Position` and `Velocity`, which are used by the
-   snapshot and movement system. The current spawn timer, enemy rows and speed are constants in `Game.cpp`.
+3. Write or extend the system that uses it. The engine's `Prefabs` class does not know JSON: the same
+   mechanism works with any data format.
 
-3. **Give it a behavior.** Reuse existing systems when possible (movement, shooting). For a new movement pattern,
-   add a server-only component holding its parameters and a system that updates Velocity. Run that behavior
-   before movement if the current tick must use the new velocity. Keep resource/render code outside the server.
+## Add a weapon
 
-4. **Display it on the client.** The current enemy branch uses one texture rectangle regardless of variant.
-   Add an explicit variant-to-sprite mapping and test its fallback. Reusing type/variant needs no new wire
-   field; adding health or other state requires the shared-contract review described above.
-4. **Display it on the client.** Add or load a texture through `client/src/ResourceManager.cpp`, then map the
-   entity type/variant to a sprite in `client/src/main.cpp`. The protocol does not change if the existing
-   `EntityType::Enemy` and `variant` fields are sufficient; a new entity category requires a protocol update.
+Weapons are in `assets/config/weapons.json`. A weapon names the prefab of its missile, its cooldown, and one
+angle per missile fired at once:
 
-5. **Test the server side** like any system: spawn the enemy, run a few ticks, check its position or state.
+```json
+"twin": { "missile": "player_missile", "cooldown": 0.3, "angles": [-4.0, 4.0] }
+```
 
-### Add a configured wave
+The missile prefab gives its sprite variant, hitbox, speed and `MissileDamage`. To give the weapon to players,
+add a bonus prefab with `"BonusEffect": {"weapon": "twin"}` and list it in `bonus_drops.prefabs`.
+`bonus_drops.chance` is the probability that a destroyed enemy drops a bonus. A destroyed ship goes back to
+`default_weapon`.
 
-Game loads `assets/levels/level1.json` at startup through `server/src/levelLoader.cpp`.
-Start the server from the repository root or the installed game directory. Restart it after editing the file.
-The other supplied level files are not selected automatically: campaign progression remains separate work.
+## Add a configured wave
 
-Append an entry to the top-level `waves` array, keeping valid JSON commas:
+The campaign plays the levels listed in `assets/config/game_rules.json`, under `campaign.levels`.
+Start the server from the repository root or the installed game directory. Restart it after editing a file.
+
+Append an entry to the `waves` array of a level, keeping valid JSON commas:
 
 ```json
 {
@@ -215,25 +232,28 @@ Append an entry to the top-level `waves` array, keeping valid JSON commas:
   "delay_before_start": 10.0,
   "enemies": [
     { "type": "patrol", "spawn_y": 500, "speed": 120 }
+  ],
+  "obstacles": [
+    { "type": "satellite_debris", "spawn_y": 200 }
   ]
 }
 ```
 
-The wave fires once when accumulated active simulation time reaches ten seconds. Time advances only
-while at least one player has a live ship. Delay is measured from the level's beginning, not from the
-previous wave. `spawn_y` is a world coordinate; positive `speed` moves the enemy left from the right edge.
-For the current 72-unit-high enemy, keep y between 0 and 1008 in the 1080-unit-high world.
+`type` is a prefab name. The wave fires once, when the level has been played for ten seconds: the delay is
+measured from the beginning of the level, not from the previous wave. `spawn_y` is a world coordinate
+(a negative value picks a random height). `speed`, `health`, `amplitude` and `frequency` replace the values
+of the prefab for this enemy only; 0 or nothing keeps them.
 
-The loader reads `type`, `amplitude` and `frequency`, but the integrated spawner currently uses only y
-and speed: changing those other fields does not implement a new movement pattern. Missing files,
-malformed JSON and a missing/non-array `waves` field are rejected; not every numeric range or optional
-field shape is validated yet. Keep finite, nonnegative delays and sensible positions/speeds.
+### Edit a level with the level editor
 
-Connect a client and verify the extra enemy appears at the configured active time and height.
-This is an extension recipe, not evidence that another team member has already followed it.
+```sh
+./r-type_level_editor assets/levels/level1.json
+```
 
-Use configuration for values an existing behavior already consumes (timing, count, speed or positions).
-A new behavior still needs C++ unless a scripting mechanism capable of expressing it is actually implemented.
+The editor shows the level as a timeline: time to the right, height downward. Left click adds the selected
+prefab, right click removes the one under the mouse, the wheel or Tab changes the prefab, +/- changes its
+speed, and Ctrl+S saves. P plays a preview with the engine's Registry, movement system and fixed timestep:
+it checks timing and heights, not movement patterns or shots. Placements in the same half-second share a wave.
 
 ## Change the network protocol
 

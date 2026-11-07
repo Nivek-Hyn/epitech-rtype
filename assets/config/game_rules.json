@@ -22,6 +22,11 @@
       "score_multiplier": 1.5
     }
   },
+  "player": {
+    "lives": 3,
+    "respawn_delay": 2.0,
+    "invulnerability": 2.0
+  },
   "infinite_mode": {
     "health_growth_per_loop": 0.2,
     "speed_growth_per_loop": 0.05,
@@ -43,6 +48,7 @@
       "assets/levels/level8.json",
       "assets/levels/level9.json"
     ],
+    "levels_per_world": 3,
     "intermission_delay": 2.0
   }
 }

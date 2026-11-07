@@ -7,25 +7,39 @@
       "delay_before_start": 2.5,
       "enemies": [
         { "type": "gravity_diver", "spawn_y": 90.0, "speed": 155.0 },
+        { "type": "gravity_diver", "spawn_y": 300.0, "speed": 155.0 },
+        { "type": "dust_striker", "spawn_y": 540.0, "speed": 135.0 },
+        { "type": "gravity_diver", "spawn_y": 450.0, "speed": 155.0 },
         { "type": "gravity_diver", "spawn_y": 610.0, "speed": 155.0 }
       ]
     },
     {
       "wave_id": 2,
       "delay_before_start": 8.5,
+      "obstacles": [
+        { "type": "mars_rock", "spawn_y": 1008.0 },
+        { "type": "mars_rock", "spawn_y": 936.0 },
+        { "type": "mars_rock", "spawn_y": 864.0 }
+      ],
       "enemies": [
-        { "type": "martian_hopper", "spawn_y": 520.0, "speed": 128.0 },
-        { "type": "dust_striker", "spawn_y": 360.0, "speed": 135.0 },
-        { "type": "martian_hopper", "spawn_y": 200.0, "speed": 128.0 }
+        { "type": "martian_hopper", "spawn_y": 780.0, "speed": 128.0 },
+        { "type": "dust_striker", "spawn_y": 540.0, "speed": 135.0 },
+        { "type": "martian_hopper", "spawn_y": 300.0, "speed": 128.0 }
       ]
     },
     {
       "wave_id": 3,
       "delay_before_start": 15.0,
+      "obstacles": [
+        { "type": "mars_rock", "spawn_y": 0.0 },
+        { "type": "mars_rock", "spawn_y": 72.0 },
+        { "type": "mars_rock", "spawn_y": 1008.0 },
+        { "type": "mars_rock", "spawn_y": 936.0 }
+      ],
       "enemies": [
         { "type": "gravity_diver", "spawn_y": 140.0, "speed": 160.0 },
         { "type": "gravity_diver", "spawn_y": 260.0, "speed": 160.0 },
-        { "type": "dust_striker", "spawn_y": 340.0, "speed": 138.0 },
+        { "type": "dust_striker", "spawn_y": 510.0, "speed": 138.0 },
         { "type": "gravity_diver", "spawn_y": 420.0, "speed": 160.0 },
         { "type": "gravity_diver", "spawn_y": 540.0, "speed": 160.0 }
       ]
@@ -34,11 +48,11 @@
       "wave_id": 4,
       "delay_before_start": 24.0,
       "enemies": [
-        { "type": "martian_hopper", "spawn_y": 110.0, "speed": 132.0 },
-        { "type": "dust_striker", "spawn_y": 220.0, "speed": 140.0 },
-        { "type": "martian_hopper", "spawn_y": 330.0, "speed": 132.0 },
-        { "type": "dust_striker", "spawn_y": 440.0, "speed": 140.0 },
-        { "type": "martian_hopper", "spawn_y": 550.0, "speed": 132.0 }
+        { "type": "martian_hopper", "spawn_y": 165.0, "speed": 132.0 },
+        { "type": "dust_striker", "spawn_y": 330.0, "speed": 140.0 },
+        { "type": "martian_hopper", "spawn_y": 495.0, "speed": 132.0 },
+        { "type": "dust_striker", "spawn_y": 660.0, "speed": 140.0 },
+        { "type": "martian_hopper", "spawn_y": 825.0, "speed": 132.0 }
       ]
     }
   ]

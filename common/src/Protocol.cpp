@@ -62,6 +62,8 @@ void writePayload(engine::net::ByteWriter &writer, const Message &message)
                 writer.u32(value.tick);
                 writer.u8(static_cast<std::uint8_t>(value.state));
                 writer.u32(value.score);
+                for (const std::uint8_t lives : value.lives)
+                    writer.u8(lives);
                 writer.u16(static_cast<std::uint16_t>(value.entities.size()));
                 for (const EntityState &entity : value.entities) {
                     writer.u32(entity.netId);
@@ -84,7 +86,7 @@ void writePayload(engine::net::ByteWriter &writer, const Message &message)
 bool validEntityType(std::uint8_t value)
 {
     return value >= static_cast<std::uint8_t>(EntityType::Player) &&
-           value <= static_cast<std::uint8_t>(EntityType::EnemyMissile);
+           value <= static_cast<std::uint8_t>(EntityType::Bonus);
 }
 
 } // namespace
@@ -114,7 +116,7 @@ std::vector<Snapshot> splitSnapshot(const Snapshot &snapshot)
         const std::size_t count = std::min(MaxEntitiesPerSnapshot, snapshot.entities.size() - offset);
         const auto first = snapshot.entities.begin() + static_cast<std::ptrdiff_t>(offset);
         parts.push_back({snapshot.tick, snapshot.state, snapshot.score,
-                         std::vector<EntityState>(first, first + static_cast<std::ptrdiff_t>(count))});
+                         std::vector<EntityState>(first, first + static_cast<std::ptrdiff_t>(count)), snapshot.lives});
         offset += count;
     } while (offset < snapshot.entities.size());
     return parts;
@@ -205,10 +207,12 @@ std::optional<Packet> decode(std::span<const std::uint8_t> datagram)
             snapshot.tick = reader.u32();
             const auto state = reader.u8();
             if (state < static_cast<std::uint8_t>(GameState::Waiting) ||
-                state > static_cast<std::uint8_t>(GameState::Finished))
+                state > static_cast<std::uint8_t>(GameState::GameOver))
                 return std::nullopt;
             snapshot.state = static_cast<GameState>(state);
             snapshot.score = reader.u32();
+            for (std::uint8_t &lives : snapshot.lives)
+                lives = reader.u8();
             const auto count = reader.u16();
             if (count > MaxEntitiesPerSnapshot || bodySize != SnapshotFixedSize + count * EntityStateSize)
                 return std::nullopt;
@@ -234,7 +238,7 @@ std::optional<Packet> decode(std::span<const std::uint8_t> datagram)
             const auto netId = reader.u32();
             const auto reason = reader.u8();
             if (reason < static_cast<std::uint8_t>(DestroyReason::Killed) ||
-                reason > static_cast<std::uint8_t>(DestroyReason::OutOfBounds))
+                reason > static_cast<std::uint8_t>(DestroyReason::Collected))
                 return std::nullopt;
             message = EntityDestroyed{netId, static_cast<DestroyReason>(reason)};
             break;

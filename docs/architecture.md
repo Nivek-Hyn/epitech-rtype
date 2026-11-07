@@ -68,7 +68,6 @@ flowchart LR
     end
     subgraph Client["client/"]
         Render["Rendering<br/>SFML"]
-        Resources["Assets<br/>ResourceManager"]
         ClientNet["Network<br/>INetworkClient"]
     end
     Protocol --> Bytes
@@ -82,15 +81,13 @@ flowchart LR
     ServerNet --> Queue
     ClientNet --> Protocol
     ClientNet --> Queue
-    Resources --> Render
 ```
 
-*Text description: the engine offers six independent building blocks. The protocol uses the engine's
-serialization. On the server, the main loop uses the fixed timestep clock, drives game logic and talks to the
-network layer. Game logic uses the ECS, movement system, AABB collision helper and shared components. It emits
-protocol destruction messages directly; it does not currently use the engine event bus. Both network layers use
-the protocol and a thread-safe queue. The client renders entities from the latest snapshot and loads textures
-through its resource manager rather than keeping a local ECS.*
+*Text description: the engine offers six reusable building blocks. The protocol uses the engine's
+serialization. On the server, the main loop uses the fixed timestep clock, drives the game logic and talks to
+the network layer. The current game logic uses the ECS, movement system, AABB collisions and shared components.
+The event bus is available but is not wired into Game. Both network layers use the protocol and a thread-safe
+queue. The client renders entities directly from the latest snapshot rather than keeping a local ECS.*
 
 | Subsystem | Main files | Status |
 |---|---|---|
@@ -102,10 +99,10 @@ through its resource manager rather than keeping a local ECS.*
 | Threading | `engine/include/engine/core/ThreadSafeQueue.hpp` | Implemented; mutex-protected FIFO queue |
 | Protocol | `common/include/common/Protocol.hpp`, `common/src/Protocol.cpp`, [protocol.md](protocol.md) | Implemented; validates datagrams and message payloads |
 | Shared components | `common/include/common/Components.hpp`, `common/include/common/Constants.hpp` | Implemented |
-| Game logic | `server/src/Game.hpp`, `server/src/Game.cpp` | Player movement/shooting, timed enemy spawning, missile collisions, score and snapshots |
+| Game logic | `server/src/Game.hpp`, `server/src/Game.cpp` and `server/src/Game*.cpp` (one file per part of the game) | Player movement, shooting, enemy spawning, missile/enemy collisions, score and snapshots |
 | Server network | `server/src/net/INetworkServer.hpp`, `server/src/net/AsioNetworkServer.cpp` | Implemented; UDP handshake, inputs, snapshots, ping/pong and timeout handling |
 | Client network | `client/src/net/INetworkClient.hpp`, `client/src/net/AsioNetworkClient.cpp` | Implemented; UDP connection retry, input sending and server timeout detection |
-| Rendering and assets | `client/src/main.cpp`, `client/src/ResourceManager.cpp` | Player, enemy and missile sprites from assets; no starfield or audio yet |
+| Rendering | `client/src/main.cpp`, `client/src/ResourceManager.cpp` | Sprites for players, missiles and enemies; no starfield or audio integration yet |
 
 ## 3. Client–server model
 

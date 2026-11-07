@@ -32,18 +32,22 @@ LevelConfig loadLevelFromJson(const std::string &filepath)
         wave.wave_id = w.value("wave_id", 0);
         wave.delay_before_start = w.value("delay_before_start", 0.f);
 
-        if (w.contains("enemies") && w["enemies"].is_array()) {
-            for (const auto &e : w["enemies"]) {
-                EnemySpawnConfig enemy;
-                enemy.type = e.value("type", "standard");
-                enemy.spawn_y = e.value("spawn_y", 300.f);
-                enemy.speed = e.value("speed", 150.f);
-                enemy.amplitude = e.value("amplitude", 0.f);
-                enemy.frequency = e.value("frequency", 0.f);
-                enemy.health = e.value("hp", e.value("health", 0));
-                wave.enemies.push_back(enemy);
+        const auto readSpawns = [&w](const char *key, std::vector<EnemySpawnConfig> &spawns) {
+            if (!w.contains(key) || !w[key].is_array())
+                return;
+            for (const auto &e : w[key]) {
+                EnemySpawnConfig spawn;
+                spawn.type = e.value("type", "standard");
+                spawn.spawn_y = e.value("spawn_y", 300.f);
+                spawn.speed = e.value("speed", 0.f); // 0: use the speed from entities.json
+                spawn.amplitude = e.value("amplitude", 0.f);
+                spawn.frequency = e.value("frequency", 0.f);
+                spawn.health = e.value("hp", e.value("health", 0));
+                spawns.push_back(spawn);
             }
-        }
+        };
+        readSpawns("enemies", wave.enemies);
+        readSpawns("obstacles", wave.obstacles);
         level.waves.push_back(wave);
     }
     return level;

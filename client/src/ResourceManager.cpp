@@ -16,8 +16,26 @@ bool ResourceManager::loadDefaults()
         std::cerr << "[ResourceManager] Failed to load assets/r-typesheet5.gif\n";
         success = false;
     }
+    loadTexture("enemy_standard", "assets/r-typesheet5.gif");
+    loadTexture("enemy_patrol", "assets/r-typesheet27.gif");
+    loadTexture("enemy_sine", "assets/r-typesheet12.gif");
+    loadTexture("enemy_orbital_probe", "assets/r-typesheet12.gif");
+    loadTexture("enemy_diver", "assets/r-typesheet8.gif");
+    loadTexture("enemy_solar_relay", "assets/r-typesheet13.gif");
+    loadTexture("enemy_rover", "assets/r-typesheet11.gif");
+    loadTexture("enemy_walker", "assets/r-typesheet10.gif");
+    loadTexture("enemy_interceptor", "assets/r-typesheet24.gif");
+    loadTexture("enemy_tentacle", "assets/r-typesheet9.gif");
+    loadTexture("enemy_boss_heavy", "assets/r-typesheet28.gif");
+    loadTexture("enemy_boss", "assets/r-typesheet38.gif");
+    loadTexture("explosion_boss", "assets/r-typesheet44.gif");
+    loadTexture("obstacles", "assets/r-typesheet21.gif");
     if (!loadTexture("bullet", "assets/r-typesheet1.gif")) {
         std::cerr << "[ResourceManager] Failed to load assets/r-typesheet1.gif\n";
+        success = false;
+    }
+    if (!loadTexture("enemy_bullet", "assets/r-typesheet3.gif")) {
+        std::cerr << "[ResourceManager] Failed to load assets/r-typesheet3.gif\n";
         success = false;
     }
 
@@ -52,6 +70,11 @@ const sf::Texture &ResourceManager::getTexture(const std::string &id) const
     if (it == _textures.end())
         throw std::out_of_range("Texture not found: " + id);
     return it->second;
+}
+
+bool ResourceManager::hasTexture(const std::string &id) const
+{
+    return _textures.find(id) != _textures.end();
 }
 
 bool ResourceManager::loadFont(const std::string &id, const std::string &path)

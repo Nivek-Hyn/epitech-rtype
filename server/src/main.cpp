@@ -53,7 +53,7 @@ int main(int argc, char **argv)
     std::string diffStr = "normal";
     std::string levelPath;
     const std::string usage =
-        " [port] [--mode campaign|infinite] [--difficulty easy|normal|hard] [--level path] [--stats]\n";
+        " [port] [level_path] [--mode campaign|infinite] [--difficulty easy|normal|hard] [--level path] [--stats]\n";
 
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
@@ -75,6 +75,8 @@ int main(int argc, char **argv)
                 std::cerr << "Usage: " << argv[0] << usage;
                 return 84;
             }
+        } else if (arg.rfind("--", 0) != 0 && i == 2 && levelPath.empty()) {
+            levelPath = arg;
         }
     }
 
@@ -99,12 +101,12 @@ int main(int argc, char **argv)
     if (!levelPath.empty()) {
         try {
             game.loadLevel(levelPath);
+            std::cout << "r-type_server: Loaded level: " << levelPath << '\n';
         } catch (const std::exception &e) {
             std::cerr << "Failed to load custom level: " << e.what() << '\n';
             return 84;
         }
     }
-
     rtype::server::AsioNetworkServer network;
     try {
         network.start(port);

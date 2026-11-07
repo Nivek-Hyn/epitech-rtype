@@ -26,6 +26,7 @@ public:
         }
         _state = snapshot.state;
         _score = snapshot.score;
+        _lives = snapshot.lives;
         for (const EntityState &entity : snapshot.entities) {
             if (_knownIds.insert(entity.netId).second)
                 _entities.push_back(entity);
@@ -40,6 +41,7 @@ public:
         _tick = 0;
         _state = GameState::Waiting;
         _score = 0;
+        _lives = {};
         _entities.clear();
         _knownIds.clear();
     }
@@ -47,6 +49,7 @@ public:
     const std::vector<EntityState> &entities() const { return _entities; }
     GameState state() const { return _state; }
     std::uint32_t score() const { return _score; }
+    const decltype(Snapshot::lives) &lives() const { return _lives; }
     std::uint32_t tick() const { return _tick; }
 
 private:
@@ -54,6 +57,7 @@ private:
     std::uint32_t _tick = 0;
     GameState _state = GameState::Waiting;
     std::uint32_t _score = 0;
+    decltype(Snapshot::lives) _lives{};
     std::vector<EntityState> _entities;
     std::unordered_set<std::uint32_t> _knownIds;
 };

@@ -6,27 +6,36 @@
       "wave_id": 1,
       "delay_before_start": 3.0,
       "enemies": [
-        { "type": "satellite_scout", "spawn_y": 130.0, "speed": 122.0 },
-        { "type": "orbital_probe", "spawn_y": 260.0, "speed": 100.0 },
-        { "type": "satellite_scout", "spawn_y": 390.0, "speed": 122.0 },
-        { "type": "orbital_probe", "spawn_y": 520.0, "speed": 100.0 }
+        { "type": "satellite_scout", "spawn_y": 195.0, "speed": 122.0 },
+        { "type": "orbital_probe", "spawn_y": 390.0, "speed": 100.0 },
+        { "type": "satellite_scout", "spawn_y": 585.0, "speed": 122.0 },
+        { "type": "orbital_probe", "spawn_y": 780.0, "speed": 100.0 }
       ]
     },
     {
       "wave_id": 2,
       "delay_before_start": 12.5,
+      "obstacles": [
+        { "type": "satellite_debris", "spawn_y": 120.0 },
+        { "type": "satellite_debris", "spawn_y": 192.0 },
+        { "type": "satellite_debris", "spawn_y": 850.0 }
+      ],
       "enemies": [
-        { "type": "solar_relay", "spawn_y": 170.0, "speed": 68.0 },
-        { "type": "satellite_scout", "spawn_y": 260.0, "speed": 124.0 },
-        { "type": "satellite_scout", "spawn_y": 380.0, "speed": 124.0 },
-        { "type": "solar_relay", "spawn_y": 500.0, "speed": 68.0 }
+        { "type": "solar_relay", "spawn_y": 255.0, "speed": 68.0 },
+        { "type": "satellite_scout", "spawn_y": 390.0, "speed": 124.0 },
+        { "type": "satellite_scout", "spawn_y": 570.0, "speed": 124.0 },
+        { "type": "solar_relay", "spawn_y": 750.0, "speed": 68.0 }
       ]
     },
     {
       "wave_id": 3,
       "delay_before_start": 25.0,
+      "obstacles": [
+        { "type": "satellite_debris", "spawn_y": 350.0 },
+        { "type": "satellite_debris", "spawn_y": 650.0 }
+      ],
       "enemies": [
-        { "type": "boss_orbital_carrier", "spawn_y": 320.0, "speed": 30.0 }
+        { "type": "boss_orbital_carrier", "spawn_y": 480.0, "speed": 30.0 }
       ]
     }
   ]

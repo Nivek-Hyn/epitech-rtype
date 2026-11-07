@@ -6,38 +6,47 @@
       "wave_id": 1,
       "delay_before_start": 2.0,
       "enemies": [
-        { "type": "quantum_shifter", "spawn_y": 140.0, "speed": 138.0 },
-        { "type": "quantum_shifter", "spawn_y": 320.0, "speed": 138.0 },
-        { "type": "quantum_shifter", "spawn_y": 500.0, "speed": 138.0 }
+        { "type": "quantum_shifter", "spawn_y": 210.0, "speed": 138.0 },
+        { "type": "quantum_shifter", "spawn_y": 480.0, "speed": 138.0 },
+        { "type": "quantum_shifter", "spawn_y": 750.0, "speed": 138.0 }
       ]
     },
     {
       "wave_id": 2,
       "delay_before_start": 9.0,
+      "obstacles": [
+        { "type": "singularity_shard", "spawn_y": 180.0 },
+        { "type": "singularity_shard", "spawn_y": 900.0 }
+      ],
       "enemies": [
-        { "type": "vortex_drone", "spawn_y": 180.0, "speed": 100.0 },
-        { "type": "vortex_drone", "spawn_y": 460.0, "speed": 100.0 },
-        { "type": "quantum_shifter", "spawn_y": 320.0, "speed": 145.0 }
+        { "type": "vortex_drone", "spawn_y": 270.0, "speed": 100.0 },
+        { "type": "vortex_drone", "spawn_y": 690.0, "speed": 100.0 },
+        { "type": "quantum_shifter", "spawn_y": 480.0, "speed": 145.0 }
       ]
     },
     {
       "wave_id": 3,
       "delay_before_start": 18.0,
       "enemies": [
-        { "type": "singularity_fragment", "spawn_y": 250.0, "speed": 55.0 },
-        { "type": "quantum_shifter", "spawn_y": 120.0, "speed": 148.0 },
-        { "type": "quantum_shifter", "spawn_y": 520.0, "speed": 148.0 }
+        { "type": "singularity_fragment", "spawn_y": 375.0, "speed": 55.0 },
+        { "type": "quantum_shifter", "spawn_y": 180.0, "speed": 148.0 },
+        { "type": "quantum_shifter", "spawn_y": 780.0, "speed": 148.0 }
       ]
     },
     {
       "wave_id": 4,
       "delay_before_start": 28.0,
+      "obstacles": [
+        { "type": "singularity_shard", "spawn_y": 396.0 },
+        { "type": "singularity_shard", "spawn_y": 468.0 },
+        { "type": "singularity_shard", "spawn_y": 612.0 }
+      ],
       "enemies": [
-        { "type": "vortex_drone", "spawn_y": 120.0, "speed": 104.0 },
-        { "type": "quantum_shifter", "spawn_y": 220.0, "speed": 150.0 },
-        { "type": "vortex_drone", "spawn_y": 320.0, "speed": 104.0 },
-        { "type": "quantum_shifter", "spawn_y": 420.0, "speed": 150.0 },
-        { "type": "vortex_drone", "spawn_y": 520.0, "speed": 104.0 }
+        { "type": "vortex_drone", "spawn_y": 180.0, "speed": 104.0 },
+        { "type": "quantum_shifter", "spawn_y": 330.0, "speed": 150.0 },
+        { "type": "vortex_drone", "spawn_y": 480.0, "speed": 104.0 },
+        { "type": "quantum_shifter", "spawn_y": 630.0, "speed": 150.0 },
+        { "type": "vortex_drone", "spawn_y": 780.0, "speed": 104.0 }
       ]
     }
   ]

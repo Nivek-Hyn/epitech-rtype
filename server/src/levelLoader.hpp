@@ -17,7 +17,8 @@ struct WaveConfig {
     int wave_id;
     float delay_before_start;
     std::vector<EnemySpawnConfig> enemies;
-    bool isSpawned = false; // Pour savoir si la vague a déjà été lancée
+    std::vector<EnemySpawnConfig> obstacles; // destructible tiles: they do not hold the level back
+    bool isSpawned = false;                  // Pour savoir si la vague a déjà été lancée
 };
 
 struct LevelConfig {

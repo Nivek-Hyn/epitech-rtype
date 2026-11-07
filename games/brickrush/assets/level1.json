@@ -1,0 +1,10 @@
+{
+  "name": "Warm-up",
+  "legend": { "R": "brick_red", "O": "brick_orange" },
+  "rows": [
+    "RRRRRRRRRRRR",
+    "RRRRRRRRRRRR",
+    "OOOOOOOOOOOO",
+    "OOOOOOOOOOOO"
+  ]
+}

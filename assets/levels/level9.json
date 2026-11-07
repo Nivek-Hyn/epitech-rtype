@@ -6,26 +6,34 @@
       "wave_id": 1,
       "delay_before_start": 2.5,
       "enemies": [
-        { "type": "quantum_shifter", "spawn_y": 130.0, "speed": 158.0 },
-        { "type": "vortex_drone", "spawn_y": 260.0, "speed": 112.0 },
-        { "type": "quantum_shifter", "spawn_y": 390.0, "speed": 158.0 },
-        { "type": "vortex_drone", "spawn_y": 520.0, "speed": 112.0 }
+        { "type": "quantum_shifter", "spawn_y": 195.0, "speed": 158.0 },
+        { "type": "vortex_drone", "spawn_y": 390.0, "speed": 112.0 },
+        { "type": "quantum_shifter", "spawn_y": 585.0, "speed": 158.0 },
+        { "type": "vortex_drone", "spawn_y": 780.0, "speed": 112.0 }
       ]
     },
     {
       "wave_id": 2,
       "delay_before_start": 13.0,
+      "obstacles": [
+        { "type": "singularity_shard", "spawn_y": 150.0 },
+        { "type": "singularity_shard", "spawn_y": 850.0 }
+      ],
       "enemies": [
-        { "type": "singularity_fragment", "spawn_y": 180.0, "speed": 60.0 },
-        { "type": "singularity_fragment", "spawn_y": 460.0, "speed": 60.0 },
-        { "type": "quantum_shifter", "spawn_y": 320.0, "speed": 160.0 }
+        { "type": "singularity_fragment", "spawn_y": 270.0, "speed": 60.0 },
+        { "type": "singularity_fragment", "spawn_y": 690.0, "speed": 60.0 },
+        { "type": "quantum_shifter", "spawn_y": 480.0, "speed": 160.0 }
       ]
     },
     {
       "wave_id": 3,
       "delay_before_start": 25.0,
+      "obstacles": [
+        { "type": "singularity_shard", "spawn_y": 400.0 },
+        { "type": "singularity_shard", "spawn_y": 640.0 }
+      ],
       "enemies": [
-        { "type": "boss_singularity_core", "spawn_y": 320.0, "speed": 25.0 }
+        { "type": "boss_singularity_core", "spawn_y": 480.0, "speed": 60.0 }
       ]
     }
   ]

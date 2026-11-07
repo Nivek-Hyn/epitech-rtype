@@ -67,6 +67,7 @@ nav:
   - Networking implementation: networking.md
   - Guides:
       - Build and run: build-and-run.md
+      - Campaign game design: game-design-campaign.md
       - How-to guides: how-to.md
       - Validation record: validation.md
       - Delivery and defense: delivery.md
