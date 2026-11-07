@@ -301,6 +301,11 @@ direction, 40 ms delay, 20 ms jitter).
 At 50 % loss one message was still on its way when the run ended: with the delay doubling after each repeat, a
 message needs several seconds to get through at that loss rate. These are single runs, not a benchmark.
 
+The same property is checked automatically, on every test run, by `tests/test_network_loss.cpp`: a relay between the
+real client and the real server loses 30 % of the datagrams in both directions, and the test requires that 60 reliable
+messages all arrive, each handed to the game once, that the measured loss is close to 30 %, and that a `Disconnect` still
+frees the server's slot long before its own timeout.
+
 ## 11. Snapshot rate and interpolation
 
 **What changed.** The server still simulates 60 ticks per second, but it sends a snapshot only every 2 ticks (30 per
@@ -653,6 +658,11 @@ par le client, par rapport au plus haut numéro vu.
 
 À 50 % de perte, un message était encore en route à la fin de l’essai : comme le délai double à chaque répétition,
 un message met plusieurs secondes à passer à ce taux de perte. Ce sont des essais uniques, pas un benchmark.
+
+La même propriété est vérifiée automatiquement, à chaque exécution des tests, par `tests/test_network_loss.cpp` : un
+relais entre le vrai client et le vrai serveur perd 30 % des datagrammes dans les deux sens, et le test exige que 60
+messages fiables arrivent tous, chacun transmis une seule fois au jeu, que la perte mesurée soit proche de 30 %, et
+qu’un `Disconnect` libère quand même la place du serveur bien avant son propre délai.
 
 ## 11. Fréquence des snapshots et interpolation
 
