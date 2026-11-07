@@ -91,6 +91,18 @@ version has changed) for that reason, it answers `ConnectRejected` with reason `
 of the client** so that the client can read it. The client then knows that the versions differ. A client of this
 version that talks to an older server gets no answer and gives up after its connection attempts.
 
+### 3.4 Rate limits
+
+A server protects itself from a sender that floods it, with a token bucket (a steady rate plus a short burst):
+
+- each connected client may send **300 datagrams per second**, with a burst of 150; a well-behaved client sends about 60
+  `Input` per second, one `Ping` per second and an `Ack` per reliable message, so it never reaches this;
+- all the senders the server does not know share a budget of **50 replies per second** (burst 25) for the answers it
+  gives them: `ConnectRejected`, the answer to a `Connect` of another version, and the `Ack` of §3.2.
+
+A datagram over the limit is dropped before anything is queued or answered, and counted. It does not close the
+session: the sender is served again as soon as it slows down.
+
 ## 4. Messages
 
 ### 4.1 Client → server

@@ -19,6 +19,7 @@ add_executable(rtype_tests
     test_reliable_queue.cpp
     test_snapshot_interpolator.cpp
     test_network_loss.cpp
+    test_rate_limiter.cpp
     ${PROJECT_SOURCE_DIR}/client/src/net/AsioNetworkClient.cpp
 )
 # AsioNetworkClient.cpp (client network layer, no SFML) is tested here and includes "net/AsioNetworkClient.hpp".

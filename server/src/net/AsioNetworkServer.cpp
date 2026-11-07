@@ -121,13 +121,25 @@ void AsioNetworkServer::handleDatagram(std::size_t size)
     const auto packet = protocol::decode(datagram);
     if (!packet) {
         // A client of another version would retry Connect forever. Answer in its own version so it can read it.
-        if (const auto version = protocol::otherVersionConnect(datagram))
-            sendTo(_sender, _nextSequence.fetch_add(1), protocol::ConnectRejected{protocol::RejectReason::VersionMismatch},
-                   std::nullopt, *version);
+        if (const auto version = protocol::otherVersionConnect(datagram)) {
+            if (_unknownSenders.allow(Clock::now()))
+                sendTo(_sender, _nextSequence.fetch_add(1),
+                       protocol::ConnectRejected{protocol::RejectReason::VersionMismatch}, std::nullopt, *version);
+            else
+                _traffic.addRateLimited();
+        }
         return;
     }
 
+    // A sender over its rate is ignored before anything is queued or answered, so a flood costs the server almost
+    // nothing: a client has its own budget, and every sender it does not know shares one.
     const auto player = findClient(_sender);
+    const auto now = Clock::now();
+    const bool allowed = player ? _clients[*player].limiter.allow(now) : _unknownSenders.allow(now);
+    if (!allowed) {
+        _traffic.addRateLimited();
+        return;
+    }
 
     if (std::holds_alternative<protocol::Connect>(packet->message)) {
         if (player) {

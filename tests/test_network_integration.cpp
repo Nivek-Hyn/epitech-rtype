@@ -460,3 +460,91 @@ TEST(NetworkIntegration, AnswersAClientOfAnotherVersionInItsOwnVersion)
     EXPECT_EQ(rejected->reason, rtype::protocol::RejectReason::VersionMismatch);
     EXPECT_EQ(server.clientCount(), 0u) << "a client of another version never takes a slot";
 }
+
+namespace {
+
+// Waits until the server has stopped reading datagrams: a flood sent in one go may lose some in the operating
+// system's receive buffer before the server reads them, so a fixed count cannot be waited for.
+std::uint64_t waitUntilQuiet(const rtype::server::AsioNetworkServer &server)
+{
+    auto last = server.traffic().totals.packetsReceived;
+    auto quietSince = std::chrono::steady_clock::now();
+    const auto deadline = quietSince + std::chrono::seconds(5);
+    while (std::chrono::steady_clock::now() < deadline) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        const auto now = server.traffic().totals.packetsReceived;
+        if (now != last) {
+            last = now;
+            quietSince = std::chrono::steady_clock::now();
+        } else if (std::chrono::steady_clock::now() - quietSince > std::chrono::milliseconds(150)) {
+            break;
+        }
+    }
+    return last;
+}
+
+} // namespace
+
+TEST(NetworkIntegration, AClientThatFloodsTheServerIsCutDownToItsRate)
+{
+    rtype::server::AsioNetworkServer server;
+    const std::uint16_t serverPort = findAvailablePort();
+    server.start(serverPort);
+
+    asio::io_context io;
+    Udp::socket flooder = connectedClient(io, serverPort, 1);
+    Udp::socket honest = connectedClient(io, serverPort, 1);
+    ASSERT_TRUE(waitUntilClientCount(server, 2));
+    const auto before = server.traffic().totals.packetsReceived;
+
+    constexpr std::uint32_t Flood = 3000;
+    for (std::uint32_t sequence = 2; sequence < 2 + Flood; ++sequence)
+        sendFrom(flooder, serverPort, sequence, rtype::protocol::Input{rtype::protocol::InputFlag::Up});
+    const auto received = waitUntilQuiet(server) - before;
+    ASSERT_GT(received, 400u) << "the flood must reach the server for this test to mean anything";
+
+    // Only the burst allowed to a client got through; everything else was dropped before reaching the game.
+    const auto inputs = drainInputs(server);
+    const auto allowedAtMost = static_cast<std::size_t>(rtype::ClientPacketBurst) + 60u; // burst + refill while sending
+    EXPECT_LE(inputs.size(), allowedAtMost);
+    EXPECT_GE(server.traffic().totals.rateLimited, received - allowedAtMost);
+
+    // The other client has its own budget and is not affected.
+    sendFrom(honest, serverPort, 2, rtype::protocol::Input{rtype::protocol::InputFlag::Down});
+    waitUntilQuiet(server);
+    EXPECT_EQ(drainInputs(server), (std::vector<std::uint8_t>{rtype::protocol::InputFlag::Down}));
+
+    // And the flooder is served again once it calms down.
+    std::this_thread::sleep_for(std::chrono::milliseconds(700));
+    sendFrom(flooder, serverPort, 5000, rtype::protocol::Input{rtype::protocol::InputFlag::Left});
+    waitUntilQuiet(server);
+    EXPECT_EQ(drainInputs(server), (std::vector<std::uint8_t>{rtype::protocol::InputFlag::Left}));
+}
+
+TEST(NetworkIntegration, RepliesToUnknownSendersAreLimited)
+{
+    rtype::server::AsioNetworkServer server;
+    const std::uint16_t serverPort = findAvailablePort();
+    server.start(serverPort);
+
+    asio::io_context io;
+    std::vector<Udp::socket> players;
+    for (std::size_t i = 0; i < rtype::MaxPlayers; ++i)
+        players.push_back(connectedClient(io, serverPort, 1));
+    ASSERT_TRUE(waitUntilClientCount(server, rtype::MaxPlayers));
+    const auto before = server.traffic().totals.packetsReceived;
+
+    // A fifth address asks to connect 400 times in a row: each one would get a ConnectRejected.
+    Udp::socket stranger(io, Udp::endpoint(Udp::v4(), 0));
+    stranger.non_blocking(true);
+    for (std::uint32_t i = 0; i < 400; ++i)
+        sendFrom(stranger, serverPort, i, rtype::protocol::Connect{});
+    const auto received = waitUntilQuiet(server) - before;
+    ASSERT_GT(received, 100u) << "the requests must reach the server for this test to mean anything";
+
+    const auto replies = collectPackets(stranger, std::chrono::milliseconds(300));
+    const auto allowedAtMost = static_cast<std::size_t>(rtype::UnknownSenderReplyBurst) + 20u;
+    EXPECT_GT(replies.size(), 0u);
+    EXPECT_LE(replies.size(), allowedAtMost) << "the server must not send a flood of replies to whoever asks";
+    EXPECT_GE(server.traffic().totals.rateLimited, received - allowedAtMost);
+}

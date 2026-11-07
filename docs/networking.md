@@ -142,6 +142,11 @@ The wire format is version 7 of the binary protocol. Integers are big-endian, po
 (1/16 of a world unit), and a datagram is limited to 1200 bytes. The receiver uses a fixed-size buffer and passes each
 datagram to `protocol::decode()` before handling it.
 
+Flooding is limited too: a client may send 300 datagrams per second (burst 150), and the replies to senders the
+server does not know are limited to 50 per second overall ([protocol.md](protocol.md) §3.4). The excess is dropped
+before it is queued or answered, so a flood costs the server almost nothing and cannot be used to send a flood of
+replies to someone else. `r-type_server --stats` counts them as "over the rate limit".
+
 The decoder rejects truncated or oversized datagrams, incorrect magic/version, unknown message types, payload
 length mismatches, invalid enum values, reserved input bits, and snapshots whose entity count does not match
 their payload. Invalid packets are dropped without being passed into the game. The protocol is specified in
@@ -496,6 +501,12 @@ Le format transmis sur le réseau est la version 7 du protocole binaire. Les ent
 positions sont des valeurs quantifiées sur 16 bits (1/16 d’unité du monde) et chaque datagramme est limité à
 1 200 octets. Le récepteur
 utilise un buffer de taille fixe et passe chaque datagramme à `protocol::decode()` avant de le traiter.
+
+Les inondations sont limitées aussi : un client peut envoyer 300 datagrammes par seconde (rafale de 150), et les
+réponses aux expéditeurs que le serveur ne connaît pas sont limitées à 50 par seconde au total
+([protocol.md](protocol.md) §3.4). L’excédent est jeté avant d’être mis en file ou de recevoir une réponse : une
+inondation ne coûte presque rien au serveur et ne peut pas servir à envoyer une inondation de réponses à quelqu’un
+d’autre. `r-type_server --stats` les compte comme « over the rate limit ».
 
 Le décodeur rejette les datagrammes tronqués ou trop volumineux, les signatures ou versions incorrectes, les
 types de messages inconnus, les tailles de contenu incohérentes, les valeurs d’énumération invalides, les bits
