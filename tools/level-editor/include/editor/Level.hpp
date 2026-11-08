@@ -35,8 +35,8 @@ struct EnemyType {
     std::string name;
     float speed = 100.f;
     std::string list = "enemies"; // "enemies" or "obstacles"
-    int variant = 0;               // sprite, from the Kind of the prefab
-    float width = 64.f;            // hit area, from the Hitbox of the prefab
+    int variant = 0;              // sprite, from the Kind of the prefab
+    float width = 64.f;           // hit area, from the Hitbox of the prefab
     float height = 64.f;
     float offsetY = 0.f;
 };
