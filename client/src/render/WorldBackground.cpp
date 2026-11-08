@@ -172,7 +172,7 @@ void WorldBackground::drawDunes(sf::RenderTarget &target, float baseY, float hei
 void WorldBackground::drawSingularity(sf::RenderTarget &target) const
 {
     const sf::Vector2f center{1450.f, 470.f};
-    drawCircle(target, center, 420.f, sf::Color(120, 40, 160, 25));
+    drawCircle(target, center, 330.f, sf::Color(120, 40, 160, 18));
     const std::array<sf::Color, 4> disk = {sf::Color(255, 170, 60, 150), sf::Color(240, 110, 70, 120),
                                            sf::Color(190, 70, 200, 100), sf::Color(110, 60, 220, 70)};
     for (std::size_t i = 0; i < disk.size(); i++) {

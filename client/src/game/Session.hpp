@@ -69,6 +69,9 @@ private:
     void drawScore(sf::RenderWindow &window) const;
     void drawBossAlert(sf::RenderWindow &window) const;
     void drawPlayers(sf::RenderWindow &window) const;
+    void drawPlayerLine(sf::RenderWindow &window, std::uint8_t player, bool active, float y) const;
+    void drawPanel(sf::RenderWindow &window, sf::Vector2f position, sf::Vector2f size) const;
+    void drawHeart(sf::RenderWindow &window, sf::Vector2f center, sf::Color color) const;
     void drawDamageFlash(sf::RenderWindow &window) const;
     void drawWaveBanner(sf::RenderWindow &window) const;
     void drawWaitingRoom(sf::RenderWindow &window) const;
