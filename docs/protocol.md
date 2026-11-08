@@ -1,8 +1,19 @@
-# R-Type Network Protocol — version 6
+# R-Type Network Protocol — version 7
 
-This document describes every message exchanged between `r-type_client` and `r-type_server`.
-It should be enough to write a new client. The reference implementation is `common/src/Protocol.cpp`. This is
-the protocol specification; runtime gaps are listed in the [networking implementation guide](networking.md).
+**Status of this document.** Specification of the R-Type game protocol, version 7, as implemented by the
+delivered client and server. Its presentation follows the conventions of the Internet RFCs; it is not an IETF
+standard.
+
+**Abstract.** R-Type clients and an authoritative server exchange binary datagrams over UDP. Clients send the
+actions held by the player; the server sends the state of the whole game 30 times per second. A few messages that
+nothing else replaces are acknowledged and repeated. This document is enough to write a new client without reading
+the C++: the reference implementation is `common/src/Protocol.cpp`, and the example datagrams of §7 are checked by
+the unit tests (`tests/test_protocol.cpp`). Runtime details are in the [networking implementation guide](networking.md).
+
+**Conventions.** The key words **MUST**, **MUST NOT**, **SHOULD**, **SHOULD NOT** and **MAY** are to be
+interpreted as described in [RFC 2119](https://www.rfc-editor.org/rfc/rfc2119) and
+[RFC 8174](https://www.rfc-editor.org/rfc/rfc8174) when, and only when, they appear in bold capitals. Byte values
+are written in hexadecimal (`0x52`). `u8`, `u16` and `u32` are unsigned integers of 1, 2 and 4 bytes.
 
 ## 1. Transport
 
@@ -15,7 +26,7 @@ the protocol specification; runtime gaps are listed in the [networking implement
 | Offset | Size | Field | Description |
 |---|---|---|---|
 | 0 | u16 | magic | Always `0x5254` ("RT") |
-| 2 | u8 | version | Protocol version, currently `6` |
+| 2 | u8 | version | Protocol version, currently `7` |
 | 3 | u8 | type | Message type (see §4); bit `0x40` set means a reliable message (§3.2) |
 | 4 | u32 | sequence | Number of the packet for this peer, see §3.1 |
 | 8 | u16 | payload_size | Number of bytes after the header |
@@ -31,7 +42,7 @@ A receiver **silently drops** a datagram if any of these is true:
 - an enumerated field has an unknown value.
 - an `Input` packet sets any reserved flag bit (`0xE0`).
 
-A malformed datagram must never crash the receiver or close the session.
+A malformed datagram **MUST NOT** crash the receiver or close the session.
 
 ### 3.1 Sequence numbers
 
@@ -153,7 +164,7 @@ Each entity:
 `p = q / 16 − 1024`. The world is 1920 × 1080 with its origin at the top-left; the range −1024 to +3071.94 leaves
 room for entities that appear or leave outside the screen, and a value outside it is clamped to the nearest end (it
 never wraps around). The error is at most 1/32 of a unit, far below one pixel, and an entity takes 10 bytes instead
-of the 14 it took with two 32-bit floats. A receiver must treat `NaN` and infinities as the ends of the range.
+of the 14 it took with two 32-bit floats. A sender **MUST** treat `NaN` and infinities as the ends of the range.
 
 A tick with more than 117 entities is sent as several Snapshot packets with the same `tick`.
 
@@ -161,8 +172,8 @@ A tick with more than 117 entities is sent as several Snapshot packets with the 
 
 The server simulates 60 ticks per second but sends a snapshot only every **2 ticks** by default (30 per second;
 `r-type_server --snapshot-every N` changes it). The `tick` of two consecutive snapshots therefore differs by the
-sending interval, and a receiver must not expect consecutive tick numbers. Each snapshot is complete, so a lost one
-costs nothing more than the wait for the next. A client should show the world slightly in the past and blend two
+sending interval, and a receiver **MUST NOT** expect consecutive tick numbers. Each snapshot is complete, so a lost one
+costs nothing more than the wait for the next. A client **SHOULD** show the world slightly in the past and blend two
 snapshots (the reference client shows it 2 sending intervals late), as described in [networking.md](networking.md)
 §11. Losses are counted from the gaps in the packet numbers of §3.1, not from the tick numbers.
 
@@ -185,3 +196,39 @@ Since snapshots keep being sent (§4.3), this information cannot be lost.
 The runtime implements every behavior described above. Only three messages are sent reliably (§3.2): `Connect` is
 repeated by the client until it gets an answer, which is a separate mechanism. See the
 [networking implementation guide](networking.md) for the current behavior and limitations.
+
+## 7. Example datagrams
+
+Both examples are produced byte for byte by the reference encoder (test `Protocol.SpecificationExamplesMatchTheEncoder`).
+
+**Input** — packet number 7, the player holds *up* and *shoot* (`0x01 | 0x10`):
+
+```text
+52 54  07  02  00 00 00 07  00 01  |  11
+magic  ver type sequence    size   |  flags
+```
+
+**Snapshot** — packet number 8, tick 120, playing, score 300, player 0 has 3 lives, one entity: the ship of
+player 0 (net id 5) at (100, 300). Quantized: x = (100 + 1024) × 16 = 17984 = `0x4640`, y = (300 + 1024) × 16 =
+21184 = `0x52C0`.
+
+```text
+52 54 07 83 00 00 00 08 00 19     header: Snapshot, sequence 8, payload of 25 bytes
+00 00 00 78                       tick 120
+02                                state: playing
+00 00 01 2C                       score 300
+03 00 00 00                       lives of players 0 to 3
+00 01                             one entity
+00 00 00 05 01 00 46 40 52 C0     net id 5, player, variant 0, x, y
+```
+
+## 8. Security considerations
+
+- Any host can send datagrams to the server port. Every field is validated (§3) and a datagram that fails is
+  dropped without an answer, except `Connect` of another version (§3.3).
+- A peer over its packet budget is ignored before anything is queued (§3.4), so a flood cannot exhaust memory.
+- Clients send actions only; positions, damage and score are computed by the server, so a modified client cannot
+  teleport or award itself points.
+- There is no authentication or encryption: a host on the path can read the traffic or forge packets with the
+  address of a player. The game carries no personal data; a session token is a possible extension.
+

@@ -395,3 +395,17 @@ TEST(Quantization, TheDecodedSnapshotKeepsEveryOtherFieldExactly)
     EXPECT_FLOAT_EQ(received.entities[0].x, 640.25f);
     EXPECT_FLOAT_EQ(received.entities[0].y, 360.75f);
 }
+
+// The example datagrams of docs/protocol.md §7, byte for byte: the specification and the code must agree.
+TEST(Protocol, SpecificationExamplesMatchTheEncoder)
+{
+    const std::vector<std::uint8_t> input = {0x52, 0x54, 0x07, 0x02, 0x00, 0x00, 0x00, 0x07, 0x00, 0x01, 0x11};
+    EXPECT_EQ(encode({7, Input{InputFlag::Up | InputFlag::Shoot}}), input);
+
+    const std::vector<std::uint8_t> snapshot = {0x52, 0x54, 0x07, 0x83, 0x00, 0x00, 0x00, 0x08, 0x00, 0x19, 0x00, 0x00,
+                                                0x00, 0x78, 0x02, 0x00, 0x00, 0x01, 0x2C, 0x03, 0x00, 0x00, 0x00, 0x00,
+                                                0x01, 0x00, 0x00, 0x00, 0x05, 0x01, 0x00, 0x46, 0x40, 0x52, 0xC0};
+    EXPECT_EQ(
+        encode({8, Snapshot{120, GameState::Playing, 300, {{5, EntityType::Player, 0, 100.f, 300.f}}, {3, 0, 0, 0}}}),
+        snapshot);
+}
