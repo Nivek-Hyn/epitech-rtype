@@ -2,12 +2,14 @@
 
 #include "common/Constants.hpp"
 
+#include <exception>
+#include <iostream>
 #include <memory>
 #include <utility>
 
 namespace rtype::server {
 
-AsioNetworkServer::AsioNetworkServer() : _socket(_io), _timeoutTimer(_io) {}
+AsioNetworkServer::AsioNetworkServer() : _socket(_io), _timeoutTimer(_io), _reliableTimer(_io) {}
 
 AsioNetworkServer::~AsioNetworkServer()
 {
@@ -20,11 +22,31 @@ void AsioNetworkServer::start(std::uint16_t port)
         return;
 
     _io.restart();
+    _traffic.reset();
+    _rateMeter = engine::net::RateMeter{};
+    _sentRate = 0.0;
+    _receivedRate = 0.0;
     _socket.open(Udp::v4());
     _socket.bind(Udp::endpoint(Udp::v4(), port));
     receive();
     scheduleTimeoutCheck();
-    _thread = std::thread([this] { _io.run(); });
+    scheduleReliableTick();
+    _thread = std::thread([this] { runIo(); });
+}
+
+// An exception escaping the I/O thread would terminate the whole server: report it and keep serving.
+void AsioNetworkServer::runIo()
+{
+    for (;;) {
+        try {
+            _io.run();
+            return;
+        } catch (const std::exception &error) {
+            std::cerr << "r-type_server: network error: " << error.what() << '\n';
+        } catch (...) {
+            std::cerr << "r-type_server: unknown network error\n";
+        }
+    }
 }
 
 void AsioNetworkServer::stop()
@@ -35,6 +57,7 @@ void AsioNetworkServer::stop()
     _io.stop();
     _thread.join();
     _timeoutTimer.cancel();
+    _reliableTimer.cancel();
     asio::error_code error;
     _socket.close(error);
 }
@@ -49,6 +72,19 @@ void AsioNetworkServer::send(PlayerId player, const protocol::Message &message)
     asio::post(_io, [this, player, message] { sendToPlayer(player, message); });
 }
 
+void AsioNetworkServer::sendReliable(PlayerId player, const protocol::Message &message)
+{
+    asio::post(_io, [this, player, message] { sendReliableToPlayer(player, message); });
+}
+
+void AsioNetworkServer::broadcastReliable(const protocol::Message &message)
+{
+    asio::post(_io, [this, message] {
+        for (PlayerId player = 0; player < MaxPlayers; ++player)
+            sendReliableToPlayer(player, message);
+    });
+}
+
 void AsioNetworkServer::broadcast(const protocol::Message &message)
 {
     asio::post(_io, [this, message] {
@@ -57,12 +93,22 @@ void AsioNetworkServer::broadcast(const protocol::Message &message)
     });
 }
 
+engine::net::TrafficStats AsioNetworkServer::traffic() const
+{
+    return {_traffic.totals(), {_sentRate, _receivedRate}};
+}
+
 void AsioNetworkServer::receive()
 {
     _socket.async_receive_from(asio::buffer(_receiveBuffer), _sender,
                                [this](const asio::error_code &error, std::size_t size) {
-                                   if (!error)
-                                       handleDatagram(size);
+                                   if (!error) {
+                                       try {
+                                           handleDatagram(size);
+                                       } catch (const std::exception &failure) {
+                                           std::cerr << "r-type_server: dropped a datagram: " << failure.what() << '\n';
+                                       }
+                                   }
                                    if (_socket.is_open())
                                        receive();
                                });
@@ -70,35 +116,100 @@ void AsioNetworkServer::receive()
 
 void AsioNetworkServer::handleDatagram(std::size_t size)
 {
-    const auto packet = protocol::decode(std::span(_receiveBuffer).first(size));
-    if (!packet)
+    _traffic.addReceived(size);
+    const auto datagram = std::span(_receiveBuffer).first(size);
+    const auto packet = protocol::decode(datagram);
+    if (!packet) {
+        // A client of another version would retry Connect forever. Answer in its own version so it can read it.
+        if (const auto version = protocol::otherVersionConnect(datagram)) {
+            if (_unknownSenders.allow(Clock::now()))
+                sendTo(_sender, _nextSequence.fetch_add(1),
+                       protocol::ConnectRejected{protocol::RejectReason::VersionMismatch}, std::nullopt, *version);
+            else
+                _traffic.addRateLimited();
+        }
         return;
+    }
 
+    // A sender over its rate is ignored before anything is queued or answered, so a flood costs the server almost
+    // nothing: a client has its own budget, and every sender it does not know shares one.
     const auto player = findClient(_sender);
-    if (player)
-        _clients[*player].lastSeen = Clock::now();
+    const auto now = Clock::now();
+    const bool allowed = player ? _clients[*player].limiter.allow(now) : _unknownSenders.allow(now);
+    if (!allowed) {
+        _traffic.addRateLimited();
+        return;
+    }
 
     if (std::holds_alternative<protocol::Connect>(packet->message)) {
         if (player) {
+            // A client that connects again from the same address starts over: number its packets from scratch.
+            _clients[*player].lastSeen = Clock::now();
+            _clients[*player].incoming.reset();
+            _clients[*player].incoming.receive(packet->sequence);
+            _clients[*player].incomingReliable.reset();
+            _clients[*player].reliable = engine::net::ReliableQueue<protocol::Message>{}; // events of the old session
             sendToPlayer(*player, protocol::ConnectAccepted{*player});
             return;
         }
         for (PlayerId candidate = 0; candidate < MaxPlayers; ++candidate) {
             if (!_clients[candidate].active) {
-                _clients[candidate] = Client{true, _sender, Clock::now()};
+                _clients[candidate] = Client{};
+                _clients[candidate].active = true;
+                _clients[candidate].endpoint = _sender;
+                _clients[candidate].lastSeen = Clock::now();
+                _clients[candidate].incoming.receive(packet->sequence);
+                ++_clientCount;
                 _events.push(PlayerJoined{candidate});
                 sendToPlayer(candidate, protocol::ConnectAccepted{candidate});
                 return;
             }
         }
-        sendTo(_sender, protocol::ConnectRejected{protocol::RejectReason::ServerFull});
+        sendTo(_sender, _nextSequence.fetch_add(1), protocol::ConnectRejected{protocol::RejectReason::ServerFull});
         return;
     }
 
-    if (!player)
+    if (!player) {
+        // The sender may have been removed after its Disconnect and keep repeating it: tell it to stop.
+        if (packet->reliableId)
+            sendTo(_sender, _nextSequence.fetch_add(1), protocol::Ack{*packet->reliableId});
         return;
+    }
+    Client &client = _clients[*player];
+
+    // A copy of a packet already handled, or one far too old, must not act twice (a stale Disconnect or Ping would).
+    const auto verdict = client.incoming.receive(packet->sequence);
+    if (verdict == engine::net::SequenceVerdict::Duplicate) {
+        _traffic.addDuplicate();
+        return;
+    }
+    if (verdict == engine::net::SequenceVerdict::TooOld) {
+        _traffic.addOutdated();
+        return;
+    }
+    client.lastSeen = Clock::now();
+
+    if (const auto *ack = std::get_if<protocol::Ack>(&packet->message)) {
+        client.reliable.acknowledge(ack->reliableId, Clock::now());
+        return;
+    }
+    if (packet->reliableId) {
+        // Always answer, even to a copy: the previous Ack may be the datagram that was lost.
+        sendTo(client.endpoint, client.nextSequence++, protocol::Ack{*packet->reliableId});
+        const auto reliableVerdict = client.incomingReliable.receive(*packet->reliableId);
+        if (reliableVerdict == engine::net::SequenceVerdict::Duplicate ||
+            reliableVerdict == engine::net::SequenceVerdict::TooOld) {
+            _traffic.addDuplicate();
+            return;
+        }
+    }
+
     if (const auto *input = std::get_if<protocol::Input>(&packet->message)) {
-        _events.push(PlayerInput{*player, input->flags});
+        // An Input states which keys are held now: one that arrives after a newer one is already obsolete.
+        if (verdict == engine::net::SequenceVerdict::Late)
+            _traffic.addOutdated();
+        else
+            _events.push(PlayerInput{*player, input->flags});
     } else if (std::holds_alternative<protocol::Disconnect>(packet->message)) {
         removeClient(*player, protocol::LeaveReason::Disconnected);
     } else if (const auto *ping = std::get_if<protocol::Ping>(&packet->message)) {
@@ -112,6 +223,7 @@ void AsioNetworkServer::scheduleTimeoutCheck()
     _timeoutTimer.async_wait([this](const asio::error_code &error) {
         if (error)
             return;
+        updateRates();
         const auto now = Clock::now();
         for (PlayerId player = 0; player < MaxPlayers; ++player) {
             if (_clients[player].active && now - _clients[player].lastSeen > rtype::ClientTimeout)
@@ -121,17 +233,67 @@ void AsioNetworkServer::scheduleTimeoutCheck()
     });
 }
 
-void AsioNetworkServer::sendTo(const Udp::endpoint &endpoint, protocol::Message message)
+void AsioNetworkServer::scheduleReliableTick()
 {
-    auto bytes =
-        std::make_shared<std::vector<std::uint8_t>>(protocol::encode({_nextSequence.fetch_add(1), std::move(message)}));
+    _reliableTimer.expires_after(std::chrono::milliseconds(50));
+    _reliableTimer.async_wait([this](const asio::error_code &error) {
+        if (error)
+            return;
+        for (PlayerId player = 0; player < MaxPlayers; ++player)
+            resendReliable(player);
+        scheduleReliableTick();
+    });
+}
+
+void AsioNetworkServer::sendReliableToPlayer(PlayerId player, protocol::Message message)
+{
+    if (player >= MaxPlayers || !_clients[player].active)
+        return;
+    _clients[player].reliable.push(std::move(message));
+    resendReliable(player); // sends it right away; later copies come from the timer
+}
+
+void AsioNetworkServer::resendReliable(PlayerId player)
+{
+    Client &client = _clients[player];
+    if (!client.active)
+        return;
+    const auto retransmissions =
+        client.reliable.resendDue(Clock::now(), [this, &client](std::uint32_t id, const protocol::Message &message) {
+            sendTo(client.endpoint, client.nextSequence++, message, id);
+        });
+    _traffic.addRetransmissions(retransmissions);
+}
+
+void AsioNetworkServer::updateRates()
+{
+    const auto rates =
+        _rateMeter.sample(_traffic.totals(), std::chrono::duration<double>(Clock::now().time_since_epoch()).count());
+    _sentRate = rates.sentBytesPerSecond;
+    _receivedRate = rates.receivedBytesPerSecond;
+}
+
+void AsioNetworkServer::sendTo(const Udp::endpoint &endpoint, std::uint32_t sequence, protocol::Message message,
+                               std::optional<std::uint32_t> reliableId, std::uint8_t version)
+{
+    auto bytes = std::make_shared<std::vector<std::uint8_t>>(
+        protocol::encode({sequence, std::move(message), reliableId}, version));
+    _traffic.addSent(bytes->size());
     _socket.async_send_to(asio::buffer(*bytes), endpoint, [bytes](const asio::error_code &, std::size_t) {});
 }
 
 void AsioNetworkServer::sendToPlayer(PlayerId player, protocol::Message message)
 {
-    if (player < MaxPlayers && _clients[player].active)
-        sendTo(_clients[player].endpoint, std::move(message));
+    if (player >= MaxPlayers || !_clients[player].active)
+        return;
+    // Every packet to this client, including each part of a split snapshot, gets the client's next number.
+    Client &client = _clients[player];
+    if (const auto *snapshot = std::get_if<protocol::Snapshot>(&message)) {
+        for (auto &part : protocol::splitSnapshot(*snapshot))
+            sendTo(client.endpoint, client.nextSequence++, std::move(part));
+        return;
+    }
+    sendTo(client.endpoint, client.nextSequence++, std::move(message));
 }
 
 std::optional<PlayerId> AsioNetworkServer::findClient(const Udp::endpoint &endpoint) const
@@ -148,7 +310,11 @@ void AsioNetworkServer::removeClient(PlayerId player, protocol::LeaveReason reas
     if (player >= MaxPlayers || !_clients[player].active)
         return;
     _clients[player].active = false;
+    _clients[player].reliable = engine::net::ReliableQueue<protocol::Message>{};
+    --_clientCount;
     _events.push(PlayerDisconnected{player, reason});
+    for (PlayerId other = 0; other < MaxPlayers; ++other)
+        sendReliableToPlayer(other, protocol::PlayerLeft{player, reason});
 }
 
 } // namespace rtype::server

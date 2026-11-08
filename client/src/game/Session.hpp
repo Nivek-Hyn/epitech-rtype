@@ -1,0 +1,105 @@
+#pragma once
+
+#include "ResourceManager.hpp"
+#include "common/Constants.hpp"
+#include "common/Protocol.hpp"
+#include "common/SnapshotAssembler.hpp"
+#include "common/SnapshotInterpolator.hpp"
+#include "net/INetworkClient.hpp"
+#include "render/EntityRenderer.hpp"
+#include "ui/GameConfig.hpp"
+
+#include <SFML/Graphics.hpp>
+
+#include <array>
+#include <cstdint>
+#include <optional>
+#include <string>
+#include <unordered_map>
+#include <vector>
+
+namespace rtype::client {
+
+// What the client knows about the game it is playing: the snapshots received, shown slightly in the past and
+// smoothed (SnapshotInterpolator), and the visual effects they produce (explosions, damage flash, screen shake,
+// wave banner). The server decides everything else.
+class Session {
+public:
+    static constexpr float DamageFlashDuration = 0.45f; // seconds
+    static constexpr float WaveBannerDuration = 2.8f;
+
+    explicit Session(ResourceManager &resources) : _resources(resources), _renderer(resources) {}
+
+    // Forgets the previous game, when going back to the menu.
+    void reset();
+    // Advances the timers of the visual effects.
+    void update(float dt, bool connected);
+    // Sends the pressed actions to the server (nothing once the game has ended).
+    void sendInput(INetworkClient &network, const ui::GameConfig &config, float dt);
+    // Reads every message the network received, then handles the snapshots whose time has come.
+    void receive(INetworkClient &network);
+    // Why the server refused us, after a ConnectRejected.
+    const std::string &rejectionReason() const { return _rejectionReason; }
+
+    // The world view, shaken for a moment when the local ship is hit.
+    sf::View view() const;
+    void draw(sf::RenderWindow &window, float time, float dt, bool hasAssets);
+
+private:
+    void handle(const protocol::Message &message, bool &gotSnapshot);
+    void onSnapshot(const protocol::Snapshot &snapshot);
+    void updateGameState(const protocol::Snapshot &snapshot);
+    void updateWaveCounter(const protocol::Snapshot &snapshot);
+    void playDestroyEffects(const protocol::Snapshot &snapshot);
+    void onDestroyed(const protocol::EntityState &entity, const protocol::Snapshot &snapshot,
+                     const std::vector<sf::Vector2f> &ships);
+    void onShipHit(const protocol::EntityState &shot, const std::vector<sf::Vector2f> &ships);
+    void onEnemyHit(const protocol::EntityState &missile, const protocol::Snapshot &snapshot);
+    void addExplosion(const protocol::EntityState &entity, float duration);
+    float tiltOf(const protocol::EntityState &entity, float dt);
+
+    // SessionHud.cpp
+    void drawConnecting(sf::RenderWindow &window) const;
+    void drawHud(sf::RenderWindow &window) const;
+    void drawScore(sf::RenderWindow &window) const;
+    void drawBossAlert(sf::RenderWindow &window) const;
+    void drawPlayers(sf::RenderWindow &window) const;
+    void drawDamageFlash(sf::RenderWindow &window) const;
+    void drawWaveBanner(sf::RenderWindow &window) const;
+    void drawEndScreen(sf::RenderWindow &window) const;
+    sf::Text centeredText(const std::string &string, unsigned int size, sf::Color color, sf::Vector2f center) const;
+
+    ResourceManager &_resources;
+    EntityRenderer _renderer;
+
+    protocol::SnapshotAssembler _world; // rebuilds the world of a tick from its (possibly split) snapshots
+    protocol::SnapshotInterpolator _interpolator{InterpolationDelaySnapshots};
+    std::vector<protocol::EntityState> _entities; // last snapshot handled: what the effects compare with
+    std::vector<protocol::EntityState> _shown;    // interpolated entities drawn this frame
+    std::string _rejectionReason = "the server refused the connection";
+    std::vector<Explosion> _explosions;
+    std::optional<std::uint8_t> _localPlayer;
+    std::array<std::uint8_t, 4> _lives{};
+    std::uint32_t _score = 0;
+    bool _connected = false;
+    bool _gameOver = false;
+    bool _gameWon = false;
+    bool _playerWasSpawned = false;
+
+    float _damageFlash = 0.f;
+    float _shakeTimer = 0.f;
+    float _shakeIntensity = 0.f;
+    float _shootSoundCooldown = 0.f;
+
+    int _wave = 1;
+    float _waveBanner = 0.f;
+    float _waveCooldown = 0.f;
+    bool _waveStarted = false;
+    int _lastEnemyCount = 0;
+
+    float _localTilt = 0.f;
+    std::unordered_map<std::uint32_t, float> _lastY; // last height of each remote ship
+    std::unordered_map<std::uint32_t, float> _tilts; // displayed tilt of each remote ship
+};
+
+} // namespace rtype::client

@@ -1,5 +1,5 @@
-#include "Game.hpp"
 #include "EnemyShootSystem.hpp"
+#include "Game.hpp"
 #include "MovementSystem.hpp"
 #include "common/Components.hpp"
 
@@ -194,13 +194,16 @@ TEST(Game, EnemyZigzagShootingAppliesMovementPattern)
     registry.emplace<rtype::components::EnemyAttack>(enemy, 0.f, 0.5f, 300.f, 0, "zigzag");
 
     engine::ecs::Entity spawnedBullet = engine::ecs::NullEntity;
-    updateEnemyShooting(registry, [&](protocol::EntityType type, std::uint8_t variant, float x, float y) {
-        spawnedBullet = registry.spawn();
-        registry.emplace<rtype::components::Kind>(spawnedBullet, type, variant);
-        registry.emplace<rtype::components::Position>(spawnedBullet, x, y);
-        registry.emplace<rtype::components::Velocity>(spawnedBullet, 0.f, 0.f);
-        return spawnedBullet;
-    }, 0.6f);
+    updateEnemyShooting(
+        registry,
+        [&](protocol::EntityType type, std::uint8_t variant, float x, float y) {
+            spawnedBullet = registry.spawn();
+            registry.emplace<rtype::components::Kind>(spawnedBullet, type, variant);
+            registry.emplace<rtype::components::Position>(spawnedBullet, x, y);
+            registry.emplace<rtype::components::Velocity>(spawnedBullet, 0.f, 0.f);
+            return spawnedBullet;
+        },
+        0.6f);
 
     ASSERT_NE(spawnedBullet, engine::ecs::NullEntity);
     const auto *pattern = registry.get<rtype::components::MovementPattern>(spawnedBullet);
@@ -325,21 +328,22 @@ TEST(Game, EnemyMultipleAttacksShootSimultaneously)
     registry.emplace<rtype::components::Position>(enemy, 500.f, 200.f);
     registry.emplace<rtype::components::Kind>(enemy, protocol::EntityType::Enemy, 0);
 
-    std::vector<rtype::components::AttackEntry> attacks = {
-        {0.f, 0.5f, 400.f, 1, "straight", 0.f},
-        {0.f, 0.5f, 250.f, 0, "zigzag", 30.f}
-    };
+    std::vector<rtype::components::AttackEntry> attacks = {{0.f, 0.5f, 400.f, 1, "straight", 0.f},
+                                                           {0.f, 0.5f, 250.f, 0, "zigzag", 30.f}};
     registry.emplace<rtype::components::EnemyAttack>(enemy, rtype::components::EnemyAttack{attacks});
 
     std::vector<engine::ecs::Entity> spawnedBullets;
-    updateEnemyShooting(registry, [&](protocol::EntityType type, std::uint8_t variant, float x, float y) {
-        auto bullet = registry.spawn();
-        registry.emplace<rtype::components::Kind>(bullet, type, variant);
-        registry.emplace<rtype::components::Position>(bullet, x, y);
-        registry.emplace<rtype::components::Velocity>(bullet, 0.f, 0.f);
-        spawnedBullets.push_back(bullet);
-        return bullet;
-    }, 0.6f);
+    updateEnemyShooting(
+        registry,
+        [&](protocol::EntityType type, std::uint8_t variant, float x, float y) {
+            auto bullet = registry.spawn();
+            registry.emplace<rtype::components::Kind>(bullet, type, variant);
+            registry.emplace<rtype::components::Position>(bullet, x, y);
+            registry.emplace<rtype::components::Velocity>(bullet, 0.f, 0.f);
+            spawnedBullets.push_back(bullet);
+            return bullet;
+        },
+        0.6f);
 
     ASSERT_EQ(spawnedBullets.size(), 2u);
 
@@ -374,9 +378,8 @@ TEST(Game, BossStopsAtItsPositionAndTheLevelWaitsForItsDeath)
     run(game, 60.f);
 
     const auto snap = game.snapshot();
-    const auto boss = std::find_if(snap.entities.begin(), snap.entities.end(), [](const auto &entity) {
-        return entity.type == protocol::EntityType::Enemy;
-    });
+    const auto boss = std::find_if(snap.entities.begin(), snap.entities.end(),
+                                   [](const auto &entity) { return entity.type == protocol::EntityType::Enemy; });
     ASSERT_NE(boss, snap.entities.end());
     EXPECT_NEAR(boss->x, 300.f, 10.f);
     EXPECT_EQ(game.gameState(), protocol::GameState::Playing);
@@ -887,13 +890,16 @@ TEST(Game, GravityWellBulletCurvesTowardTheCentralLine)
     registry.emplace<rtype::components::EnemyAttack>(enemy, 0.f, 0.5f, 300.f, 0, "gravity_well");
 
     engine::ecs::Entity bullet = engine::ecs::NullEntity;
-    updateEnemyShooting(registry, [&](protocol::EntityType type, std::uint8_t variant, float x, float y) {
-        bullet = registry.spawn();
-        registry.emplace<rtype::components::Kind>(bullet, type, variant);
-        registry.emplace<rtype::components::Position>(bullet, x, y);
-        registry.emplace<rtype::components::Velocity>(bullet, 0.f, 0.f);
-        return bullet;
-    }, 0.6f);
+    updateEnemyShooting(
+        registry,
+        [&](protocol::EntityType type, std::uint8_t variant, float x, float y) {
+            bullet = registry.spawn();
+            registry.emplace<rtype::components::Kind>(bullet, type, variant);
+            registry.emplace<rtype::components::Position>(bullet, x, y);
+            registry.emplace<rtype::components::Velocity>(bullet, 0.f, 0.f);
+            return bullet;
+        },
+        0.6f);
 
     ASSERT_NE(bullet, engine::ecs::NullEntity);
     EXPECT_GT(registry.get<rtype::components::Velocity>(bullet)->y, 0.f); // pulled down, toward y = 540
@@ -926,9 +932,8 @@ TEST(Game, EnemyKeepsTheSpriteOfItsDefinition)
     run(game, 0.1f);
 
     const auto snap = game.snapshot();
-    const auto enemy = std::find_if(snap.entities.begin(), snap.entities.end(), [](const auto &entity) {
-        return entity.type == protocol::EntityType::Enemy;
-    });
+    const auto enemy = std::find_if(snap.entities.begin(), snap.entities.end(),
+                                    [](const auto &entity) { return entity.type == protocol::EntityType::Enemy; });
     ASSERT_NE(enemy, snap.entities.end());
     EXPECT_EQ(enemy->variant, 3);
 }

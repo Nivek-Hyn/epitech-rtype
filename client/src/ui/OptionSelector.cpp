@@ -2,15 +2,10 @@
 
 namespace rtype::client::ui {
 
-OptionSelector::OptionSelector(const sf::Font &font, const std::string &labelText,
-                               std::vector<std::string> options, sf::Vector2f position,
-                               std::size_t defaultIndex)
-    : _label(font, labelText, 24),
-      _arrowLeft(font, "<", 26),
-      _valueText(font, "", 22),
-      _arrowRight(font, ">", 26),
-      _options(std::move(options)),
-      _currentIndex(defaultIndex)
+OptionSelector::OptionSelector(const sf::Font &font, const std::string &labelText, std::vector<std::string> options,
+                               sf::Vector2f position, std::size_t defaultIndex)
+    : _label(font, labelText, 24), _arrowLeft(font, "<", 26), _valueText(font, "", 22), _arrowRight(font, ">", 26),
+      _options(std::move(options)), _currentIndex(defaultIndex)
 {
     _label.setPosition({position.x, position.y + 10.f});
     _label.setFillColor(sf::Color(190, 195, 215));
@@ -183,4 +178,4 @@ void OptionSelector::setSelectedIndex(std::size_t index)
     }
 }
 
-}
+} // namespace rtype::client::ui

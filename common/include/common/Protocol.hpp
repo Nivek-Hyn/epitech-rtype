@@ -15,7 +15,7 @@
 namespace rtype::protocol {
 
 inline constexpr std::uint16_t Magic = 0x5254; // "RT"
-inline constexpr std::uint8_t Version = 5;
+inline constexpr std::uint8_t Version = 7;
 inline constexpr std::size_t HeaderSize = 10;
 // Stay under the usual Internet MTU so datagrams are never fragmented.
 inline constexpr std::size_t MaxPacketSize = 1200;
@@ -26,6 +26,7 @@ enum class MessageType : std::uint8_t {
     Input = 0x02,
     Disconnect = 0x03,
     Ping = 0x04,
+    Ack = 0x05, // both directions: the receiver of a reliable message sends it back
     // server -> client
     ConnectAccepted = 0x81,
     ConnectRejected = 0x82,
@@ -34,6 +35,10 @@ enum class MessageType : std::uint8_t {
     PlayerLeft = 0x85,
     Pong = 0x86,
 };
+
+// Set in the type byte of a packet that must be delivered: its payload then starts with a u32 reliable number, and the
+// receiver answers with an Ack carrying that number (the sender repeats the packet until it gets it).
+inline constexpr std::uint8_t ReliableFlag = 0x40;
 
 enum class EntityType : std::uint8_t {
     Player = 1,
@@ -68,6 +73,11 @@ struct Ping {
     std::uint32_t timestampMs = 0;
 };
 
+// Acknowledges the reliable message that had this number. Itself never reliable.
+struct Ack {
+    std::uint32_t reliableId = 0;
+};
+
 // ---- server -> client ----
 struct ConnectAccepted {
     std::uint8_t playerId = 0; // 0-3
@@ -82,7 +92,15 @@ struct EntityState {
     float x = 0.f;
     float y = 0.f;
 };
-inline constexpr std::size_t EntityStateSize = 14;
+// A position travels as a u16 counting 1/16 of a world unit, from -1024 to +3071.94: the world is 1920 x 1080 and
+// entities appear or leave a few hundred units outside it. A value outside that range is clamped. The error is
+// at most 1/32 of a unit, far below a pixel, and an entity costs 10 bytes instead of 14.
+inline constexpr float PositionScale = 16.f;
+inline constexpr float PositionOffset = 1024.f;
+std::uint16_t quantizePosition(float value);
+float dequantizePosition(std::uint16_t quantized);
+
+inline constexpr std::size_t EntityStateSize = 10;
 inline constexpr std::size_t SnapshotFixedSize = 15;
 inline constexpr std::size_t MaxEntitiesPerSnapshot =
     (MaxPacketSize - HeaderSize - SnapshotFixedSize) / EntityStateSize;
@@ -110,15 +128,26 @@ struct Pong {
     std::uint32_t timestampMs = 0;
 };
 
-using Message = std::variant<Connect, Input, Disconnect, Ping, ConnectAccepted, ConnectRejected, Snapshot,
+using Message = std::variant<Connect, Input, Disconnect, Ping, Ack, ConnectAccepted, ConnectRejected, Snapshot,
                              EntityDestroyed, PlayerLeft, Pong>;
 
 struct Packet {
-    std::uint32_t sequence = 0; // incremented by the sender for each packet
+    std::uint32_t sequence = 0; // incremented by the sender for each packet it sends to this peer
     Message message;
+    std::optional<std::uint32_t> reliableId; // set for a message the receiver must acknowledge
 };
 
-std::vector<std::uint8_t> encode(const Packet &packet);
+// `version` is only meant for answering a peer that speaks another version (see otherVersionConnect).
+std::vector<std::uint8_t> encode(const Packet &packet, std::uint8_t version = Version);
+
+// A Connect written for another protocol version cannot be decoded, but its sender deserves an answer instead of
+// silence. Returns that version when the datagram has our magic, a different version and the Connect type byte
+// (which no version has changed), and nothing otherwise.
+std::optional<std::uint8_t> otherVersionConnect(std::span<const std::uint8_t> datagram);
+
+// Cuts a snapshot into one or more snapshots that each fit in a datagram (at most MaxEntitiesPerSnapshot entities).
+// Every part keeps the tick, state and score; there is always at least one part, even without entities.
+std::vector<Snapshot> splitSnapshot(const Snapshot &snapshot);
 
 // Returns nullopt for any invalid datagram (bad magic/version, unknown type, wrong size...). Never throws.
 std::optional<Packet> decode(std::span<const std::uint8_t> datagram);

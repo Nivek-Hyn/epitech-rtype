@@ -1,7 +1,7 @@
-#include <gtest/gtest.h>
 #include "ui/GameConfig.hpp"
 #include <filesystem>
 #include <fstream>
+#include <gtest/gtest.h>
 
 using rtype::client::ui::GameConfig;
 using Key = sf::Keyboard::Key;

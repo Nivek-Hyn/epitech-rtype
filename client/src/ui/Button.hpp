@@ -31,4 +31,4 @@ private:
     bool _selected{false};
 };
 
-}
+} // namespace rtype::client::ui

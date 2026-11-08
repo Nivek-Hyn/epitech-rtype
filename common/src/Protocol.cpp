@@ -2,6 +2,9 @@
 
 #include "engine/net/ByteBuffer.hpp"
 
+#include <algorithm>
+#include <cmath>
+#include <cstddef>
 #include <stdexcept>
 #include <type_traits>
 #include <utility>
@@ -22,6 +25,8 @@ MessageType typeOf(const Message &message)
                 return MessageType::Disconnect;
             else if constexpr (std::is_same_v<T, Ping>)
                 return MessageType::Ping;
+            else if constexpr (std::is_same_v<T, Ack>)
+                return MessageType::Ack;
             else if constexpr (std::is_same_v<T, ConnectAccepted>)
                 return MessageType::ConnectAccepted;
             else if constexpr (std::is_same_v<T, ConnectRejected>)
@@ -46,6 +51,8 @@ void writePayload(engine::net::ByteWriter &writer, const Message &message)
                 writer.u8(value.flags);
             } else if constexpr (std::is_same_v<T, Ping> || std::is_same_v<T, Pong>) {
                 writer.u32(value.timestampMs);
+            } else if constexpr (std::is_same_v<T, Ack>) {
+                writer.u32(value.reliableId);
             } else if constexpr (std::is_same_v<T, ConnectAccepted>) {
                 writer.u8(value.playerId);
             } else if constexpr (std::is_same_v<T, ConnectRejected>) {
@@ -63,8 +70,8 @@ void writePayload(engine::net::ByteWriter &writer, const Message &message)
                     writer.u32(entity.netId);
                     writer.u8(static_cast<std::uint8_t>(entity.type));
                     writer.u8(entity.variant);
-                    writer.f32(entity.x);
-                    writer.f32(entity.y);
+                    writer.u16(quantizePosition(entity.x));
+                    writer.u16(quantizePosition(entity.y));
                 }
             } else if constexpr (std::is_same_v<T, EntityDestroyed>) {
                 writer.u32(value.netId);
@@ -85,19 +92,61 @@ bool validEntityType(std::uint8_t value)
 
 } // namespace
 
-std::vector<std::uint8_t> encode(const Packet &packet)
+std::uint16_t quantizePosition(float value)
+{
+    const float scaled = std::round((value + PositionOffset) * PositionScale);
+    if (!(scaled >= 0.f)) // below the range, or not a number
+        return 0;
+    return static_cast<std::uint16_t>(std::min(scaled, 65535.f));
+}
+
+float dequantizePosition(std::uint16_t quantized)
+{
+    return static_cast<float>(quantized) / PositionScale - PositionOffset;
+}
+
+std::vector<std::uint8_t> encode(const Packet &packet, std::uint8_t version)
 {
     engine::net::ByteWriter payload;
+    if (packet.reliableId)
+        payload.u32(*packet.reliableId);
     writePayload(payload, packet.message);
 
     engine::net::ByteWriter writer;
     writer.u16(Magic);
-    writer.u8(Version);
-    writer.u8(static_cast<std::uint8_t>(typeOf(packet.message)));
+    writer.u8(version);
+    writer.u8(static_cast<std::uint8_t>(typeOf(packet.message)) | (packet.reliableId ? ReliableFlag : 0));
     writer.u32(packet.sequence);
     writer.u16(static_cast<std::uint16_t>(payload.size()));
     writer.data().insert(writer.data().end(), payload.data().begin(), payload.data().end());
     return writer.data();
+}
+
+std::vector<Snapshot> splitSnapshot(const Snapshot &snapshot)
+{
+    std::vector<Snapshot> parts;
+    std::size_t offset = 0;
+    do {
+        const std::size_t count = std::min(MaxEntitiesPerSnapshot, snapshot.entities.size() - offset);
+        const auto first = snapshot.entities.begin() + static_cast<std::ptrdiff_t>(offset);
+        parts.push_back({snapshot.tick, snapshot.state, snapshot.score,
+                         std::vector<EntityState>(first, first + static_cast<std::ptrdiff_t>(count)), snapshot.lives});
+        offset += count;
+    } while (offset < snapshot.entities.size());
+    return parts;
+}
+
+std::optional<std::uint8_t> otherVersionConnect(std::span<const std::uint8_t> datagram)
+{
+    if (datagram.size() < HeaderSize || datagram.size() > MaxPacketSize)
+        return std::nullopt;
+    engine::net::ByteReader header(datagram.first(HeaderSize));
+    const auto magic = header.u16();
+    const auto version = header.u8();
+    const auto type = header.u8();
+    if (magic != Magic || version == Version || type != static_cast<std::uint8_t>(MessageType::Connect))
+        return std::nullopt;
+    return version;
 }
 
 std::optional<Packet> decode(std::span<const std::uint8_t> datagram)
@@ -109,22 +158,34 @@ std::optional<Packet> decode(std::span<const std::uint8_t> datagram)
         engine::net::ByteReader header(datagram.first(HeaderSize));
         if (header.u16() != Magic || header.u8() != Version)
             return std::nullopt;
-        const auto rawType = header.u8();
+        const auto typeByte = header.u8();
         const auto sequence = header.u32();
         const auto payloadSize = header.u16();
         if (!header.ok() || payloadSize != datagram.size() - HeaderSize)
             return std::nullopt;
 
+        // A reliable message starts with its number; the rest is the usual payload of the message type.
+        const bool reliable = (typeByte & ReliableFlag) != 0;
+        const auto rawType = static_cast<std::uint8_t>(typeByte & ~ReliableFlag);
         engine::net::ByteReader reader(datagram.subspan(HeaderSize));
+        std::optional<std::uint32_t> reliableId;
+        std::size_t bodySize = payloadSize;
+        if (reliable) {
+            if (payloadSize < 4 || static_cast<MessageType>(rawType) == MessageType::Ack)
+                return std::nullopt; // an acknowledgement is never itself acknowledged
+            reliableId = reader.u32();
+            bodySize -= 4;
+        }
+
         Message message;
         switch (static_cast<MessageType>(rawType)) {
         case MessageType::Connect:
-            if (payloadSize != 0)
+            if (bodySize != 0)
                 return std::nullopt;
             message = Connect{};
             break;
         case MessageType::Input: {
-            if (payloadSize != 1)
+            if (bodySize != 1)
                 return std::nullopt;
             const auto flags = reader.u8();
             if ((flags & 0xE0) != 0)
@@ -133,26 +194,31 @@ std::optional<Packet> decode(std::span<const std::uint8_t> datagram)
             break;
         }
         case MessageType::Disconnect:
-            if (payloadSize != 0)
+            if (bodySize != 0)
                 return std::nullopt;
             message = Disconnect{};
             break;
         case MessageType::Ping:
-            if (payloadSize != 4)
+            if (bodySize != 4)
                 return std::nullopt;
             message = Ping{reader.u32()};
             break;
+        case MessageType::Ack:
+            if (bodySize != 4)
+                return std::nullopt;
+            message = Ack{reader.u32()};
+            break;
         case MessageType::ConnectAccepted: {
-            if (payloadSize != 1)
+            if (bodySize != 1)
                 return std::nullopt;
             const auto playerId = reader.u8();
-            if (playerId >= 4)
+            if (playerId >= MaxPlayers)
                 return std::nullopt;
             message = ConnectAccepted{playerId};
             break;
         }
         case MessageType::ConnectRejected: {
-            if (payloadSize != 1)
+            if (bodySize != 1)
                 return std::nullopt;
             const auto reason = reader.u8();
             if (reason < static_cast<std::uint8_t>(RejectReason::ServerFull) ||
@@ -162,7 +228,7 @@ std::optional<Packet> decode(std::span<const std::uint8_t> datagram)
             break;
         }
         case MessageType::Snapshot: {
-            if (payloadSize < SnapshotFixedSize)
+            if (bodySize < SnapshotFixedSize)
                 return std::nullopt;
             Snapshot snapshot;
             snapshot.tick = reader.u32();
@@ -175,7 +241,7 @@ std::optional<Packet> decode(std::span<const std::uint8_t> datagram)
             for (std::uint8_t &lives : snapshot.lives)
                 lives = reader.u8();
             const auto count = reader.u16();
-            if (count > MaxEntitiesPerSnapshot || payloadSize != SnapshotFixedSize + count * EntityStateSize)
+            if (count > MaxEntitiesPerSnapshot || bodySize != SnapshotFixedSize + count * EntityStateSize)
                 return std::nullopt;
             snapshot.entities.reserve(count);
             for (std::uint16_t i = 0; i < count; ++i) {
@@ -186,15 +252,15 @@ std::optional<Packet> decode(std::span<const std::uint8_t> datagram)
                     return std::nullopt;
                 entity.type = static_cast<EntityType>(type);
                 entity.variant = reader.u8();
-                entity.x = reader.f32();
-                entity.y = reader.f32();
+                entity.x = dequantizePosition(reader.u16());
+                entity.y = dequantizePosition(reader.u16());
                 snapshot.entities.push_back(entity);
             }
             message = std::move(snapshot);
             break;
         }
         case MessageType::EntityDestroyed: {
-            if (payloadSize != 5)
+            if (bodySize != 5)
                 return std::nullopt;
             const auto netId = reader.u32();
             const auto reason = reader.u8();
@@ -205,18 +271,18 @@ std::optional<Packet> decode(std::span<const std::uint8_t> datagram)
             break;
         }
         case MessageType::PlayerLeft: {
-            if (payloadSize != 2)
+            if (bodySize != 2)
                 return std::nullopt;
             const auto playerId = reader.u8();
             const auto reason = reader.u8();
-            if (playerId >= 4 || reason < static_cast<std::uint8_t>(LeaveReason::Disconnected) ||
+            if (playerId >= MaxPlayers || reason < static_cast<std::uint8_t>(LeaveReason::Disconnected) ||
                 reason > static_cast<std::uint8_t>(LeaveReason::TimedOut))
                 return std::nullopt;
             message = PlayerLeft{playerId, static_cast<LeaveReason>(reason)};
             break;
         }
         case MessageType::Pong:
-            if (payloadSize != 4)
+            if (bodySize != 4)
                 return std::nullopt;
             message = Pong{reader.u32()};
             break;
@@ -226,7 +292,7 @@ std::optional<Packet> decode(std::span<const std::uint8_t> datagram)
 
         if (!reader.ok() || reader.remaining() != 0)
             return std::nullopt;
-        return Packet{sequence, std::move(message)};
+        return Packet{sequence, std::move(message), reliableId};
     } catch (...) {
         return std::nullopt;
     }

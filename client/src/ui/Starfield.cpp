@@ -3,8 +3,7 @@
 
 namespace rtype::client::ui {
 
-Starfield::Starfield(std::size_t starCount, float width, float height)
-    : _width(width), _height(height)
+Starfield::Starfield(std::size_t starCount, float width, float height) : _width(width), _height(height)
 {
     std::mt19937 rng(42);
     std::uniform_real_distribution<float> distX(0.f, _width);
@@ -56,4 +55,4 @@ void Starfield::draw(sf::RenderWindow &window) const
     }
 }
 
-}
+} // namespace rtype::client::ui

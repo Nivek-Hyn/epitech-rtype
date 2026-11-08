@@ -13,3 +13,6 @@ They feed the technical and comparative study. To add one, copy the format of an
 | [0006](0006-ecs-sparse-arrays.md) | ECS with sparse arrays |
 | [0007](0007-authoritative-snapshots.md) | Authoritative server, inputs up and full snapshots down |
 | [0008](0008-binary-protocol.md) | Binary protocol design |
+| [0009](0009-reliable-messages-over-udp.md) | Reliable messages over UDP with acknowledgements |
+| [0010](0010-snapshot-rate-and-interpolation.md) | Fewer snapshots, positions on 16 bits, smoothed by the client |
+| [0011](0011-delta-snapshots-not-adopted.md) | Delta snapshots evaluated, not adopted |

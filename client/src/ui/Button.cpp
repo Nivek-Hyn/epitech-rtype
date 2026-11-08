@@ -84,4 +84,4 @@ void Button::setLabel(const std::string &label)
     updateVisuals();
 }
 
-}
+} // namespace rtype::client::ui
