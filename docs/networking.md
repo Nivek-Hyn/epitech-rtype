@@ -191,8 +191,8 @@ server-owned player positions.
   (`EntityDestroyed`, `PlayerLeft`, `Disconnect`) are reliable, see section 10.
 - Both sides number their packets per peer and ignore duplicated, out-of-order (`Input` and `Snapshot` only) and
   too old packets with an `engine::net::SequenceWindow` of 32 numbers; see [protocol.md](protocol.md) §3.1.
-- Clients display the newest snapshot directly; interpolation, prediction, and reconciliation are not
-  implemented.
+- Clients show the world about two snapshots in the past, interpolated between them (section 11); prediction
+  and reconciliation are not implemented.
 - When a player leaves or times out, the server broadcasts `EntityDestroyed` for its ship and sends `PlayerLeft`
   to the remaining clients, both reliably. Reliable messages are not ordered between themselves.
 - The protocol limit is 117 entities per snapshot. The server splits larger snapshots into several packets with
@@ -555,8 +555,8 @@ des joueurs calculées par le serveur.
 - Chaque côté numérote ses paquets par interlocuteur et ignore les paquets dupliqués, arrivés dans le désordre
   (`Input` et `Snapshot` seulement) ou trop anciens, grâce à une `engine::net::SequenceWindow` de 32 numéros ;
   voir [protocol.md](protocol.md) §3.1.
-- Les clients affichent directement le snapshot le plus récent ; l’interpolation, la prédiction et la
-  réconciliation ne sont pas implémentées.
+- Les clients affichent le monde environ deux snapshots dans le passé, interpolé entre eux (section 11) ; la
+  prédiction et la réconciliation ne sont pas implémentées.
 - Lorsqu’un joueur part ou expire, le serveur diffuse `EntityDestroyed` pour son vaisseau et envoie `PlayerLeft`
   aux clients restants, tous deux de façon fiable. Les messages fiables ne sont pas ordonnés entre eux.
 - Un snapshot est limité à 117 entités. Le serveur découpe les snapshots plus grands en plusieurs paquets de même
