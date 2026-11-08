@@ -34,9 +34,11 @@ snapshots whose time has come (sounds, explosions, HUD) and draws the entities b
    Without the window focus, an empty input is sent, so another window's keys never move the ship.
 2. `Session::receive` merges the packets of a tick (`SnapshotAssembler`) and queues the complete snapshot in the
    `SnapshotInterpolator`, which shows the world about two snapshots in the past.
-3. A snapshot whose time has come updates the score, lives and game state. An entity of the previous snapshot that
-   is missing was destroyed: the session plays its explosion, sound, flash or screen shake.
-4. `Session::draw` draws the blended entities, then the HUD.
+3. A snapshot whose time has come updates the score, lives, level, wave and game state.
+4. An `EntityDestroyed` from the server says why an entity disappeared. Only a killed one explodes (with its sound,
+   flash or screen shake); a bonus that was picked up or an entity that left the screen does not. The entity is hidden
+   at once, until the snapshots drop it too. A `PlayerLeft` shows "P2 LEFT THE GAME" for a few seconds.
+5. `Session::draw` draws the blended entities, then the HUD.
 
 ## Drawing an entity
 

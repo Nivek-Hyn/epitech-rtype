@@ -40,26 +40,6 @@ bool pressed(sf::Keyboard::Key configured, sf::Keyboard::Key arrow)
     return sf::Keyboard::isKeyPressed(configured) || sf::Keyboard::isKeyPressed(arrow);
 }
 
-// Rough hit radius around an enemy sprite, to play the hit effect where a missile disappeared.
-std::pair<float, float> hitRadiusAndOffset(std::uint8_t variant)
-{
-    switch (variant) {
-    case 6:
-        return {180.f, -60.f};
-    case 5:
-        return {130.f, -20.f};
-    case 4:
-        return {80.f, 0.f};
-    default:
-        return {65.f, 0.f};
-    }
-}
-
-bool within(float dx, float dy, float radius)
-{
-    return dx * dx + dy * dy < radius * radius;
-}
-
 } // namespace
 
 void Session::reset()
@@ -74,10 +54,10 @@ void Session::reset()
     _lives.fill(0);
     _score = 0;
     _connected = _gameOver = _gameWon = _playerWasSpawned = _waiting = _isReady = false; // settings are kept
-    _damageFlash = _shakeTimer = _waveBanner = _waveCooldown = _localTilt = 0.f;
-    _wave = 1;
-    _waveStarted = false;
-    _lastEnemyCount = 0;
+    _damageFlash = _shakeTimer = _waveBanner = _leftTimer = _localTilt = 0.f;
+    _level = _wave = 0;
+    _destroyed.clear();
+    _leftMessage.clear();
     _lastY.clear();
     _tilts.clear();
 }
@@ -87,7 +67,7 @@ void Session::update(float dt, bool connected)
     countDown(_damageFlash, dt);
     countDown(_shakeTimer, dt);
     countDown(_waveBanner, dt);
-    countDown(_waveCooldown, dt);
+    countDown(_leftTimer, dt);
     for (auto &explosion : _explosions)
         explosion.timer += dt;
     std::erase_if(_explosions, [](const Explosion &explosion) { return explosion.timer >= explosion.maxDuration; });
@@ -149,7 +129,7 @@ void Session::receive(INetworkClient &network)
     // The packets of a split tick are complete only once the batch is drained: hand the world over once.
     const auto now = protocol::SnapshotInterpolator::Clock::now();
     if (gotSnapshot)
-        _interpolator.push({_world.tick(), _world.state(), _world.score(), _world.entities(), _world.lives()}, now);
+        _interpolator.push(_world.snapshot(), now);
     // Each snapshot is handled when its time comes, so that sounds, explosions and HUD match what is drawn.
     while (const auto due = _interpolator.popDue(now))
         onSnapshot(*due);
@@ -170,6 +150,10 @@ void Session::handle(const protocol::Message &message, bool &gotSnapshot)
         _rejectionReason = rejected->reason == protocol::RejectReason::ServerFull ? "the server is full"
                                                                                   : "the protocol versions differ";
         std::cerr << "Server rejected connection: " << _rejectionReason << ".\n";
+    } else if (const auto *destroyed = std::get_if<protocol::EntityDestroyed>(&message)) {
+        onDestroyed(*destroyed);
+    } else if (const auto *left = std::get_if<protocol::PlayerLeft>(&message)) {
+        onPlayerLeft(*left);
     }
 }
 
@@ -177,11 +161,17 @@ void Session::onSnapshot(const protocol::Snapshot &snapshot)
 {
     _score = snapshot.score;
     _lives = snapshot.lives;
+    _level = snapshot.level;
+    if (snapshot.wave > _wave && snapshot.state == protocol::GameState::Playing)
+        _waveBanner = WaveBannerDuration; // a new wave has come
+    _wave = snapshot.wave;
     updateGameState(snapshot);
-    updateWaveCounter(snapshot);
-    if (!_entities.empty())
-        playDestroyEffects(snapshot);
     _entities = snapshot.entities;
+    // A destroyed entity stays hidden until it is gone from the snapshots too.
+    std::erase_if(_destroyed, [this](std::uint32_t netId) {
+        return std::none_of(_entities.begin(), _entities.end(),
+                            [netId](const EntityState &entity) { return entity.netId == netId; });
+    });
 }
 
 // The server decides when the game is lost or won.
@@ -197,101 +187,59 @@ void Session::updateGameState(const protocol::Snapshot &snapshot)
     }
 }
 
-// A new wave is announced when enemies appear again after a calm moment.
-void Session::updateWaveCounter(const protocol::Snapshot &snapshot)
+// Where the entity is drawn now (or was in the last snapshot), to place its explosion.
+std::optional<EntityState> Session::lastSeen(std::uint32_t netId) const
 {
-    const int enemies =
-        static_cast<int>(std::count_if(snapshot.entities.begin(), snapshot.entities.end(),
-                                       [](const EntityState &e) { return e.type == EntityType::Enemy; }));
-    if (_connected && !_waveStarted && snapshot.state == protocol::GameState::Playing) {
-        _waveStarted = true;
-        _wave = 1;
-        _waveBanner = WaveBannerDuration;
-        _waveCooldown = 6.0f;
-    } else if (_waveStarted && _waveCooldown <= 0.f && _lastEnemyCount == 0 && enemies > 0) {
-        _wave++;
-        _waveBanner = WaveBannerDuration;
-        _waveCooldown = 8.0f;
+    for (const auto *list : {&_shown, &_entities}) {
+        const auto found = std::find_if(list->begin(), list->end(),
+                                        [netId](const EntityState &entity) { return entity.netId == netId; });
+        if (found != list->end())
+            return *found;
     }
-    _lastEnemyCount = enemies;
+    return std::nullopt;
 }
 
-// Entities of the previous snapshot that disappeared were destroyed: explosions, sounds, flash.
-void Session::playDestroyEffects(const protocol::Snapshot &snapshot)
+// The server tells why each entity disappeared: only a destroyed one explodes.
+void Session::onDestroyed(const protocol::EntityDestroyed &event)
 {
-    std::unordered_set<std::uint32_t> alive;
-    for (const auto &entity : snapshot.entities)
-        alive.insert(entity.netId);
-    std::vector<sf::Vector2f> ships;
-    for (const auto &entity : _entities) {
-        if (entity.type == EntityType::Player)
-            ships.push_back({entity.x, entity.y});
-    }
-    for (const auto &entity : _entities) {
-        if (!alive.contains(entity.netId))
-            onDestroyed(entity, snapshot, ships);
-    }
-}
-
-void Session::onDestroyed(const EntityState &entity, const protocol::Snapshot &snapshot,
-                          const std::vector<sf::Vector2f> &ships)
-{
-    switch (entity.type) {
+    const std::optional<EntityState> entity = lastSeen(event.netId);
+    if (!entity)
+        return;
+    _destroyed.push_back(event.netId);
+    if (event.reason == protocol::DestroyReason::Collected)
+        _resources.playSound("shoot", 60.f);
+    if (event.reason != protocol::DestroyReason::Killed)
+        return;
+    switch (entity->type) {
     case EntityType::Enemy:
     case EntityType::Obstacle:
-        // Ignore what left the screen: only an entity destroyed on screen explodes.
-        if (entity.x > 30.f && entity.x < WorldWidth + 100.f) {
-            _resources.playSound("explosion", 90.f);
-            addExplosion(entity, 0.35f);
-        }
+        _resources.playSound("explosion", 90.f);
+        addExplosion(*entity, 0.35f);
         break;
     case EntityType::Player:
         _resources.playSound("hit", 100.f);
         _resources.playSound("explosion", 100.f);
-        addExplosion(entity, 0.45f);
+        addExplosion(*entity, 0.45f);
         _damageFlash = DamageFlashDuration;
         _shakeTimer = ShakeDuration;
         _shakeIntensity = 15.f;
         break;
-    case EntityType::EnemyMissile:
-        onShipHit(entity, ships);
-        break;
     case EntityType::PlayerMissile:
-        onEnemyHit(entity, snapshot);
+    case EntityType::EnemyMissile: // a shot that hit something
+        _resources.playSound("hit", 95.f);
+        addExplosion(*entity, 0.2f);
         break;
     case EntityType::Bonus:
         break;
     }
 }
 
-// An enemy shot that disappeared next to a ship hit it.
-void Session::onShipHit(const EntityState &shot, const std::vector<sf::Vector2f> &ships)
+// "P2 LEFT THE GAME" for a few seconds, so the other players know why a ship vanished.
+void Session::onPlayerLeft(const protocol::PlayerLeft &event)
 {
-    for (const auto &ship : ships) {
-        if (within(shot.x - ship.x, shot.y - ship.y, 75.f)) {
-            _resources.playSound("hit", 95.f);
-            addExplosion(shot, 0.25f);
-            _damageFlash = std::max(_damageFlash, 0.25f);
-            _shakeTimer = std::max(_shakeTimer, 0.2f);
-            _shakeIntensity = std::max(_shakeIntensity, 8.f);
-            return;
-        }
-    }
-}
-
-// A player missile that disappeared next to an enemy hit it.
-void Session::onEnemyHit(const EntityState &missile, const protocol::Snapshot &snapshot)
-{
-    for (const auto &enemy : snapshot.entities) {
-        if (enemy.type != EntityType::Enemy)
-            continue;
-        const auto [radius, offsetY] = hitRadiusAndOffset(enemy.variant);
-        if (within(missile.x - enemy.x, missile.y - (enemy.y + offsetY), radius)) {
-            _resources.playSound("hit", 95.f);
-            addExplosion(missile, 0.2f);
-            return;
-        }
-    }
+    _leftMessage = "P" + std::to_string(event.playerId + 1) +
+                   (event.reason == protocol::LeaveReason::TimedOut ? " LOST THE CONNECTION" : " LEFT THE GAME");
+    _leftTimer = 3.f;
 }
 
 void Session::addExplosion(const EntityState &entity, float duration)
@@ -337,6 +285,8 @@ void Session::draw(sf::RenderWindow &window, float time, float dt, bool hasAsset
         drawConnecting(window);
     if (hasAssets) {
         for (const auto &entity : _shown) {
+            if (std::find(_destroyed.begin(), _destroyed.end(), entity.netId) != _destroyed.end())
+                continue;
             const float tilt = entity.type == EntityType::Player ? tiltOf(entity, dt) : 0.f;
             _renderer.draw(window, entity, time, tilt, _localPlayer);
         }

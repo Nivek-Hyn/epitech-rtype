@@ -139,7 +139,7 @@ to that thread.
 
 ## 6. Packet handling and safety
 
-The wire format is version 7 of the binary protocol. Integers are big-endian, positions are 16-bit quantized values
+The wire format is version 8 of the binary protocol. Integers are big-endian, positions are 16-bit quantized values
 (1/16 of a world unit), and a datagram is limited to 1200 bytes. The receiver uses a fixed-size buffer and passes each
 datagram to `protocol::decode()` before handling it.
 
@@ -498,7 +498,7 @@ travail à effectuer.
 
 ## 6. Paquets et sécurité
 
-Le format transmis sur le réseau est la version 7 du protocole binaire. Les entiers sont en big-endian, les
+Le format transmis sur le réseau est la version 8 du protocole binaire. Les entiers sont en big-endian, les
 positions sont des valeurs quantifiées sur 16 bits (1/16 d’unité du monde) et chaque datagramme est limité à
 1 200 octets. Le récepteur
 utilise un buffer de taille fixe et passe chaque datagramme à `protocol::decode()` avant de le traiter.

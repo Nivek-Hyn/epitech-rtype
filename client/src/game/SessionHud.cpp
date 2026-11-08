@@ -106,6 +106,7 @@ void Session::drawHud(sf::RenderWindow &window) const
     drawDamageFlash(window);
     drawWaveBanner(window);
     drawWaitingRoom(window);
+    drawPlayerLeft(window);
     drawEndScreen(window);
 }
 
@@ -118,18 +119,19 @@ void Session::drawScore(sf::RenderWindow &window) const
     outline(score);
     window.draw(score);
 
-    sf::Text stage(_resources.getFont("default"), "STAGE 1 - WAVE " + std::to_string(_wave), 20);
+    sf::Text stage(_resources.getFont("default"),
+                   "LEVEL " + std::to_string(_level + 1) + " - WAVE " + std::to_string(std::max(_wave, 1)), 20);
     stage.setFillColor(sf::Color(255, 204, 0));
     stage.setPosition({45.f, 62.f});
     outline(stage);
     window.draw(stage);
 }
 
-// A banner while the heavy cruiser boss (enemy variant 5) is on screen.
+// A banner while a boss (enemy variants 5 and 6, see entities.json) is on screen.
 void Session::drawBossAlert(sf::RenderWindow &window) const
 {
     const bool boss = std::any_of(_shown.begin(), _shown.end(), [](const protocol::EntityState &entity) {
-        return entity.type == protocol::EntityType::Enemy && entity.variant == 5;
+        return entity.type == protocol::EntityType::Enemy && entity.variant >= 5 && entity.variant <= 6;
     });
     if (!boss)
         return;
@@ -227,19 +229,26 @@ void Session::drawWaitingRoom(sf::RenderWindow &window) const
         readyBox.setOutlineColor(sf::Color(0, 255, 120));
         readyBox.setOutlineThickness(2.f);
         window.draw(readyBox);
-        window.draw(centeredText("READY ! (WAITING FOR OTHERS)", 20, sf::Color(255, 255, 255),
-                                 {WorldWidth / 2.f, 420.f}));
+        window.draw(
+            centeredText("READY ! (WAITING FOR OTHERS)", 20, sf::Color(255, 255, 255), {WorldWidth / 2.f, 420.f}));
     } else {
         readyBox.setFillColor(sf::Color(140, 90, 0, 200));
         readyBox.setOutlineColor(sf::Color(255, 204, 0));
         readyBox.setOutlineThickness(2.f);
         window.draw(readyBox);
-        window.draw(centeredText("PRESS SPACE / ENTER TO READY", 20, sf::Color(255, 255, 255),
-                                 {WorldWidth / 2.f, 420.f}));
+        window.draw(
+            centeredText("PRESS SPACE / ENTER TO READY", 20, sf::Color(255, 255, 255), {WorldWidth / 2.f, 420.f}));
     }
 
     window.draw(centeredText("Move: arrows or your keys    Network stats: F3    Menu: ESC", 18,
                              sf::Color(200, 210, 230), {WorldWidth / 2.f, 475.f}));
+}
+
+void Session::drawPlayerLeft(sf::RenderWindow &window) const
+{
+    if (_leftTimer <= 0.f)
+        return;
+    window.draw(centeredText(_leftMessage, 28, sf::Color(255, 170, 40), {WorldWidth / 2.f, 140.f}));
 }
 
 // Victory or defeat, decided by the server, with the final score.

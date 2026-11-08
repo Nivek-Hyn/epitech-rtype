@@ -192,7 +192,7 @@ keeping the fraction. Without this limit a slow server could accumulate an endle
 | **Reliable messages** for `EntityDestroyed`, `PlayerLeft` and `Disconnect` ([ADR 0009](adr/0009-reliable-messages-over-udp.md)) | A TCP channel, everything reliable | Only what nothing replaces is acknowledged and repeated, with a delay that follows the measured round-trip time. Snapshots and inputs stay unreliable: a newer one replaces them. |
 | **Binary protocol** ([ADR 0008](adr/0008-binary-protocol.md), [specification](protocol.md)) | JSON, text | Compact and fast to parse. One entity takes 10 bytes in binary (two quantized 16-bit positions), about 50 to 60 bytes in JSON. |
 
-Bandwidth, worst case (a full snapshot packet: 10-byte header + 15 bytes + 117 entities × 10 bytes = 1,195 bytes):
+Bandwidth, worst case (a full snapshot packet: 10-byte header + 17 bytes + 117 entities × 10 bytes = 1,197 bytes):
 30 packets per second ≈ 36 KB/s ≈ 287 kbit/s per client, about 1.15 Mbit/s for 4 clients. This is a payload
 estimate: it excludes UDP/IP overhead. Measured on a campaign game with 27 to 28 entities per snapshot, one client
 receives 8.4 KB/s, against 24.3 KB/s with the first protocol (14-byte entities, 60 snapshots per second): the

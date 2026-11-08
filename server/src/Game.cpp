@@ -181,6 +181,9 @@ protocol::Snapshot Game::snapshot()
     snap.tick = _tick;
     snap.state = _state;
     snap.score = _score;
+    snap.level = static_cast<std::uint8_t>(std::min<std::size_t>(_currentLevelIndex, 255));
+    snap.wave = static_cast<std::uint8_t>(std::count_if(_currentLevel.waves.begin(), _currentLevel.waves.end(),
+                                                        [](const WaveConfig &wave) { return wave.isSpawned; }));
     for (std::size_t player = 0; player < _lives.size(); player++)
         snap.lives[player] = static_cast<std::uint8_t>(std::clamp(_lives[player], 0, 255));
 

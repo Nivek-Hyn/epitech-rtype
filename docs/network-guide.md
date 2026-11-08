@@ -93,7 +93,7 @@ Every number is written **big-endian** (the most significant byte first).
 | Offset | Size | Field | Meaning |
 |---|---|---|---|
 | 0 | 2 bytes | magic | Always `0x5254` ("RT"): a packet from another program is dropped at once |
-| 2 | 1 byte | version | Version of the protocol, currently `7` |
+| 2 | 1 byte | version | Version of the protocol, currently `8` |
 | 3 | 1 byte | type | The message type; bit `0x40` set means "reliable message" |
 | 4 | 4 bytes | sequence | Number of this packet for this peer (0, 1, 2...) |
 | 8 | 2 bytes | payload size | Bytes after the header |
@@ -524,7 +524,7 @@ Tous les nombres sont écrits en **big-endian** (l’octet de poids fort d’abo
 | Position | Taille | Champ | Signification |
 |---|---|---|---|
 | 0 | 2 octets | magic | Toujours `0x5254` (« RT ») : un paquet d’un autre programme est jeté tout de suite |
-| 2 | 1 octet | version | Version du protocole, actuellement `7` |
+| 2 | 1 octet | version | Version du protocole, actuellement `8` |
 | 3 | 1 octet | type | Le type de message ; le bit `0x40` à 1 signifie « message fiable » |
 | 4 | 4 octets | séquence | Numéro de ce paquet pour cet interlocuteur (0, 1, 2...) |
 | 8 | 2 octets | taille du contenu | Octets après l’en-tête |
