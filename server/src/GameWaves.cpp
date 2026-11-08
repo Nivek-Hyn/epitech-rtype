@@ -2,23 +2,11 @@
 
 #include "Game.hpp"
 #include "common/Components.hpp"
+#include <algorithm>
 #include <iostream>
 #include <random>
 
 namespace rtype::server {
-
-namespace {
-
-// Used when a level asks for a negative spawn_y.
-float randomSpawnY()
-{
-    static std::random_device device;
-    static std::mt19937 generator(device());
-    static std::uniform_real_distribution<float> distribution(50.0f, 650.0f);
-    return distribution(generator);
-}
-
-} // namespace
 
 void Game::updateWaves(float dt)
 {
@@ -56,16 +44,28 @@ void Game::spawnWave(WaveConfig &wave)
 }
 
 // The prefab named by the level appears on the right edge, with what the level overrides.
+// Wherever a level gives a negative spawn_y, and from the second loop of infinite mode, the height is random.
 void Game::spawnFromLevel(const EnemySpawnConfig &config)
 {
-    const float spawnY = config.spawn_y < 0.f ? randomSpawnY() : config.spawn_y;
-    const auto entity = spawnPrefab(config.type, WorldWidth, spawnY);
+    const auto entity = spawnPrefab(config.type, WorldWidth, config.spawn_y);
     if (!entity) {
         std::cerr << "Warning: unknown prefab '" << config.type << "' in level '" << _currentLevel.level_name << "'\n";
         return;
     }
+    if (config.spawn_y < 0.f || completedLoops() > 0.f)
+        placeAtRandomHeight(*entity);
     applyLevelOverrides(*entity, config);
     applyDifficulty(*entity);
+}
+
+// Anywhere on the right edge where the whole hit area stays on screen.
+void Game::placeAtRandomHeight(engine::ecs::Entity entity)
+{
+    const engine::physics::Aabb area = hitArea(entity);
+    auto *position = _registry.get<rtype::components::Position>(entity);
+    const float offset = area.top - position->y; // a boss hit area can start above its position
+    const float lowest = std::max(0.f, WorldHeight - area.height);
+    position->y = std::uniform_real_distribution<float>(0.f, lowest)(_random) - offset;
 }
 
 // A value of 0 in the level keeps the value of the prefab.

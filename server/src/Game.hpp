@@ -157,6 +157,7 @@ private:
     void updateWaves(float dt);
     void spawnWave(WaveConfig &wave);
     void spawnFromLevel(const EnemySpawnConfig &config);
+    void placeAtRandomHeight(engine::ecs::Entity entity);
     void applyLevelOverrides(engine::ecs::Entity entity, const EnemySpawnConfig &config);
     void applyDifficulty(engine::ecs::Entity entity);
 

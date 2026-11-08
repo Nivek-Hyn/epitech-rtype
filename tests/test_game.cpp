@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <array>
 #include <fstream>
+#include <set>
 #include <string>
 
 using namespace rtype;
@@ -1070,4 +1071,29 @@ TEST(Movement, BossSpriteStaysOnScreenWhileBouncing)
         EXPECT_LE(position->y + box.offsetY + box.height, WorldHeight + 5.f);
         EXPECT_GE(position->y + box.offsetY, -5.f);
     }
+}
+
+TEST(Game, LaterInfiniteLoopsSpawnEnemiesAtRandomHeightsOnTheRight)
+{
+    std::set<int> heights;
+    for (int attempt = 0; attempt < 5; ++attempt) {
+        Game game;
+        game.rules().lobbyDelay = 0.f;
+        game.loadEntitiesConfig(TestEntities);
+        game.loadLevel(OneGrunt); // the grunt is placed at y = 300 by the level, after 1 second
+        game.setGameMode(Game::GameMode::Infinite);
+        game.setInfiniteLoopCount(2);
+        game.onPlayerJoined(0);
+        game.onInput(0, protocol::InputFlag::Down); // out of the enemy's way
+        run(game, 1.05f);
+        const auto snap = game.snapshot();
+        const auto enemy = std::find_if(snap.entities.begin(), snap.entities.end(),
+                                        [](const auto &entity) { return entity.type == protocol::EntityType::Enemy; });
+        ASSERT_NE(enemy, snap.entities.end());
+        EXPECT_GE(enemy->y, 0.f);
+        EXPECT_LE(enemy->y, WorldHeight - 72.f);
+        EXPECT_GT(enemy->x, WorldWidth - 100.f); // it appeared on the right edge
+        heights.insert(static_cast<int>(enemy->y));
+    }
+    EXPECT_GT(heights.size(), 1u); // not always the height written in the level
 }

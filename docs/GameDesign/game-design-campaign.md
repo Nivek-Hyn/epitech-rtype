@@ -117,6 +117,8 @@ Main archetypes:
 ## Authoring rules
 
 Spawn heights use the full 1080-unit world: `spawn_y` goes from about 100 to 900.
+A negative `spawn_y` makes the enemy appear at a random height on the right edge, its whole hit area on screen.
+From the second loop of infinite mode, every enemy appears at a random height, so no two loops look the same.
 Keep `gravity_diver` in the upper part, since it falls until it leaves the screen.
 
 Components of an enemy prefab in `entities.json` (the full list is in the [how-to guides](../how-to.md#add-an-enemy-a-tile-or-a-bonus)):
