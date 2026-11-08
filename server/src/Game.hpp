@@ -1,12 +1,12 @@
 #pragma once
 
+#include "LevelLoader.hpp"
 #include "Prefabs.hpp"
 #include "Weapons.hpp"
 #include "common/Constants.hpp"
 #include "common/Protocol.hpp"
 #include "engine/ecs/Registry.hpp"
 #include "engine/physics/Aabb.hpp"
-#include "levelLoader.hpp"
 #include "net/INetworkServer.hpp"
 
 #include <array>
@@ -79,6 +79,10 @@ public:
 
     void loadLevel(const std::string &filepath);
     void loadCampaign(const std::vector<std::string> &levelPaths);
+    // Reads every level of the campaign; throws std::runtime_error naming the first broken file.
+    void checkLevels() const;
+    // Starts the campaign at the given level (from 0), e.g. from the campaign map. Out of range: the first level.
+    void startAtLevel(std::size_t index);
     void loadRules(const std::string &filepath);
     // Adds the prefabs of an entities file (see assets/config/entities.json).
     void loadEntitiesConfig(const std::string &filepath);
@@ -217,7 +221,5 @@ private:
     std::uint32_t _infiniteLoopCount = 1;
     protocol::GameState _state = protocol::GameState::Waiting;
 };
-
-LevelConfig loadLevelFromJson(const std::string &filepath);
 
 } // namespace rtype::server

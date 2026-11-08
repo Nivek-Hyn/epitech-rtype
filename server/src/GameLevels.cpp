@@ -21,6 +21,19 @@ void Game::loadCampaign(const std::vector<std::string> &levelPaths)
         loadCurrentLevel();
 }
 
+void Game::checkLevels() const
+{
+    for (const std::string &path : _campaignLevels)
+        loadLevelFromJson(path);
+}
+
+void Game::startAtLevel(std::size_t index)
+{
+    _currentLevelIndex = index < _campaignLevels.size() ? index : 0;
+    if (!_campaignLevels.empty())
+        loadCurrentLevel();
+}
+
 void Game::loadCurrentLevel()
 {
     _currentLevel = loadLevelFromJson(_campaignLevels[_currentLevelIndex]);

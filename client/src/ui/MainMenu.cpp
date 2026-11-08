@@ -55,7 +55,7 @@ void MainMenu::initHostScreen()
     const float spacing = 80.f;
 
     _hostModeSelector = std::make_unique<OptionSelector>(
-        _font, "GAME MODE", std::vector<std::string>{"SCENARIO", "ENDLESS"}, sf::Vector2f(posX, startY));
+        _font, "GAME MODE", std::vector<std::string>{"CAMPAIGN", "INFINITE"}, sf::Vector2f(posX, startY));
     startY += spacing;
 
     _hostDifficultySelector = std::make_unique<OptionSelector>(
@@ -63,7 +63,8 @@ void MainMenu::initHostScreen()
     startY += spacing;
 
     _hostMissionSelector = std::make_unique<OptionSelector>(
-        _font, "MISSION", std::vector<std::string>{"1 : DEEP SPACE", "2 : ASTEROID BELT", "3 : ALIEN CORE"},
+        _font, "START AT",
+        std::vector<std::string>{"WORLD 1 : ORBITAL BELT", "WORLD 2 : MARS", "WORLD 3 : SINGULARITY"},
         sf::Vector2f(posX, startY));
     startY += spacing;
 

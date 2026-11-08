@@ -8,7 +8,9 @@ rtype_set_warnings(level_editor_core)
 
 if(RTYPE_BUILD_CLIENT)
     add_executable(r-type_level_editor src/main.cpp)
-    target_link_libraries(r-type_level_editor PRIVATE level_editor_core RTypeEngine::Core SFML::Graphics
-        -Wl,--start-group freetype harfbuzz -Wl,--end-group)
+    target_link_libraries(r-type_level_editor PRIVATE level_editor_core RTypeEngine::Core SFML::Graphics)
+    if(NOT MSVC)
+        target_link_libraries(r-type_level_editor PRIVATE -Wl,--start-group freetype harfbuzz -Wl,--end-group)
+    endif()
     rtype_set_warnings(r-type_level_editor)
 endif()

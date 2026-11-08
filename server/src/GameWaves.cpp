@@ -29,7 +29,7 @@ void Game::updateWaves(float dt)
 
     _levelTimer += dt;
     for (auto &wave : _currentLevel.waves) {
-        if (!wave.isSpawned && _levelTimer >= wave.delay_before_start)
+        if (!wave.isSpawned && _levelTimer >= wave.delay)
             spawnWave(wave);
     }
 }
@@ -47,12 +47,12 @@ void Game::spawnWave(WaveConfig &wave)
 // Wherever a level gives a negative spawn_y, and from the second loop of infinite mode, the height is random.
 void Game::spawnFromLevel(const EnemySpawnConfig &config)
 {
-    const auto entity = spawnPrefab(config.type, WorldWidth, config.spawn_y);
+    const auto entity = spawnPrefab(config.type, WorldWidth, config.spawnY);
     if (!entity) {
-        std::cerr << "Warning: unknown prefab '" << config.type << "' in level '" << _currentLevel.level_name << "'\n";
+        std::cerr << "Warning: unknown prefab '" << config.type << "' in level '" << _currentLevel.name << "'\n";
         return;
     }
-    if (config.spawn_y < 0.f || completedLoops() > 0.f)
+    if (config.spawnY < 0.f || completedLoops() > 0.f)
         placeAtRandomHeight(*entity);
     applyLevelOverrides(*entity, config);
     applyDifficulty(*entity);

@@ -6,6 +6,7 @@
 #include "common/Components.hpp"
 #include "engine/systems/Movement.hpp"
 #include <algorithm>
+#include <iostream>
 #include <utility>
 #include <vector>
 
@@ -50,8 +51,9 @@ Game::Game()
     if (!_campaignLevels.empty()) {
         try {
             loadCurrentLevel();
-        } catch (...) {
-            // Level file might not be found in some test environments
+        } catch (const std::exception &error) {
+            // Not fatal here: tests load their own levels. A server checks every level before starting.
+            std::cerr << "Warning: " << error.what() << '\n';
         }
     }
 }

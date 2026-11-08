@@ -116,9 +116,8 @@ void Game::damageEnemy(CollisionFrame &frame, const std::pair<engine::ecs::Entit
 
 std::uint32_t Game::pointsFor(engine::ecs::Entity enemy)
 {
-    const float loopBonus = (_gameMode == GameMode::Infinite)
-                                ? completedLoops() * _rules.infinite.scoreMultiplierPerLoop
-                                : 0.f;
+    const float loopBonus =
+        (_gameMode == GameMode::Infinite) ? completedLoops() * _rules.infinite.scoreMultiplierPerLoop : 0.f;
     const float multiplier = currentDifficulty().scoreMultiplier + loopBonus;
     const auto *traits = _registry.get<rtype::components::EnemyTraits>(enemy);
     const std::uint32_t base = traits ? traits->score : 100;

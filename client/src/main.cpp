@@ -1,18 +1,14 @@
-#include "Game.hpp"
 #include "ResourceManager.hpp"
 #include "common/Constants.hpp"
 #include "common/Protocol.hpp"
-#include "engine/core/FixedTimestep.hpp"
+#include "game/LocalServer.hpp"
 #include "game/Session.hpp"
 #include "net/AsioNetworkClient.hpp"
-#include "net/AsioNetworkServer.hpp"
 #include "ui/MainMenu.hpp"
 #include "ui/Starfield.hpp"
 
 #include <SFML/Graphics.hpp>
 
-#include <atomic>
-#include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -20,12 +16,12 @@
 #include <iostream>
 #include <optional>
 #include <string>
-#include <thread>
 #include <vector>
 
 namespace {
 
 using namespace rtype::client;
+namespace server = rtype::server;
 
 struct Arguments {
     std::string host = "127.0.0.1";
@@ -65,84 +61,13 @@ std::optional<Arguments> parseArguments(int argc, char **argv)
     return arguments;
 }
 
-// Runs an embedded local server in a background thread for Solo and Local Host.
-class LocalServer {
-public:
-    ~LocalServer() { stop(); }
-
-    void start(std::uint16_t port, const std::string &mode = "campaign", const std::string &difficulty = "normal",
-               const std::string &level = "")
-    {
-        stop();
-        _running = true;
-        _thread = std::thread([this, port, mode, difficulty, level]() { run(port, mode, difficulty, level); });
-        std::this_thread::sleep_for(std::chrono::milliseconds(50));
-    }
-
-    void stop()
-    {
-        _running = false;
-        if (_thread.joinable())
-            _thread.join();
-    }
-
-private:
-    void run(std::uint16_t port, const std::string &mode, const std::string &difficulty, const std::string &level)
-    {
-        try {
-            rtype::server::Game game;
-            game.setGameMode(mode == "infinite" ? rtype::server::Game::GameMode::Infinite
-                                                : rtype::server::Game::GameMode::Campaign);
-            if (difficulty == "easy")
-                game.setDifficulty(rtype::server::Game::Difficulty::Easy);
-            else if (difficulty == "hard")
-                game.setDifficulty(rtype::server::Game::Difficulty::Hard);
-            else
-                game.setDifficulty(rtype::server::Game::Difficulty::Normal);
-
-            if (!level.empty()) {
-                try {
-                    game.loadLevel(level);
-                } catch (...) {
-                }
-            }
-
-            rtype::server::AsioNetworkServer network;
-            network.start(port);
-
-            engine::core::FixedTimestep clock(rtype::TickRate);
-            while (_running) {
-                for (int i = clock.advance(); i > 0; --i) {
-                    while (auto event = network.poll()) {
-                        std::visit(
-                            [&game](const auto &e) {
-                                using Event = std::decay_t<decltype(e)>;
-                                if constexpr (std::is_same_v<Event, rtype::server::PlayerJoined>)
-                                    game.onPlayerJoined(e.id);
-                                else if constexpr (std::is_same_v<Event, rtype::server::PlayerDisconnected>)
-                                    game.onPlayerLeft(e.id);
-                                else if constexpr (std::is_same_v<Event, rtype::server::PlayerInput>)
-                                    game.onInput(e.id, e.flags);
-                            },
-                            *event);
-                    }
-                    game.update(clock.step());
-                    if (game.tick() % rtype::SnapshotEveryTicks == 0)
-                        network.broadcast(game.snapshot());
-                    for (const auto &message : game.takeEvents())
-                        network.broadcastReliable(message);
-                }
-                std::this_thread::sleep_for(clock.untilNextTick());
-            }
-            network.stop();
-        } catch (const std::exception &e) {
-            std::cerr << "[LocalServer] Stopped: " << e.what() << '\n';
-        }
-    }
-
-    std::atomic<bool> _running{false};
-    std::thread _thread;
-};
+// The difficulty chosen in the host screen: 0 easy, 1 normal, 2 hard.
+server::Game::Difficulty difficultyOf(int index)
+{
+    if (index == 0)
+        return server::Game::Difficulty::Easy;
+    return index == 2 ? server::Game::Difficulty::Hard : server::Game::Difficulty::Normal;
+}
 
 // The client: the menu, then a game session, back to the menu with Escape.
 class App {
@@ -157,6 +82,20 @@ public:
         _resources.setSfxVolume(config.sfxVolume);
         _resources.setMusicVolume(config.musicVolume);
         _resources.playMusic("assets/audio/music.wav", config.musicVolume, true);
+    }
+
+    // Starts the local server, then joins it. On failure, the menu shows why.
+    void host(server::ServerSettings settings, const std::string &port = "")
+    {
+        try {
+            if (!port.empty())
+                settings.port = static_cast<std::uint16_t>(std::stoul(port));
+            _server.start(settings);
+            connect("127.0.0.1", settings.port);
+        } catch (const std::exception &e) {
+            _server.stop();
+            _menu.setStatusMessage("Could not start the game: " + std::string(e.what()), sf::Color::Red);
+        }
     }
 
     void connect(const std::string &host, std::uint16_t port)
@@ -233,27 +172,14 @@ private:
         if (action == ui::MenuAction::Exit) {
             _window.close();
         } else if (action == ui::MenuAction::Play) {
-            try {
-                _server.start(rtype::DefaultPort, "campaign", "normal", "assets/levels/level1.json");
-                connect("127.0.0.1", rtype::DefaultPort);
-            } catch (const std::exception &e) {
-                _menu.setStatusMessage("Failed to start local game: " + std::string(e.what()), sf::Color::Red);
-            }
+            host(server::ServerSettings{}); // the whole campaign, normal difficulty, default port
         } else if (action == ui::MenuAction::Host) {
             const auto &config = _menu.getConfig();
-            try {
-                const std::uint16_t port = static_cast<std::uint16_t>(
-                    config.hostPort.empty() ? rtype::DefaultPort : std::stoul(config.hostPort));
-                const std::string mode = config.gameMode == 0 ? "campaign" : "infinite";
-                const std::string diff =
-                    config.difficulty == 0 ? "easy" : (config.difficulty == 1 ? "normal" : "hard");
-                const std::string lvl =
-                    mode == "campaign" ? "assets/levels/level" + std::to_string(config.mission + 1) + ".json" : "";
-                _server.start(port, mode, diff, lvl);
-                connect("127.0.0.1", port);
-            } catch (const std::exception &e) {
-                _menu.setStatusMessage("Failed to host server: " + std::string(e.what()), sf::Color::Red);
-            }
+            server::ServerSettings settings;
+            settings.mode = config.gameMode == 0 ? server::Game::GameMode::Campaign : server::Game::GameMode::Infinite;
+            settings.difficulty = difficultyOf(config.difficulty);
+            settings.startLevel = static_cast<std::size_t>(config.mission) * 3; // the first level of the world
+            host(settings, config.hostPort);
         } else if (action == ui::MenuAction::Connect) {
             const auto &config = _menu.getConfig();
             try {
