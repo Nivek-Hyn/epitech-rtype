@@ -173,10 +173,9 @@ keeping the fraction. Without this limit a slow server could accumulate an endle
 
 ### Known limits
 
-- Entity ids are recycled without a *generation* counter: an old id kept by mistake may point to a new entity.
-  The game sends a separate `NetworkId` over the network. That separates the two id spaces, but does not
-  detect stale local ids: callers must manage their lifetime. This is a usage rule, not a check enforced by Registry.
-  A generation counter is a possible improvement, not part of the current implementation.
+- Entity ids carry an 8-bit generation besides their slot: a stale id kept by mistake no longer reaches the entity
+  that reuses its slot (`Registry::alive` checks the generation). It wraps after 256 reuses of a slot. The game still
+  sends a separate `NetworkId` over the network, because slots are local to each machine.
 - Growing a vector or removing a component can invalidate pointers and references to components.
   Callbacks of `each` must not keep them.
 - Removing a component leaves an empty slot. Storage follows the largest inserted id and retained vector capacity,
@@ -281,7 +280,7 @@ the network maintainer; no checks were disabled. This is separate from the succe
 
 | Decision | What we gain | What we accept |
 |---|---|---|
-| Our own ECS with sparse arrays | Simplicity, testability, full understanding | Some memory on empty slots; no generation counter yet |
+| Our own ECS with sparse arrays | Simplicity, testability, full understanding | Some memory on empty slots; 8-bit generations wrap after 256 reuses |
 | Separate engine modules and installed package | Reuse with selected dependencies and a separate consumer | Additional CMake rules; compatible compiler/OS/configuration still required; no runtime plugins |
 | Fixed timestep with catch-up limit | Consistent step duration; bounded catch-up work | Game loses simulated time after a long stall; cross-machine determinism is not guaranteed |
 | Event bus with immediate and queued modes | Decoupled systems, safe deferred reactions | Events must be copyable; no priorities yet |

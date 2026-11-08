@@ -5,18 +5,20 @@ namespace engine::ecs {
 Entity Registry::spawn()
 {
     if (!_freeIds.empty()) {
-        const Entity entity = _freeIds.back();
+        const std::uint32_t slot = _freeIds.back();
         _freeIds.pop_back();
-        _alive[entity] = true;
-        return entity;
+        _alive[slot] = true;
+        return makeEntity(slot, _generations[slot]);
     }
 
-    if (_alive.size() >= static_cast<std::size_t>(NullEntity))
+    // The last slot is reserved: with the highest generation it would be NullEntity.
+    if (_alive.size() >= EntityIndexMask)
         throw std::overflow_error("Registry has no entity ids left");
 
-    const Entity entity = static_cast<Entity>(_alive.size());
+    const auto slot = static_cast<std::uint32_t>(_alive.size());
     _alive.push_back(true);
-    return entity;
+    _generations.push_back(0);
+    return makeEntity(slot, 0);
 }
 
 void Registry::kill(Entity entity)
@@ -27,13 +29,16 @@ void Registry::kill(Entity entity)
     for (auto &entry : _componentArrays)
         entry.second->erase(entity);
 
-    _freeIds.push_back(entity);
-    _alive[entity] = false;
+    const std::uint32_t slot = indexOf(entity);
+    _alive[slot] = false;
+    _generations[slot] = (_generations[slot] + 1) & 0xFFu; // old handles to this slot are now stale
+    _freeIds.push_back(slot);
 }
 
 bool Registry::alive(Entity entity) const
 {
-    return entity < _alive.size() && _alive[entity];
+    const std::uint32_t slot = indexOf(entity);
+    return entity != NullEntity && slot < _alive.size() && _alive[slot] && _generations[slot] == generationOf(entity);
 }
 
 void Registry::addSystem(System system)
