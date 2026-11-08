@@ -46,6 +46,7 @@ void parsePlayerRules(const Json &json, Game::GameRules &rules)
     rules.playerLives = std::max(1, json.value("lives", 3));
     rules.respawnDelay = json.value("respawn_delay", 2.0f);
     rules.invulnerability = json.value("invulnerability", 2.0f);
+    rules.lobbyDelay = std::max(0.f, json.value("lobby_delay", 0.f));
 }
 
 void parseInfiniteRules(const Json &json, Game::GameRules &rules)

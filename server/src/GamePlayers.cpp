@@ -22,9 +22,10 @@ void Game::onPlayerJoined(PlayerId player)
     _lives[player] = _rules.playerLives;
     _respawnTimers[player] = 0.f;
     _invulnerableTimers[player] = 0.f;
-    if (_state != protocol::GameState::Playing)
-        return; // the game has ended: no ship until it restarts
-    spawnPlayerShip(player);
+    if (_state == protocol::GameState::GameOver || _state == protocol::GameState::Finished)
+        return;              // the game has ended: no ship until it restarts
+    spawnPlayerShip(player); // in the waiting room too, so the player can try the controls
+    startIfLobbyOver();
 }
 
 void Game::onPlayerLeft(PlayerId player)

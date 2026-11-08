@@ -19,26 +19,26 @@ that research does not establish that their accessibility features exist in this
 |---|---|---|---|
 | Keyboard movement with arrows or ZQSD | Gives two existing key layouts | Available; keyboard input only | Check both layouts, diagonal movement and release on Linux/Windows. |
 | Continuous shooting while holding Space | Avoids repeated presses | Available through the Shoot action and server cooldown; still requires holding a key | Check held fire and release; distinguish this from toggle auto-fire. |
-| Remappable actions | Lets players choose reachable keys | Tracked, #66 | Rebind each action, handle conflicts and confirm saved settings after restart. |
-| Toggle auto-fire | Avoids holding a key for a long period | Tracked, #114 | One press toggles; stopping/reconnecting does not leave unwanted shooting enabled. |
+| Remappable actions | Lets players choose reachable keys | Available in Settings, saved in `config.json` | Rebind each action, handle conflicts and confirm saved settings after restart. |
+| Toggle auto-fire | Avoids holding a key for a long period | Available: Settings or F1 in game, saved; shown in the HUD. No action is sent while the window has no focus | One press toggles; stopping/reconnecting does not leave unwanted shooting enabled. |
 | Gamepad/adaptive controller input | Alternative input devices | Optional | Select supported hardware and verify it before claiming support. |
 | Slower game speed | More reaction time | Optional | An authoritative multiplayer speed setting affects the whole game and needs team agreement. |
 
 The client sends action flags, not physical key codes. This allows a different local mapping without
-changing the movement actions understood by the server. It does not mean remapping or device support is already present.
+changing the movement actions understood by the server. Gamepads are not supported.
 
 ## Visual access
 
 | Feature | Barrier addressed | Current status | Verification to perform |
 |---|---|---|---|
-| Player appearance variants | Helps identify players | Available as sprite variants; shape/number redundancy is not established | Check four players without relying only on hue. |
-| Shapes/numbers in addition to color | Supports recognition without color alone | Tracked, #67 | Check players and opposing projectile types in normal play and contrast modes. |
-| High-contrast presentation | Helps distinguish objects from the background | Tracked, #67 | Compare ships/projectiles, backgrounds, overlays and both UI themes where applicable. |
-| Readable HUD text | Helps read score, health and states | HUD tracked, #46 | Check text size, contrast, scaling and absence of clipping. |
-| Controlled flashes and distractions | Reduces distracting effects | Review needed when animations/effects are added | Inspect the delivered effects; this prototype is not a photosensitivity safety assessment. |
+| Player appearance variants | Helps identify players | Available: sprite variants plus a "P1"..."P4" tag above each ship and in the HUD | Check four players without relying only on hue. |
+| Shapes/numbers in addition to color | Supports recognition without color alone | Available: player tags, bonus letters (S, L, +), red ring around enemy shots in high contrast | Check players and opposing projectile types in normal play and contrast modes. |
+| High-contrast presentation | Helps distinguish objects from the background | Available: Settings or F2 in game, saved. Plain dark background, outlined HUD text | Compare ships/projectiles, backgrounds, overlays and both UI themes where applicable. |
+| Readable HUD text | Helps read score, health and states | Score, wave and lives of every player shown | Check text size, contrast, scaling and absence of clipping. |
+| Controlled flashes and distractions | Reduces distracting effects | High contrast softens the red damage flash and removes the screen shake | Inspect the delivered effects; this prototype is not a photosensitivity safety assessment. |
 
-The current prototype has a dark background and sprites. That alone does not establish suitable contrast
-for every object or an implemented high-contrast option. The server sends type/variant; the client owns their appearance.
+These options were not measured against a contrast ratio and are not a photosensitivity assessment.
+The server sends type/variant; the client owns their appearance.
 
 ## Audio access
 

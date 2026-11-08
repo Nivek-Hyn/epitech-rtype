@@ -173,6 +173,9 @@ Configured in `assets/config/game_rules.json` under `player`:
 - `lives`: lives of each player.
 - `respawn_delay`: seconds before the ship comes back.
 - `invulnerability`: seconds without damage after a respawn.
+- `lobby_delay`: seconds the waiting room stays open after the first player joins (5). During that time the
+  snapshots carry the `Waiting` state: ships can move, no wave comes, and the client shows the waiting room.
+  When every player leaves, the game goes back to the waiting room at the first level.
 
 Lives are per world: `levels_per_world` in the `campaign` section (3 by default) says how many levels form a world. At the start of a new world, every connected player is back to the full count, not added to what is left (2 lives left gives 3, not 5), and a player out of lives comes back.
 

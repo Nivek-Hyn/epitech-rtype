@@ -57,6 +57,7 @@ public:
         float respawnDelay = 2.0f;
         float invulnerability = 2.0f;
         std::size_t levelsPerWorld = 3;
+        float lobbyDelay = 0.f; // seconds the waiting room stays open after the first player joins
     };
 
     Game();
@@ -117,6 +118,8 @@ private:
     void updateLevelProgression(float dt);
     void goToNextLevel();
     void restartCampaign();
+    void updateLobby(float dt);
+    void startIfLobbyOver();
 
     // GamePlayers.cpp
     void applyMovementInput(std::size_t player, std::uint8_t flags);
@@ -199,6 +202,7 @@ private:
     LevelConfig _currentLevel;
     float _levelTimer = 0.f;
     float _transitionTimer = 0.f;
+    float _lobbyTimer = 0.f;
 
     Prefabs _prefabs;
     GameRules _rules;
@@ -208,7 +212,7 @@ private:
     GameMode _gameMode = GameMode::Campaign;
     Difficulty _difficulty = Difficulty::Normal;
     std::uint32_t _infiniteLoopCount = 1;
-    protocol::GameState _state = protocol::GameState::Playing;
+    protocol::GameState _state = protocol::GameState::Waiting;
 };
 
 LevelConfig loadLevelFromJson(const std::string &filepath);

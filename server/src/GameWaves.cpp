@@ -26,9 +26,11 @@ void Game::updateWaves(float dt)
         return;
 
     if (!anyPlayerConnected()) {
-        // The level restarts for the next player: nothing may stay from the previous attempt.
+        // The level restarts in the waiting room: nothing may stay from the previous attempt.
         clearEnemies();
         resetWaves();
+        _state = protocol::GameState::Waiting;
+        _lobbyTimer = 0.f;
         return;
     }
     if (!anyPlayerStillInGame()) {

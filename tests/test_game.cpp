@@ -41,6 +41,7 @@ long countOf(Game &game, protocol::EntityType type)
 TEST(Game, PlayerJoinAppearsInSnapshot)
 {
     Game game;
+    game.rules().lobbyDelay = 0.f; // no waiting room in rule tests
     game.onPlayerJoined(0);
     const auto snap = game.snapshot();
     ASSERT_EQ(snap.entities.size(), 1u);
@@ -50,6 +51,7 @@ TEST(Game, PlayerJoinAppearsInSnapshot)
 TEST(Game, InputMovesPlayer)
 {
     Game game;
+    game.rules().lobbyDelay = 0.f; // no waiting room in rule tests
     game.onPlayerJoined(1);
     const auto before = game.snapshot();
     ASSERT_EQ(before.entities.size(), 1u);
@@ -63,6 +65,7 @@ TEST(Game, InputMovesPlayer)
 TEST(Game, PlayerLeftProducesDestroyEvent)
 {
     Game game;
+    game.rules().lobbyDelay = 0.f; // no waiting room in rule tests
     game.onPlayerJoined(2);
     game.onPlayerLeft(2);
     EXPECT_TRUE(game.snapshot().entities.empty());
@@ -74,6 +77,7 @@ TEST(Game, PlayerLeftProducesDestroyEvent)
 TEST(Game, RejoiningPlayerGetsANewNetworkIdentityAndFreshMovement)
 {
     Game game;
+    game.rules().lobbyDelay = 0.f; // no waiting room in rule tests
     game.onPlayerJoined(2);
     const auto initial = game.snapshot();
     ASSERT_EQ(initial.entities.size(), 1u);
@@ -104,6 +108,7 @@ TEST(Game, RejoiningPlayerGetsANewNetworkIdentityAndFreshMovement)
 TEST(Game, HoldingShootKeepsSnapshotsWithinDatagramLimit)
 {
     Game game;
+    game.rules().lobbyDelay = 0.f; // no waiting room in rule tests
     game.onPlayerJoined(0);
 
     for (int tick = 0; tick < 600; ++tick) {
@@ -117,6 +122,7 @@ TEST(Game, HoldingShootKeepsSnapshotsWithinDatagramLimit)
 TEST(Game, EnemiesAppearOnlyWhilePlayersAreConnected)
 {
     Game game;
+    game.rules().lobbyDelay = 0.f; // no waiting room in rule tests
     game.loadEntitiesConfig(TestEntities);
     game.loadLevel(OneGrunt);
     for (int tick = 0; tick < 240; tick++)
@@ -136,6 +142,7 @@ TEST(Game, EnemiesAppearOnlyWhilePlayersAreConnected)
 TEST(Game, DeadPlayerCannotControlAReusedEntity)
 {
     Game game;
+    game.rules().lobbyDelay = 0.f; // no waiting room in rule tests
     game.loadEntitiesConfig(TestEntities);
     game.loadLevel(OneGrunt);
     game.rules().intermissionDelay = 1000.f; // the game must still be running when the others join
@@ -167,6 +174,7 @@ TEST(Game, DeadPlayerCannotControlAReusedEntity)
 TEST(Game, PlayerMissileDestroysEnemyAndScores)
 {
     Game game;
+    game.rules().lobbyDelay = 0.f; // no waiting room in rule tests
     game.loadEntitiesConfig(TestEntities);
     game.loadLevel(OneGrunt);
     game.setGameMode(Game::GameMode::Infinite);
@@ -218,6 +226,7 @@ TEST(Game, EnemyZigzagShootingAppliesMovementPattern)
 TEST(Game, GameRulesLoadedCorrectlyForGameDesigner)
 {
     Game game;
+    game.rules().lobbyDelay = 0.f; // no waiting room in rule tests
     const auto &rules = game.rules();
     EXPECT_GE(rules.campaignLevels.size(), 3u);
     EXPECT_GT(rules.infinite.maxBulletSpeed, 0.f);
@@ -231,6 +240,7 @@ TEST(Game, GameRulesLoadedCorrectlyForGameDesigner)
 TEST(Game, DifficultySettingsChangeGameModeAndDifficulty)
 {
     Game game;
+    game.rules().lobbyDelay = 0.f; // no waiting room in rule tests
     EXPECT_EQ(game.gameMode(), Game::GameMode::Campaign);
     EXPECT_EQ(game.difficulty(), Game::Difficulty::Normal);
 
@@ -244,6 +254,7 @@ TEST(Game, DifficultySettingsChangeGameModeAndDifficulty)
 TEST(Game, CampaignProgressionAdvancesLevelsAndFinishes)
 {
     Game game;
+    game.rules().lobbyDelay = 0.f; // no waiting room in rule tests
     game.loadCampaign({"assets/levels/level1.json", "assets/levels/level2.json", "assets/levels/level3.json"});
     game.setGameMode(Game::GameMode::Campaign);
     game.loadEntitiesConfig(TestEntities);
@@ -288,6 +299,7 @@ TEST(Game, CampaignProgressionAdvancesLevelsAndFinishes)
 TEST(Game, InfiniteModeLoopsAndIncrementsLoopCount)
 {
     Game game;
+    game.rules().lobbyDelay = 0.f; // no waiting room in rule tests
     game.loadCampaign({"assets/levels/level1.json", "assets/levels/level2.json", "assets/levels/level3.json"});
     game.setGameMode(Game::GameMode::Infinite);
     game.loadEntitiesConfig(TestEntities);
@@ -371,6 +383,7 @@ TEST(Game, EnemyMultipleAttacksShootSimultaneously)
 TEST(Game, BossStopsAtItsPositionAndTheLevelWaitsForItsDeath)
 {
     Game game;
+    game.rules().lobbyDelay = 0.f; // no waiting room in rule tests
     game.loadEntitiesConfig(TestEntities);
     game.loadLevel(OneBoss);
     game.rules().intermissionDelay = 0.0f;
@@ -388,6 +401,7 @@ TEST(Game, BossStopsAtItsPositionAndTheLevelWaitsForItsDeath)
 TEST(Game, RammingKillsTheShipButNotTheBoss)
 {
     Game game;
+    game.rules().lobbyDelay = 0.f; // no waiting room in rule tests
     game.loadEntitiesConfig(TestEntities);
     game.loadLevel(OneBoss);
     game.onPlayerJoined(0);
@@ -405,6 +419,7 @@ TEST(Game, RammingKillsTheShipButNotTheBoss)
 TEST(Game, CampaignGivesNoScore)
 {
     Game game;
+    game.rules().lobbyDelay = 0.f; // no waiting room in rule tests
     game.loadEntitiesConfig(TestEntities);
     game.loadLevel(OneGrunt);
     game.setGameMode(Game::GameMode::Campaign);
@@ -421,6 +436,7 @@ TEST(Game, CampaignGivesNoScore)
 TEST(Game, ScoreOfAnEnemyComesFromItsDefinition)
 {
     Game game;
+    game.rules().lobbyDelay = 0.f; // no waiting room in rule tests
     game.loadEntitiesConfig(TestEntities);
     game.loadLevel(OneBoss);
     game.setGameMode(Game::GameMode::Infinite);
@@ -437,6 +453,7 @@ TEST(Game, ScoreOfAnEnemyComesFromItsDefinition)
 TEST(Game, LevelRestartsCleanlyWhenNoPlayerIsLeft)
 {
     Game game;
+    game.rules().lobbyDelay = 0.f; // no waiting room in rule tests
     game.loadEntitiesConfig(TestEntities);
     game.loadLevel(OneBoss);
     game.onPlayerJoined(0);
@@ -455,6 +472,7 @@ TEST(Game, LevelRestartsCleanlyWhenNoPlayerIsLeft)
 TEST(Game, PlayerStartsWithTheConfiguredLives)
 {
     Game game;
+    game.rules().lobbyDelay = 0.f; // no waiting room in rule tests
     game.rules().playerLives = 5;
     game.onPlayerJoined(0);
     EXPECT_EQ(game.playerLives(0), 5);
@@ -463,6 +481,7 @@ TEST(Game, PlayerStartsWithTheConfiguredLives)
 TEST(Game, DeadPlayerLosesALifeAndRespawnsAfterTheDelay)
 {
     Game game;
+    game.rules().lobbyDelay = 0.f; // no waiting room in rule tests
     game.loadEntitiesConfig(TestEntities);
     game.loadLevel(OneBoss);
     game.onPlayerJoined(0);
@@ -513,6 +532,7 @@ float ramTheBossUntilOutOfLives(Game &game, std::uint8_t player)
 TEST(Game, InvulnerabilityProtectsAndGameIsOverWhenLivesRunOut)
 {
     Game game;
+    game.rules().lobbyDelay = 0.f; // no waiting room in rule tests
     game.loadEntitiesConfig(TestEntities);
     game.loadLevel(OneBoss);
     game.onPlayerJoined(0);
@@ -535,6 +555,7 @@ TEST(Game, InvulnerabilityProtectsAndGameIsOverWhenLivesRunOut)
 TEST(Game, DeathWithLivesLeftIsNotGameOver)
 {
     Game game;
+    game.rules().lobbyDelay = 0.f; // no waiting room in rule tests
     game.loadEntitiesConfig(TestEntities);
     game.loadLevel(OneBoss);
     game.onPlayerJoined(0);
@@ -552,6 +573,7 @@ TEST(Game, DeathWithLivesLeftIsNotGameOver)
 TEST(Game, GameGoesOnWhileAnotherPlayerHasLives)
 {
     Game game;
+    game.rules().lobbyDelay = 0.f; // no waiting room in rule tests
     game.loadEntitiesConfig(TestEntities);
     game.loadLevel(OneBoss);
     game.onPlayerJoined(0);
@@ -567,6 +589,7 @@ TEST(Game, GameGoesOnWhileAnotherPlayerHasLives)
 TEST(Game, NextPlayersStartAgainFromTheFirstLevelAfterAGameOver)
 {
     Game game;
+    game.rules().lobbyDelay = 0.f; // no waiting room in rule tests
     game.loadEntitiesConfig(TestEntities);
     game.loadCampaign({OneGrunt, OneBoss});
     game.rules().intermissionDelay = 0.f;
@@ -579,12 +602,51 @@ TEST(Game, NextPlayersStartAgainFromTheFirstLevelAfterAGameOver)
     ASSERT_EQ(game.gameState(), protocol::GameState::GameOver);
 
     game.onPlayerLeft(0);
-    EXPECT_EQ(game.gameState(), protocol::GameState::Playing);
+    EXPECT_EQ(game.gameState(), protocol::GameState::Waiting);
     EXPECT_EQ(game.currentLevelIndex(), 0u);
 
     game.onPlayerJoined(0);
+    EXPECT_EQ(game.gameState(), protocol::GameState::Playing);
     EXPECT_EQ(game.playerLives(0), 3);
     EXPECT_EQ(countOf(game, protocol::EntityType::Player), 1);
+}
+
+TEST(Game, WaitingRoomLetsPlayersJoinBeforeTheFirstWave)
+{
+    Game game;
+    game.rules().lobbyDelay = 5.f;
+    game.loadEntitiesConfig(TestEntities);
+    game.loadLevel(OneGrunt);
+    EXPECT_EQ(game.gameState(), protocol::GameState::Waiting);
+
+    game.onPlayerJoined(0);
+    run(game, 3.f);
+    EXPECT_EQ(game.gameState(), protocol::GameState::Waiting);
+    EXPECT_EQ(countOf(game, protocol::EntityType::Player), 1); // the ship can already move
+    EXPECT_EQ(countOf(game, protocol::EntityType::Enemy), 0);  // but no wave comes
+
+    game.onPlayerJoined(1);
+    run(game, 3.f);
+    EXPECT_EQ(game.gameState(), protocol::GameState::Playing);
+    EXPECT_EQ(game.snapshot().state, protocol::GameState::Playing);
+}
+
+TEST(Game, WaitingRoomStartsAgainWhenEveryoneLeaves)
+{
+    Game game;
+    game.rules().lobbyDelay = 5.f;
+    game.loadEntitiesConfig(TestEntities);
+    game.loadLevel(OneGrunt);
+    game.onPlayerJoined(0);
+    run(game, 6.f);
+    ASSERT_EQ(game.gameState(), protocol::GameState::Playing);
+
+    game.onPlayerLeft(0);
+    run(game, 0.1f);
+    EXPECT_EQ(game.gameState(), protocol::GameState::Waiting);
+    game.onPlayerJoined(0);
+    run(game, 3.f);
+    EXPECT_EQ(game.gameState(), protocol::GameState::Waiting); // the full delay again
 }
 
 namespace {
@@ -602,6 +664,7 @@ void runUntilLevel(Game &game, std::size_t level)
 TEST(Game, LivesComeBackToTheFullCountOnlyWhenANewWorldStarts)
 {
     Game game;
+    game.rules().lobbyDelay = 0.f; // no waiting room in rule tests
     game.loadEntitiesConfig(TestEntities);
     game.loadCampaign({OneGrunt, OneGrunt, OneGrunt});
     game.rules().levelsPerWorld = 2;
@@ -618,6 +681,7 @@ TEST(Game, LivesComeBackToTheFullCountOnlyWhenANewWorldStarts)
 TEST(Game, PlayerOutOfLivesComesBackInTheNextWorld)
 {
     Game game;
+    game.rules().lobbyDelay = 0.f; // no waiting room in rule tests
     game.loadEntitiesConfig(TestEntities);
     game.loadCampaign({OneGrunt, OneGrunt});
     game.rules().levelsPerWorld = 1;
@@ -640,6 +704,7 @@ TEST(Game, PlayerOutOfLivesComesBackInTheNextWorld)
 TEST(Game, GameRulesGiveThreeLevelsPerWorld)
 {
     Game game;
+    game.rules().lobbyDelay = 0.f; // no waiting room in rule tests
     EXPECT_EQ(game.rules().levelsPerWorld, 3u);
     EXPECT_EQ(game.rules().playerLives, 3);
 }
@@ -647,6 +712,7 @@ TEST(Game, GameRulesGiveThreeLevelsPerWorld)
 TEST(Game, SnapshotTellsTheLivesLeftOfEachPlayer)
 {
     Game game;
+    game.rules().lobbyDelay = 0.f; // no waiting room in rule tests
     game.loadEntitiesConfig(TestEntities);
     game.loadLevel(OneBoss);
     game.onPlayerJoined(0);
@@ -662,6 +728,7 @@ TEST(Game, SnapshotTellsTheLivesLeftOfEachPlayer)
 TEST(Obstacle, CostsALifeOnContactAndStaysInPlace)
 {
     Game game;
+    game.rules().lobbyDelay = 0.f; // no waiting room in rule tests
     game.loadEntitiesConfig(TestEntities);
     game.loadLevel("tests/data/one_tile.json");
     game.rules().intermissionDelay = 1000.f;
@@ -675,6 +742,7 @@ TEST(Obstacle, CostsALifeOnContactAndStaysInPlace)
 TEST(Obstacle, ResistsAsManyShotsAsItsHealthAndGivesNoScore)
 {
     Game game;
+    game.rules().lobbyDelay = 0.f; // no waiting room in rule tests
     game.loadEntitiesConfig(TestEntities);
     game.loadLevel("tests/data/one_tile.json");
     game.setGameMode(Game::GameMode::Infinite);
@@ -697,6 +765,7 @@ TEST(Obstacle, ResistsAsManyShotsAsItsHealthAndGivesNoScore)
 TEST(Obstacle, StopsEnemyFireWithoutBeingDamaged)
 {
     Game game;
+    game.rules().lobbyDelay = 0.f; // no waiting room in rule tests
     game.loadEntitiesConfig(TestEntities);
     game.loadLevel("tests/data/tile_shield.json");
     game.onPlayerJoined(0);
@@ -709,6 +778,7 @@ TEST(Obstacle, StopsEnemyFireWithoutBeingDamaged)
 TEST(Obstacle, DoesNotHoldTheLevelBack)
 {
     Game game;
+    game.rules().lobbyDelay = 0.f; // no waiting room in rule tests
     game.loadEntitiesConfig(TestEntities);
     game.loadLevel("tests/data/one_tile.json");
     game.rules().intermissionDelay = 0.f;
@@ -721,6 +791,7 @@ TEST(Obstacle, DoesNotHoldTheLevelBack)
 TEST(Obstacle, LeavesTheGameAtTheLeftOfTheScreen)
 {
     Game game;
+    game.rules().lobbyDelay = 0.f; // no waiting room in rule tests
     game.loadEntitiesConfig(TestEntities);
     game.loadLevel("tests/data/one_tile.json");
     game.rules().intermissionDelay = 1000.f;
@@ -760,6 +831,7 @@ TEST(Obstacle, EveryTileOfTheCampaignExistsAndEveryWorldHasItsOwn)
 TEST(Game, PlayerJoiningAFinishedGameGetsNoShip)
 {
     Game game;
+    game.rules().lobbyDelay = 0.f; // no waiting room in rule tests
     game.loadEntitiesConfig(TestEntities);
     game.loadLevel(OneBoss);
     game.onPlayerJoined(0);
@@ -926,6 +998,7 @@ TEST(Movement, StoppedBossNeverLeavesTheScreen)
 TEST(Game, EnemyKeepsTheSpriteOfItsDefinition)
 {
     Game game;
+    game.rules().lobbyDelay = 0.f; // no waiting room in rule tests
     game.loadEntitiesConfig(TestEntities);
     game.loadLevel(OneSprite);
     game.onPlayerJoined(0);

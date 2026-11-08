@@ -34,8 +34,11 @@ public:
     void reset();
     // Advances the timers of the visual effects.
     void update(float dt, bool connected);
-    // Sends the pressed actions to the server (nothing once the game has ended).
-    void sendInput(INetworkClient &network, const ui::GameConfig &config, float dt);
+    // Sends the pressed actions to the server: nothing once the game has ended, and no action while the window
+    // does not have the focus. With auto fire, Shoot is sent without holding the key.
+    void sendInput(INetworkClient &network, const ui::GameConfig &config, float dt, bool focused);
+    // High contrast: outlined enemy shots and HUD, softer flash, no screen shake.
+    void setHighContrast(bool enabled) { _highContrast = enabled; }
     // Reads every message the network received, then handles the snapshots whose time has come.
     void receive(INetworkClient &network);
     // Why the server refused us, after a ConnectRejected.
@@ -66,6 +69,10 @@ private:
     void drawPlayers(sf::RenderWindow &window) const;
     void drawDamageFlash(sf::RenderWindow &window) const;
     void drawWaveBanner(sf::RenderWindow &window) const;
+    void drawWaitingRoom(sf::RenderWindow &window) const;
+    void drawAutoFire(sf::RenderWindow &window) const;
+    void drawShotMarkers(sf::RenderWindow &window) const;
+    void outline(sf::Text &text) const;
     void drawEndScreen(sf::RenderWindow &window) const;
     sf::Text centeredText(const std::string &string, unsigned int size, sf::Color color, sf::Vector2f center) const;
 
@@ -85,6 +92,9 @@ private:
     bool _gameOver = false;
     bool _gameWon = false;
     bool _playerWasSpawned = false;
+    bool _waiting = false; // the server is in its waiting room
+    bool _highContrast = false;
+    bool _autoFire = false; // shown in the HUD
 
     float _damageFlash = 0.f;
     float _shakeTimer = 0.f;

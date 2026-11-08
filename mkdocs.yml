@@ -50,6 +50,7 @@ nav:
       - Overview: architecture.md
       - Cross-platform support: cross-platform.md
       - Engine: engine.md
+      - Client: client.md
       - Shared data: shared-data.md
       - Technical study: technical-study.md
       - Decision records:
@@ -71,7 +72,7 @@ nav:
   - Networking implementation: networking.md
   - Guides:
       - Build and run: build-and-run.md
-      - Campaign game design: game-design-campaign.md
+      - Campaign game design: GameDesign/game-design-campaign.md
       - How-to guides: how-to.md
       - Validation record: validation.md
       - Delivery and defense: delivery.md

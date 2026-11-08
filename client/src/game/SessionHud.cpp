@@ -48,7 +48,44 @@ sf::Text Session::centeredText(const std::string &string, unsigned int size, sf:
     const auto bounds = text.getLocalBounds();
     text.setOrigin({bounds.size.x / 2.f, bounds.size.y / 2.f});
     text.setPosition(center);
+    outline(text);
     return text;
+}
+
+// In high contrast, every HUD text gets a black outline so it stays readable over any sprite.
+void Session::outline(sf::Text &text) const
+{
+    if (!_highContrast)
+        return;
+    text.setOutlineColor(sf::Color::Black);
+    text.setOutlineThickness(3.f);
+}
+
+// In high contrast, a red ring around each enemy shot: enemy and player shots differ by shape, not only color.
+void Session::drawShotMarkers(sf::RenderWindow &window) const
+{
+    for (const auto &entity : _shown) {
+        if (entity.type != protocol::EntityType::EnemyMissile)
+            continue;
+        sf::CircleShape ring(26.f);
+        ring.setOrigin({26.f, 26.f});
+        ring.setPosition({entity.x, entity.y});
+        ring.setFillColor(sf::Color::Transparent);
+        ring.setOutlineColor(sf::Color(255, 60, 60));
+        ring.setOutlineThickness(3.f);
+        window.draw(ring);
+    }
+}
+
+void Session::drawAutoFire(sf::RenderWindow &window) const
+{
+    if (!_autoFire)
+        return;
+    sf::Text text(_resources.getFont("default"), "AUTO FIRE ON (F1)", 20);
+    text.setFillColor(sf::Color(255, 204, 0));
+    text.setPosition({45.f, 92.f});
+    outline(text);
+    window.draw(text);
 }
 
 void Session::drawConnecting(sf::RenderWindow &window) const
@@ -63,10 +100,12 @@ void Session::drawConnecting(sf::RenderWindow &window) const
 void Session::drawHud(sf::RenderWindow &window) const
 {
     drawScore(window);
+    drawAutoFire(window);
     drawBossAlert(window);
     drawPlayers(window);
     drawDamageFlash(window);
     drawWaveBanner(window);
+    drawWaitingRoom(window);
     drawEndScreen(window);
 }
 
@@ -76,11 +115,13 @@ void Session::drawScore(sf::RenderWindow &window) const
     sf::Text score(_resources.getFont("default"), "SCORE: " + std::to_string(_score), 28);
     score.setFillColor(sf::Color(0, 230, 255));
     score.setPosition({45.f, 25.f});
+    outline(score);
     window.draw(score);
 
     sf::Text stage(_resources.getFont("default"), "STAGE 1 - WAVE " + std::to_string(_wave), 20);
     stage.setFillColor(sf::Color(255, 204, 0));
     stage.setPosition({45.f, 62.f});
+    outline(stage);
     window.draw(stage);
 }
 
@@ -123,6 +164,7 @@ void Session::drawPlayers(sf::RenderWindow &window) const
                                     : (active[player] ? sf::Color(255, 200, 50) : sf::Color(140, 140, 140)));
         text.setOrigin({text.getLocalBounds().size.x, 0.f});
         text.setPosition({WorldWidth - 45.f, y});
+        outline(text);
         window.draw(text);
         y += 26.f;
     }
@@ -134,7 +176,8 @@ void Session::drawDamageFlash(sf::RenderWindow &window) const
     if (_damageFlash <= 0.f)
         return;
     sf::RectangleShape flash({WorldWidth, WorldHeight});
-    flash.setFillColor(sf::Color(255, 0, 0, alphaOf(_damageFlash / DamageFlashDuration, 135.f)));
+    // Softer in high contrast: no bright full-screen flash.
+    flash.setFillColor(sf::Color(255, 0, 0, alphaOf(_damageFlash / DamageFlashDuration, _highContrast ? 50.f : 135.f)));
     window.draw(flash);
 }
 
@@ -154,6 +197,28 @@ void Session::drawWaveBanner(sf::RenderWindow &window) const
                              sf::Color(255, 204, 0, alphaOf(alpha, 255.f)), {WorldWidth / 2.f, 235.f}));
     window.draw(centeredText("INCOMING ENEMY SQUADRON", 18, sf::Color(0, 230, 255, alphaOf(alpha, 240.f)),
                              {WorldWidth / 2.f, 275.f}));
+}
+
+// While the server waits for players: how many are here, and the controls to try meanwhile.
+void Session::drawWaitingRoom(sf::RenderWindow &window) const
+{
+    if (!_waiting)
+        return;
+    const auto players = std::count_if(_shown.begin(), _shown.end(), [](const protocol::EntityState &entity) {
+        return entity.type == protocol::EntityType::Player;
+    });
+    sf::RectangleShape panel({900.f, 260.f});
+    panel.setOrigin({450.f, 130.f});
+    panel.setPosition({WorldWidth / 2.f, 420.f});
+    panel.setFillColor(sf::Color(10, 15, 30, 220));
+    panel.setOutlineThickness(2.f);
+    panel.setOutlineColor(sf::Color(0, 230, 255));
+    window.draw(panel);
+    window.draw(centeredText("WAITING FOR PLAYERS", 44, sf::Color(0, 230, 255), {WorldWidth / 2.f, 340.f}));
+    window.draw(centeredText(std::to_string(players) + " / 4 connected - the game starts in a few seconds", 24,
+                             sf::Color(255, 204, 0), {WorldWidth / 2.f, 405.f}));
+    window.draw(centeredText("Move: arrows or your keys    Shoot: your fire key    Network stats: F3    Menu: ESC", 20,
+                             sf::Color(200, 210, 230), {WorldWidth / 2.f, 470.f}));
 }
 
 // Victory or defeat, decided by the server, with the final score.
