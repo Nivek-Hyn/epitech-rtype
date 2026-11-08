@@ -1,5 +1,4 @@
 #include "editor/Level.hpp"
-#include "editor/Preview.hpp"
 
 #include <gtest/gtest.h>
 
@@ -37,30 +36,6 @@ TEST(LevelEditor, EnemiesAtTheSameTimeShareOneWaveSortedByTime)
     EXPECT_FLOAT_EQ(saved["waves"][0]["delay_before_start"].get<float>(), 1.f);
     EXPECT_EQ(saved["waves"][1]["enemies"].size(), 2u);
     EXPECT_EQ(saved["waves"][1]["enemies"][0]["hp"], 3);
-}
-
-TEST(LevelEditor, PreviewSpawnsEnemiesAtTheirTimeAndMovesThemLeft)
-{
-    editor::Level level;
-    level.enemies.push_back({1.f, {{"type", "a"}, {"spawn_y", 200.f}, {"speed", 100.f}}});
-    editor::Preview preview(level);
-
-    int count = 0;
-    auto countEnemies = [&] {
-        count = 0;
-        preview.registry().each<editor::Position>([&](engine::ecs::Entity, editor::Position &) { count++; });
-    };
-    for (int i = 0; i < 30; i++)
-        preview.step(1.f / 60.f);
-    countEnemies();
-    EXPECT_EQ(count, 0);
-
-    for (int i = 0; i < 60; i++)
-        preview.step(1.f / 60.f);
-    countEnemies();
-    EXPECT_EQ(count, 1);
-    preview.registry().each<editor::Position>(
-        [](engine::ecs::Entity, editor::Position &position) { EXPECT_LT(position.x, editor::Preview::WorldWidth); });
 }
 
 TEST(LevelEditor, TilesStayInTheObstaclesListOfTheirWave)

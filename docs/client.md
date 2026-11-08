@@ -7,7 +7,11 @@ is the authority, and the client draws what the snapshots contain.
 
 | File | Role |
 |---|---|
-| `client/src/main.cpp` | Arguments, then the `App` class: menu or game session, volumes, F1/F2/F3 keys, return to the menu |
+| `client/src/main.cpp` | Command-line arguments, then the application |
+| `client/src/App.cpp` | One state per screen (menu, campaign map, editor, game); hosts the local server; F1/F2/F3; where Escape leads |
+| `client/src/ui/CampaignMap.cpp` | Campaign map: one node per level, locked levels, difficulty, progress saved in `config.json` |
+| `client/src/editor/LevelEditor.cpp`, `LevelEditorDraw.cpp` | Level editor inside the game, on an engine `Registry` |
+| `client/src/render/WorldBackground.cpp` | Background of each world, drawn by code, with parallax |
 | `client/src/ui/MainMenu.cpp` | Menu screens: join a server, settings (volumes, auto fire, high contrast, key remapping) |
 | `client/src/ui/GameConfig.cpp` | Settings saved in `config.json`; an invalid file falls back to the defaults |
 | `client/src/game/Session.cpp` | One game: inputs sent, snapshots received and smoothed, effects of destroyed entities |

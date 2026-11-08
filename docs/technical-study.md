@@ -24,7 +24,7 @@ loss and latency still need the network track to be merged; they are not claimed
 | Dependencies | **CPM** | vcpkg, Conan | Keeps version declarations in CMake ([ADR 0001](adr/0001-cpp20-cmake-cpm.md)). The first build downloads and compiles application libraries. Compilers, SDKs and documented platform libraries such as X11/OpenGL remain prerequisites; builds are not assumed identical on every machine. |
 | Unit tests | **GoogleTest** | Catch2, doctest | Widely used, integrated with CTest (`gtest_discover_tests`), good failure messages. Catch2 or doctest would also fit; the choice is mostly familiarity. |
 | Continuous integration | **GitHub Actions**, run on demand + `scripts/check.sh` locally | GitLab CI, Jenkins | The repository is on GitHub. The manual workflow builds and tests on Linux and Windows and checks formatting. Local checks additionally run clang-tidy; they do not use Actions credits. |
-| Level editing | **Graphical editor** (`tools/level-editor`, SFML) writing the level JSON | Editing JSON by hand, in-game editor | Placing enemies on a time × height timeline is faster and less error-prone than typing coordinates. A separate tool keeps editing code out of the client. Its preview reuses the engine (Registry, movement, fixed timestep) but replays straight-line timing only, not movement patterns or shots. |
+| Level editing | **Editor inside the client** (CREATE A LEVEL), writing the level JSON | Editing JSON by hand, a separate tool | The level is shown as it is played: world background, real sprites, time to the right. TEST saves the level and plays it for real on a local server, so what is designed is exactly what is played. Placed objects are entities of an engine Registry. An earlier separate tool with colored dots was replaced. |
 
 ## 2. Libraries
 
@@ -289,5 +289,5 @@ the network maintainer; no checks were disabled. This is separate from the succe
 | Full snapshots over UDP | Robust to packet loss, simple | Higher bandwidth than deltas |
 | No persistence | No corruption or disk security issues | Nothing survives a server restart |
 | Prefabs described by components | Content and new entities without recompiling, in any game | New behaviors still need C++; component names are strings checked at load time |
-| Separate graphical level editor | Fast, visual level design writing the server's format | Preview replays timing only, not patterns or shots |
+| Level editor inside the game | Levels designed with the real sprites and backgrounds, tested for real in one click | The timeline shows spawn positions, not movement patterns: TEST is the way to see them |
 | A brick breaker as second game | Shows the engine on a very different game | A small game: it proves reuse, not every engine feature |

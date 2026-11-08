@@ -40,7 +40,7 @@ cmake --build build/windows --config Release --parallel 4
 .\Release\r-type_client.exe
 ```
 
-A dedicated server for a LAN game: `./r-type_server 4242`, then `./r-type_client <server address> 4242` on each
+The menu also opens the campaign map and the level editor (CREATE A LEVEL). A dedicated server for a LAN game: `./r-type_server 4242`, then `./r-type_client <server address> 4242` on each
 player's computer (allow the UDP port in the firewall). `./r-type_server --help` lists its options (mode,
 difficulty, first level, statistics). Run the programs from the repository or installed directory, where `assets/`
 is. Arrows or ZQSD move, Space shoots, F1 auto fire, F2 high contrast, F3 network statistics, Escape returns to
@@ -74,7 +74,6 @@ The same build also produces, at the repository root (run them from there):
 | Program | What it is | Controls |
 |---|---|---|
 | `./brickrush` | A second, unrelated game: a brick breaker. It uses the engine only, not `common/` or the R-Type assets. Bricks, paddle and ball are prefabs of `games/brickrush/assets/bricks.json`; each level is a grid of bricks. | Left/Right or Q/D to move, Space to launch, R to restart |
-| `./r-type_level_editor assets/levels/level1.json` | R-Type level editor with a preview played by the engine | See the [how-to guides](docs/how-to.md#edit-a-level-with-the-level-editor) |
 
 ## Project and documentation
 
@@ -85,7 +84,7 @@ The same build also produces, at the repository root (run them from there):
 | `server/` | Authoritative simulation and Asio transport. |
 | `client/` | SFML rendering, menus, input and Asio transport; hosts a local server for solo games. |
 | `games/brickrush/` | Second game made with the engine only. |
-| `tools/level-editor/` | Level editor. |
+| `tools/level-editor/` | Reading and writing of level files, used by the level editor of the client. |
 | `tests/` | GoogleTest tests. |
 | `docs/` | [Documentation index](docs/index.md), [architecture](docs/architecture.md), [study](docs/technical-study.md) and [protocol](docs/protocol.md). |
 
