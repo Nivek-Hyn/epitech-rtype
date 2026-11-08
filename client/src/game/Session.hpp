@@ -43,6 +43,9 @@ public:
     void receive(INetworkClient &network);
     // Why the server refused us, after a ConnectRejected.
     const std::string &rejectionReason() const { return _rejectionReason; }
+    bool isWaiting() const { return _waiting; }
+    bool isReady() const { return _isReady; }
+    void setReady(bool ready = true) { _isReady = ready; }
 
     // The world view, shaken for a moment when the local ship is hit.
     sf::View view() const;
@@ -93,6 +96,7 @@ private:
     bool _gameWon = false;
     bool _playerWasSpawned = false;
     bool _waiting = false; // the server is in its waiting room
+    bool _isReady = false;
     bool _highContrast = false;
     bool _autoFire = false; // shown in the HUD
 

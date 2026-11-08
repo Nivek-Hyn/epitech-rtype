@@ -199,7 +199,7 @@ void Session::drawWaveBanner(sf::RenderWindow &window) const
                              {WorldWidth / 2.f, 275.f}));
 }
 
-// While the server waits for players: how many are here, and the controls to try meanwhile.
+// While the server waits for players: how many are here, ready button and controls to try.
 void Session::drawWaitingRoom(sf::RenderWindow &window) const
 {
     if (!_waiting)
@@ -207,18 +207,39 @@ void Session::drawWaitingRoom(sf::RenderWindow &window) const
     const auto players = std::count_if(_shown.begin(), _shown.end(), [](const protocol::EntityState &entity) {
         return entity.type == protocol::EntityType::Player;
     });
-    sf::RectangleShape panel({900.f, 260.f});
-    panel.setOrigin({450.f, 130.f});
+    sf::RectangleShape panel({900.f, 270.f});
+    panel.setOrigin({450.f, 135.f});
     panel.setPosition({WorldWidth / 2.f, 420.f});
     panel.setFillColor(sf::Color(10, 15, 30, 220));
     panel.setOutlineThickness(2.f);
     panel.setOutlineColor(sf::Color(0, 230, 255));
     window.draw(panel);
-    window.draw(centeredText("WAITING FOR PLAYERS", 44, sf::Color(0, 230, 255), {WorldWidth / 2.f, 340.f}));
-    window.draw(centeredText(std::to_string(players) + " / 4 connected - the game starts in a few seconds", 24,
-                             sf::Color(255, 204, 0), {WorldWidth / 2.f, 405.f}));
-    window.draw(centeredText("Move: arrows or your keys    Shoot: your fire key    Network stats: F3    Menu: ESC", 20,
-                             sf::Color(200, 210, 230), {WorldWidth / 2.f, 470.f}));
+    window.draw(centeredText("WAITING FOR PLAYERS", 40, sf::Color(0, 230, 255), {WorldWidth / 2.f, 335.f}));
+    window.draw(centeredText(std::to_string(players) + " / 4 connected", 20, sf::Color(180, 200, 230),
+                             {WorldWidth / 2.f, 375.f}));
+
+    // Ready indicator / button
+    sf::RectangleShape readyBox({420.f, 48.f});
+    readyBox.setOrigin({210.f, 24.f});
+    readyBox.setPosition({WorldWidth / 2.f, 420.f});
+    if (_isReady) {
+        readyBox.setFillColor(sf::Color(0, 140, 60, 200));
+        readyBox.setOutlineColor(sf::Color(0, 255, 120));
+        readyBox.setOutlineThickness(2.f);
+        window.draw(readyBox);
+        window.draw(centeredText("READY ! (WAITING FOR OTHERS)", 20, sf::Color(255, 255, 255),
+                                 {WorldWidth / 2.f, 420.f}));
+    } else {
+        readyBox.setFillColor(sf::Color(140, 90, 0, 200));
+        readyBox.setOutlineColor(sf::Color(255, 204, 0));
+        readyBox.setOutlineThickness(2.f);
+        window.draw(readyBox);
+        window.draw(centeredText("PRESS SPACE / ENTER TO READY", 20, sf::Color(255, 255, 255),
+                                 {WorldWidth / 2.f, 420.f}));
+    }
+
+    window.draw(centeredText("Move: arrows or your keys    Network stats: F3    Menu: ESC", 18,
+                             sf::Color(200, 210, 230), {WorldWidth / 2.f, 475.f}));
 }
 
 // Victory or defeat, decided by the server, with the final score.
