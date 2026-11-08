@@ -1,7 +1,7 @@
 // Players: connection, controls, lives and respawn.
 
 #include "Game.hpp"
-#include "common/Components.hpp"
+#include "GameComponents.hpp"
 #include <algorithm>
 
 namespace rtype::server {

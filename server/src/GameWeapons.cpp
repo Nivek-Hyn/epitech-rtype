@@ -1,7 +1,7 @@
 // Player weapons and bonuses: weapons.json says which prefabs to use, entities.json describes them.
 
 #include "Game.hpp"
-#include "common/Components.hpp"
+#include "GameComponents.hpp"
 #include <algorithm>
 #include <cmath>
 #include <numbers>

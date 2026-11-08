@@ -1,7 +1,7 @@
 // Levels: loading them, going to the next one, winning the campaign, starting again.
 
 #include "Game.hpp"
-#include "common/Components.hpp"
+#include "GameComponents.hpp"
 #include <algorithm>
 
 namespace rtype::server {

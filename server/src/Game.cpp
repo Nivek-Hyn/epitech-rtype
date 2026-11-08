@@ -2,8 +2,8 @@
 
 #include "Game.hpp"
 #include "EnemyShootSystem.hpp"
+#include "GameComponents.hpp"
 #include "MovementSystem.hpp"
-#include "common/Components.hpp"
 #include "engine/systems/Movement.hpp"
 #include <algorithm>
 #include <iostream>

@@ -1,7 +1,7 @@
 // Waves: making enemies and tiles appear, and detecting the game over.
 
 #include "Game.hpp"
-#include "common/Components.hpp"
+#include "GameComponents.hpp"
 #include <algorithm>
 #include <iostream>
 #include <random>

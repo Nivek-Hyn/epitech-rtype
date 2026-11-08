@@ -1,7 +1,7 @@
 #include "EnemyShootSystem.hpp"
 #include "Game.hpp"
+#include "GameComponents.hpp"
 #include "MovementSystem.hpp"
-#include "common/Components.hpp"
 
 #include <gtest/gtest.h>
 

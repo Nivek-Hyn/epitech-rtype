@@ -1,7 +1,7 @@
 // Collisions: every case of a shot or a ship touching something.
 
 #include "Game.hpp"
-#include "common/Components.hpp"
+#include "GameComponents.hpp"
 #include <algorithm>
 #include <cmath>
 #include <utility>
