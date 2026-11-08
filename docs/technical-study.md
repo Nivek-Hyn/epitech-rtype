@@ -233,8 +233,9 @@ by the current implementation, and this comparison does not add high scores to t
 
 The [accessibility study](accessibility.md) maps current behavior and tracked features to physical/motor,
 visual/audio and cognitive barriers. The action-based input protocol lets the client own key mapping:
-keys can be remapped and are saved with the volumes in `config.json`. Toggle auto-fire and color-blind
-visuals remain tracked work. Bonuses are told apart by a letter as well as a color. A shared game-speed/difficulty setting would additionally need server/gameplay agreement.
+keys can be remapped and are saved with the volumes in `config.json`, together with toggle auto-fire and a
+high-contrast mode (plain background, outlined HUD, circled enemy shots, softer flash). Bonuses carry a letter and
+ships a player tag besides their color. A shared game-speed/difficulty setting would additionally need server/gameplay agreement.
 Platform/cross-play tests are not an accessibility audit; no compliance certification is claimed.
 
 ## 7. Security
