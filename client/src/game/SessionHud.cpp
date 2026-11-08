@@ -83,9 +83,25 @@ void Session::drawAutoFire(sf::RenderWindow &window) const
         return;
     sf::Text text(_resources.getFont("default"), "AUTO FIRE ON (F1)", 20);
     text.setFillColor(sf::Color(255, 204, 0));
-    text.setPosition({45.f, 92.f});
+    text.setPosition({45.f, 122.f});
     outline(text);
     window.draw(text);
+}
+
+void Session::drawWeaponBanner(sf::RenderWindow &window) const
+{
+    if (_weaponBannerTimer <= 0.f || _weaponBannerText.empty())
+        return;
+    const float alpha = std::min(1.f, _weaponBannerTimer / 0.4f);
+    sf::RectangleShape banner({460.f, 44.f});
+    banner.setOrigin({230.f, 22.f});
+    banner.setPosition({WorldWidth / 2.f, 110.f});
+    banner.setFillColor(sf::Color(10, 20, 35, alphaOf(alpha, 220.f)));
+    banner.setOutlineThickness(2.f);
+    banner.setOutlineColor(sf::Color(0, 230, 255, alphaOf(alpha, 255.f)));
+    window.draw(banner);
+    window.draw(centeredText(_weaponBannerText, 20, sf::Color(255, 230, 80, alphaOf(alpha, 255.f)),
+                             {WorldWidth / 2.f, 110.f}));
 }
 
 void Session::drawConnecting(sf::RenderWindow &window) const
@@ -101,6 +117,7 @@ void Session::drawHud(sf::RenderWindow &window) const
 {
     drawScore(window);
     drawAutoFire(window);
+    drawWeaponBanner(window);
     drawBossAlert(window);
     drawPlayers(window);
     drawDamageFlash(window);
@@ -123,6 +140,13 @@ void Session::drawScore(sf::RenderWindow &window) const
     stage.setPosition({45.f, 62.f});
     outline(stage);
     window.draw(stage);
+
+    sf::Text weapon(_resources.getFont("default"), "WEAPON: " + _currentWeapon, 20);
+    weapon.setFillColor(_currentWeapon == "LASER" ? sf::Color(255, 90, 220)
+                       : (_currentWeapon == "SPREAD" ? sf::Color(80, 200, 255) : sf::Color(200, 220, 240)));
+    weapon.setPosition({45.f, 92.f});
+    outline(weapon);
+    window.draw(weapon);
 }
 
 // A banner while the heavy cruiser boss (enemy variant 5) is on screen.
