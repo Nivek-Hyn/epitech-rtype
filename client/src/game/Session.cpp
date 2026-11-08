@@ -181,10 +181,9 @@ void Session::updateGameState(const protocol::Snapshot &snapshot)
                     [](const EntityState &entity) { return entity.type == EntityType::Player; }))
         _playerWasSpawned = true;
     _waiting = snapshot.state == protocol::GameState::Waiting;
-    if (snapshot.state == protocol::GameState::GameOver || snapshot.state == protocol::GameState::Finished) {
-        _gameOver = true;
-        _gameWon = snapshot.state == protocol::GameState::Finished;
-    }
+    // The end screen stays while the server shows it; a new game (waiting room) removes it.
+    _gameOver = snapshot.state == protocol::GameState::GameOver || snapshot.state == protocol::GameState::Finished;
+    _gameWon = snapshot.state == protocol::GameState::Finished;
 }
 
 // Where the entity is drawn now (or was in the last snapshot), to place its explosion.

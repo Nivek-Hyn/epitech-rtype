@@ -11,8 +11,6 @@ namespace rtype::server {
 
 namespace {
 
-constexpr int MaxLives = 5;
-
 // Turns the velocity of the prefab by the given angle, keeping its speed.
 void aim(rtype::components::Velocity &velocity, float degrees)
 {
@@ -75,7 +73,7 @@ void Game::giveBonus(engine::ecs::Entity bonus, std::size_t player)
     const auto &effect = *_registry.get<rtype::components::BonusEffect>(bonus);
     if (!effect.weapon.empty())
         _weapons[player] = effect.weapon;
-    _lives[player] = std::min(MaxLives, _lives[player] + effect.lives);
+    _lives[player] = std::min(std::max(_rules.maxLives, _rules.playerLives), _lives[player] + effect.lives);
     if (const auto *networkId = _registry.get<rtype::components::NetworkId>(bonus))
         _events.push_back(protocol::EntityDestroyed{networkId->id, protocol::DestroyReason::Collected});
     _registry.kill(bonus);

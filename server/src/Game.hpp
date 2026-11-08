@@ -54,6 +54,8 @@ public:
                                                    "assets/levels/level3.json"};
         float intermissionDelay = 2.0f;
         int playerLives = 3;
+        int maxLives = 5;          // a life bonus never goes above this (nor above playerLives when higher)
+        float restartDelay = 10.f; // seconds the end screen stays before the game goes back to the waiting room
         float respawnDelay = 2.0f;
         float invulnerability = 2.0f;
         std::size_t levelsPerWorld = 3;
@@ -123,6 +125,7 @@ private:
     void goToNextLevel();
     void restartCampaign();
     void updateLobby(float dt);
+    void restartAfterEnd(float dt);
     void startIfLobbyOver();
 
     // GamePlayers.cpp
@@ -199,8 +202,6 @@ private:
     std::vector<protocol::Message> _events;
     std::uint32_t _tick = 0;
     std::uint32_t _nextNetId = 1;
-    float _enemySpawnTimer = 0.f;
-    std::uint32_t _enemiesSpawned = 0;
     std::uint32_t _score = 0;
     Arsenal _arsenal;
     std::array<std::string, MaxPlayers> _weapons;
@@ -210,6 +211,7 @@ private:
     float _levelTimer = 0.f;
     float _transitionTimer = 0.f;
     float _lobbyTimer = 0.f;
+    float _endTimer = 0.f;
 
     Prefabs _prefabs;
     GameRules _rules;

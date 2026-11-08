@@ -44,6 +44,8 @@ void parseDifficulties(const Json &json, Game::GameRules &rules)
 void parsePlayerRules(const Json &json, Game::GameRules &rules)
 {
     rules.playerLives = std::max(1, json.value("lives", 3));
+    rules.maxLives = std::max(1, json.value("max_lives", rules.maxLives));
+    rules.restartDelay = std::max(0.f, json.value("restart_delay", rules.restartDelay));
     rules.respawnDelay = json.value("respawn_delay", 2.0f);
     rules.invulnerability = json.value("invulnerability", 2.0f);
     rules.lobbyDelay = std::max(0.f, json.value("lobby_delay", 0.f));
@@ -71,15 +73,12 @@ void parseCampaignRules(const Json &json, Game::GameRules &rules)
     rules.intermissionDelay = json.value("intermission_delay", 2.0f);
 }
 
-// Default configuration calibrated for Game Designers, used when game_rules.json does not say otherwise.
+// Default difficulties, used when game_rules.json does not say otherwise. The other defaults are in Game.hpp.
 void setDefaultRules(Game::GameRules &rules)
 {
     rules.difficulties[Game::Difficulty::Easy] = {0.8f, 0.85f, 0.8f, 0.8f, 0.8f};
     rules.difficulties[Game::Difficulty::Normal] = {1.0f, 1.0f, 1.0f, 1.0f, 1.0f};
     rules.difficulties[Game::Difficulty::Hard] = {1.25f, 1.15f, 1.25f, 1.2f, 1.5f};
-    rules.infinite = {0.2f, 0.05f, 0.1f, 0.5f, 0.1f, 700.0f, 0.5f};
-    rules.campaignLevels = {"assets/levels/level1.json", "assets/levels/level2.json", "assets/levels/level3.json"};
-    rules.intermissionDelay = 2.0f;
 }
 
 } // namespace

@@ -61,6 +61,7 @@ Game::Game()
 void Game::update(float dt)
 {
     updateLobby(dt);
+    restartAfterEnd(dt);
     updatePlayerLives(dt);
     updateWaves(dt);
     updateEnemyMovements(_registry, dt);

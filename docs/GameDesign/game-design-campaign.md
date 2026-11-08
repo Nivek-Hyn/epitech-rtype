@@ -175,6 +175,9 @@ Configured in `assets/config/game_rules.json` under `player`:
 - `lives`: lives of each player.
 - `respawn_delay`: seconds before the ship comes back.
 - `invulnerability`: seconds without damage after a respawn.
+- `max_lives`: a life bonus never raises the lives above this value (5), nor above `lives` when it is higher.
+- `restart_delay`: seconds the victory or game over screen stays (10). Then the game goes back to the waiting room
+  at the first level, and the players still connected get a ship and full lives.
 - `lobby_delay`: seconds the waiting room stays open after the first player joins (5). During that time the
   snapshots carry the `Waiting` state: ships can move, no wave comes, and the client shows the waiting room.
   When every player leaves, the game goes back to the waiting room at the first level.

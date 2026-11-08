@@ -546,11 +546,17 @@ TEST(Game, InvulnerabilityProtectsAndGameIsOverWhenLivesRunOut)
     EXPECT_EQ(game.snapshot().state, protocol::GameState::GameOver);
     EXPECT_EQ(countOf(game, protocol::EntityType::Enemy), 0);
 
-    // It stays over: nothing comes back while the players look at the screen.
-    run(game, 10.f);
+    // It stays over while the players look at the end screen...
+    run(game, game.rules().restartDelay - 1.f);
     EXPECT_EQ(game.gameState(), protocol::GameState::GameOver);
     EXPECT_EQ(countOf(game, protocol::EntityType::Enemy), 0);
     EXPECT_EQ(countOf(game, protocol::EntityType::Player), 0);
+
+    // ...then a new game starts in the waiting room, with a ship and full lives for the players still here.
+    run(game, 1.5f);
+    EXPECT_NE(game.gameState(), protocol::GameState::GameOver);
+    EXPECT_EQ(countOf(game, protocol::EntityType::Player), 1);
+    EXPECT_EQ(game.playerLives(0), 3);
 }
 
 TEST(Game, DeathWithLivesLeftIsNotGameOver)
