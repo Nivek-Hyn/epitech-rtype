@@ -145,7 +145,7 @@ TEST(Protocol, RejectsSnapshotWithUnknownState)
 TEST(Protocol, RejectsReservedInputFlagsAndUnknownEnumValues)
 {
     auto input = encode({1, Input{}});
-    input[HeaderSize] = 0x20;
+    input[HeaderSize] = 0x40;
     EXPECT_FALSE(decode(input));
 
     auto accepted = encode({1, ConnectAccepted{0}});

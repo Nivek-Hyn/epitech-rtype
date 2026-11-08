@@ -56,6 +56,7 @@ inline constexpr std::uint8_t Down = 1 << 1;
 inline constexpr std::uint8_t Left = 1 << 2;
 inline constexpr std::uint8_t Right = 1 << 3;
 inline constexpr std::uint8_t Shoot = 1 << 4;
+inline constexpr std::uint8_t Ready = 1 << 5;
 } // namespace InputFlag
 
 enum class RejectReason : std::uint8_t { ServerFull = 1, VersionMismatch = 2 };

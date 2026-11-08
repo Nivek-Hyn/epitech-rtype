@@ -188,7 +188,7 @@ std::optional<Packet> decode(std::span<const std::uint8_t> datagram)
             if (bodySize != 1)
                 return std::nullopt;
             const auto flags = reader.u8();
-            if ((flags & 0xE0) != 0)
+            if ((flags & 0xC0) != 0)
                 return std::nullopt;
             message = Input{flags};
             break;
