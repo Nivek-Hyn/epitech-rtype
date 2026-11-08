@@ -23,18 +23,22 @@ flowchart BT
     server --> engine
     client --> common
     client --> engine
+    client -. "hosts a local game" .-> server
 ```
 
 *Text description: `engine` is at the bottom and depends on nothing but the standard library.
 `common` depends on `engine` (the protocol uses its serialization). `server` and `client` each depend directly on
-both `common` (the protocol they share) and `engine` (ECS, game loop), but never on each other.*
+both `common` (the protocol they share) and `engine` (ECS, game loop). The server never depends on the client. The
+client links the server library for one purpose: hosting a solo or local game (a "listen server"). It runs the same
+`ServerLoop` as `r-type_server` on its own thread and talks to it through UDP like any remote server, so the game
+logic still runs only on the server side.*
 
 | Module | Responsibility | Third-party libraries | CMake target |
 |---|---|---|---|
 | `engine/` | Generic game engine: knows nothing about R-Type | none | `rtype_engine` / `RTypeEngine::Engine` (interface target grouping enabled modules) |
 | `common/` | What the server and the client must agree on: protocol, components, constants | none | `rtype_common` (static library) |
 | `server/` | Authoritative game simulation and server networking | Asio | `rtype_server_lib` (game logic, tested) + `r-type_server` |
-| `client/` | Display, keyboard input and client networking; sound integration remains pending | SFML, Asio | `r-type_client` |
+| `client/` | Display, menus, sound, keyboard input and client networking; hosts a local server for solo games | SFML, Asio, server library | `r-type_client` |
 
 The engine is also a separate CMake project. ECS and Core are static libraries; Physics, Net and Systems
 are header-only targets. Systems depends on ECS, and Core provides the platform thread dependency.
@@ -110,7 +114,7 @@ draws the entities of the latest snapshots, smoothed by interpolation.*
 ## 3. Client–server model
 
 The server is the only authority on the game. Clients send what the player presses; the server sends back
-the whole state of the game, 60 times per second.
+the whole state of the game, 30 times per second (the simulation runs at 60 steps per second).
 
 ```mermaid
 sequenceDiagram
