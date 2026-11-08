@@ -120,6 +120,15 @@ void MainMenu::initSettingsScreen()
     _musicVolumeSelector = std::make_unique<OptionSelector>(
         _font, "MUSIC VOLUME", std::vector<std::string>{"MUTE", "25%", "50%", "75%", "100%"},
         sf::Vector2f(posX, startY), musicIdx);
+    startY += 70.f;
+
+    // Accessibility: also toggled in game with F1 (auto fire) and F2 (high contrast).
+    _autoFireSelector = std::make_unique<OptionSelector>(_font, "AUTO FIRE (F1)", std::vector<std::string>{"OFF", "ON"},
+                                                         sf::Vector2f(posX, startY), _config.autoFire ? 1 : 0);
+    startY += 70.f;
+    _contrastSelector =
+        std::make_unique<OptionSelector>(_font, "HIGH CONTRAST (F2)", std::vector<std::string>{"OFF", "ON"},
+                                         sf::Vector2f(posX, startY), _config.highContrast ? 1 : 0);
     startY += 85.f;
 
     _controlsTitleText.setString("--- CONTROLS RECONFIGURATION ---");
@@ -237,6 +246,14 @@ void MainMenu::update(float dt)
         _config.sfxVolume = static_cast<float>(_sfxVolumeSelector->getSelectedIndex()) * 25.f;
     if (_musicVolumeSelector)
         _config.musicVolume = static_cast<float>(_musicVolumeSelector->getSelectedIndex()) * 25.f;
+}
+
+void MainMenu::setAccessibility(bool autoFire, bool highContrast)
+{
+    _config.autoFire = autoFire;
+    _config.highContrast = highContrast;
+    _autoFireSelector->setSelectedIndex(autoFire ? 1 : 0);
+    _contrastSelector->setSelectedIndex(highContrast ? 1 : 0);
 }
 
 void MainMenu::handleEvent(const sf::Event &event, const sf::RenderWindow &window)
@@ -362,6 +379,8 @@ void MainMenu::handleEvent(const sf::Event &event, const sf::RenderWindow &windo
         if (event.is<sf::Event::MouseMoved>()) {
             _sfxVolumeSelector->handleMouseMove(mousePos);
             _musicVolumeSelector->handleMouseMove(mousePos);
+            _autoFireSelector->handleMouseMove(mousePos);
+            _contrastSelector->handleMouseMove(mousePos);
             for (auto &btn : _keyButtons) {
                 btn->handleMouseMove(mousePos);
             }
@@ -404,6 +423,16 @@ void MainMenu::handleEvent(const sf::Event &event, const sf::RenderWindow &windo
                 if (_musicVolumeSelector->handleMouseClick(clickedPos)) {
                     playUiSound("click");
                     _config.musicVolume = static_cast<float>(_musicVolumeSelector->getSelectedIndex()) * 25.f;
+                    volumeChanged = true;
+                }
+                if (_autoFireSelector->handleMouseClick(clickedPos)) {
+                    playUiSound("click");
+                    _config.autoFire = _autoFireSelector->getSelectedIndex() == 1;
+                    volumeChanged = true;
+                }
+                if (_contrastSelector->handleMouseClick(clickedPos)) {
+                    playUiSound("click");
+                    _config.highContrast = _contrastSelector->getSelectedIndex() == 1;
                     volumeChanged = true;
                 }
                 if (volumeChanged) {
@@ -586,6 +615,8 @@ void MainMenu::draw(sf::RenderWindow &window)
 
         _sfxVolumeSelector->draw(window);
         _musicVolumeSelector->draw(window);
+        _autoFireSelector->draw(window);
+        _contrastSelector->draw(window);
         window.draw(_controlsTitleText);
 
         for (const auto &btn : _keyButtons) {

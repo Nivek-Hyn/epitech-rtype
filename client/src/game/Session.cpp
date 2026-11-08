@@ -73,7 +73,7 @@ void Session::reset()
     _localPlayer.reset();
     _lives.fill(0);
     _score = 0;
-    _connected = _gameOver = _gameWon = _playerWasSpawned = _waiting = false;
+    _connected = _gameOver = _gameWon = _playerWasSpawned = _waiting = false; // settings are kept
     _damageFlash = _shakeTimer = _waveBanner = _waveCooldown = _localTilt = 0.f;
     _wave = 1;
     _waveStarted = false;
@@ -98,11 +98,15 @@ void Session::update(float dt, bool connected)
     }
 }
 
-void Session::sendInput(INetworkClient &network, const ui::GameConfig &config, float dt)
+void Session::sendInput(INetworkClient &network, const ui::GameConfig &config, float dt, bool focused)
 {
     using sf::Keyboard::Key;
     float targetTilt = 0.f;
-    if (!_gameOver) {
+    _autoFire = config.autoFire;
+    if (!_gameOver && !focused) {
+        if (network.connected())
+            network.send(protocol::Input{0}); // keys of another window must not move the ship
+    } else if (!_gameOver) {
         std::uint8_t flags = 0;
         if (pressed(config.keyUp, Key::Up)) {
             flags |= protocol::InputFlag::Up;
@@ -118,7 +122,7 @@ void Session::sendInput(INetworkClient &network, const ui::GameConfig &config, f
             flags |= protocol::InputFlag::Right;
 
         _shootSoundCooldown -= dt;
-        if (sf::Keyboard::isKeyPressed(config.keyShoot)) {
+        if (config.autoFire || sf::Keyboard::isKeyPressed(config.keyShoot)) {
             flags |= protocol::InputFlag::Shoot;
             if (_shootSoundCooldown <= 0.f) {
                 _resources.playSound("shoot", 80.f);
@@ -293,7 +297,7 @@ void Session::addExplosion(const EntityState &entity, float duration)
 sf::View Session::view() const
 {
     sf::View view(sf::FloatRect({0.f, 0.f}, {WorldWidth, WorldHeight}));
-    if (_shakeTimer > 0.f) {
+    if (_shakeTimer > 0.f && !_highContrast) {
         const float strength = (_shakeTimer / ShakeDuration) * _shakeIntensity;
         const float offsetX = (static_cast<float>(std::rand() % 200 - 100) / 100.f) * strength;
         const float offsetY = (static_cast<float>(std::rand() % 200 - 100) / 100.f) * strength;
@@ -332,6 +336,8 @@ void Session::draw(sf::RenderWindow &window, float time, float dt, bool hasAsset
             _renderer.draw(window, entity, time, tilt, _localPlayer);
         }
     }
+    if (_highContrast)
+        drawShotMarkers(window);
     for (const auto &explosion : _explosions)
         _renderer.drawExplosion(window, explosion);
     drawHud(window);

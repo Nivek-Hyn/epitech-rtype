@@ -185,6 +185,8 @@ GameConfig GameConfig::loadFromFile(const std::string &path)
             config.musicVolume = std::clamp(j["musicVolume"].get<float>(), 0.f, 100.f);
         }
 
+        config.autoFire = j.value("auto_fire", false);
+        config.highContrast = j.value("high_contrast", false);
         if (j.contains("join_ip") && j["join_ip"].is_string()) {
             config.joinIp = j["join_ip"].get<std::string>();
         }
@@ -247,6 +249,8 @@ bool GameConfig::saveToFile(const std::string &path) const
         nlohmann::json j;
         j["sfx_volume"] = sfxVolume;
         j["music_volume"] = musicVolume;
+        j["auto_fire"] = autoFire;
+        j["high_contrast"] = highContrast;
         j["host_port"] = hostPort;
         j["join_ip"] = joinIp;
         j["join_port"] = joinPort;

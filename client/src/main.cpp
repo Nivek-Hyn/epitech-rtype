@@ -121,7 +121,12 @@ private:
             if (!_playing) {
                 _menu.handleEvent(*event, _window);
             } else if (const auto *key = event->getIf<sf::Event::KeyPressed>()) {
-                if (key->code == sf::Keyboard::Key::F3)
+                const auto &config = _menu.getConfig();
+                if (key->code == sf::Keyboard::Key::F1)
+                    _menu.setAccessibility(!config.autoFire, config.highContrast);
+                else if (key->code == sf::Keyboard::Key::F2)
+                    _menu.setAccessibility(config.autoFire, !config.highContrast);
+                else if (key->code == sf::Keyboard::Key::F3)
                     _showStats = !_showStats;
                 else if (key->code == sf::Keyboard::Key::Escape)
                     leaveToMenu();
@@ -149,7 +154,8 @@ private:
     {
         _starfield.update(dt);
         _session.update(dt, _network.connected());
-        _session.sendInput(_network, _menu.getConfig(), dt);
+        _session.setHighContrast(_menu.getConfig().highContrast);
+        _session.sendInput(_network, _menu.getConfig(), dt, _window.hasFocus());
         _session.receive(_network);
         checkConnection();
     }
@@ -198,7 +204,8 @@ private:
         _window.clear(sf::Color(10, 10, 25));
         if (_playing) {
             _window.setView(_session.view());
-            _starfield.draw(_window);
+            if (!_menu.getConfig().highContrast) // plain dark background in high contrast
+                _starfield.draw(_window);
             _session.draw(_window, _time, dt, _hasAssets);
             if (_showStats)
                 drawStats();

@@ -14,6 +14,8 @@ struct GameConfig {
     std::string joinPort{"4242"};
     float sfxVolume{100.f};
     float musicVolume{100.f};
+    bool autoFire{false};     // shoot without holding the fire key (the server keeps its fire rate)
+    bool highContrast{false}; // plain background, outlined shots and HUD, softer flashes
 
     sf::Keyboard::Key keyUp{sf::Keyboard::Key::Z};
     sf::Keyboard::Key keyDown{sf::Keyboard::Key::S};
