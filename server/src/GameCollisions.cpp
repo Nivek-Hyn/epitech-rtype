@@ -29,7 +29,6 @@ struct Game::CollisionFrame {
     std::vector<bool> enemyHit;
     std::vector<bool> obstacleHit;
     std::vector<engine::ecs::Entity> destroyed;
-    std::vector<std::pair<float, float>> killedEnemies; // where a bonus may drop
 };
 
 void Game::handleCollisions()
@@ -39,7 +38,7 @@ void Game::handleCollisions()
     resolveShipContacts(frame);
     resolveEnemyMissiles(frame);
     destroyEntities(frame.destroyed);
-    dropBonuses(frame.killedEnemies);
+    _bus.dispatch(); // the reactions run now that no component is being iterated
 }
 
 Game::CollisionFrame Game::collectHitAreas()
@@ -110,7 +109,6 @@ void Game::damageEnemy(CollisionFrame &frame, const std::pair<engine::ecs::Entit
             return;
     }
     frame.destroyed.push_back(enemy.first);
-    frame.killedEnemies.emplace_back(enemy.second.left, enemy.second.top);
     _score += pointsFor(enemy.first);
 }
 
@@ -190,9 +188,13 @@ void Game::missileHitsShips(CollisionFrame &frame, engine::ecs::Entity missile, 
 void Game::destroyEntities(const std::vector<engine::ecs::Entity> &entities)
 {
     for (const engine::ecs::Entity entity : entities) {
-        loseLifeIfShip(entity);
-        if (const auto *networkId = _registry.get<rtype::components::NetworkId>(entity))
-            _events.push_back(protocol::EntityDestroyed{networkId->id, protocol::DestroyReason::Killed});
+        if (!_registry.alive(entity))
+            continue; // already destroyed by another collision of this tick
+        const auto *networkId = _registry.get<rtype::components::NetworkId>(entity);
+        const auto *kind = _registry.get<rtype::components::Kind>(entity);
+        const engine::physics::Aabb area = hitArea(entity);
+        _bus.enqueue(EntityKilled{entity, networkId ? networkId->id : 0,
+                                  kind ? kind->type : protocol::EntityType::Enemy, area.left, area.top});
         _registry.kill(entity);
     }
 }

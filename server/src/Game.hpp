@@ -5,6 +5,7 @@
 #include "Weapons.hpp"
 #include "common/Constants.hpp"
 #include "common/Protocol.hpp"
+#include "engine/core/EventBus.hpp"
 #include "engine/ecs/Registry.hpp"
 #include "engine/physics/Aabb.hpp"
 #include "net/INetworkServer.hpp"
@@ -63,6 +64,9 @@ public:
     };
 
     Game();
+    // The event handlers keep a pointer to the game: it must stay where it was built.
+    Game(const Game &) = delete;
+    Game &operator=(const Game &) = delete;
 
     void onPlayerJoined(PlayerId player);
     void onPlayerLeft(PlayerId player);
@@ -111,6 +115,17 @@ public:
 
 private:
     struct CollisionFrame;
+
+    // Published on the event bus when a collision destroys an entity; each reaction subscribes on its own
+    // (lives, network event, bonus drop), so the collision code knows none of them.
+    struct EntityKilled {
+        engine::ecs::Entity entity = engine::ecs::NullEntity;
+        std::uint32_t netId = 0;
+        protocol::EntityType type = protocol::EntityType::Enemy;
+        float x = 0.f; // top-left corner of its hit area
+        float y = 0.f;
+    };
+    void subscribeToEvents();
 
     // GameConfigLoader.cpp
     void applyDefaultRules();
@@ -172,7 +187,7 @@ private:
     void handleCollisions();
     // GameWeapons.cpp
     void fire(std::size_t player, float x, float y);
-    void dropBonuses(const std::vector<std::pair<float, float>> &positions);
+    void dropBonusAt(float x, float y);
     std::optional<std::size_t> playerTouching(const engine::physics::Aabb &box);
     void collectBonuses();
     void giveBonus(engine::ecs::Entity bonus, std::size_t player);
@@ -192,6 +207,7 @@ private:
     void loseLifeIfShip(engine::ecs::Entity entity);
 
     engine::ecs::Registry _registry;
+    engine::core::EventBus _bus;
     std::array<engine::ecs::Entity, MaxPlayers> _players;
     std::array<float, MaxPlayers> _shootCooldowns{};
     std::array<bool, MaxPlayers> _connected{};

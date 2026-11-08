@@ -32,17 +32,14 @@ void Game::fire(std::size_t player, float x, float y)
     _shootCooldowns[player] = weapon.cooldown;
 }
 
-// Called once the collisions are resolved: creating entities while iterating is not allowed.
-void Game::dropBonuses(const std::vector<std::pair<float, float>> &positions)
+// A destroyed enemy may leave a bonus. Called from an event handler, once the collisions are resolved.
+void Game::dropBonusAt(float x, float y)
 {
-    if (_arsenal.dropPrefabs.empty())
+    if (_arsenal.dropPrefabs.empty() ||
+        !std::bernoulli_distribution(std::clamp(_arsenal.dropChance, 0.f, 1.f))(_random))
         return;
-    std::bernoulli_distribution drops(std::clamp(_arsenal.dropChance, 0.f, 1.f));
     std::uniform_int_distribution<std::size_t> pick(0, _arsenal.dropPrefabs.size() - 1);
-    for (const auto &[x, y] : positions) {
-        if (drops(_random))
-            spawnPrefab(_arsenal.dropPrefabs[pick(_random)], x, y);
-    }
+    spawnPrefab(_arsenal.dropPrefabs[pick(_random)], x, y);
 }
 
 // The player whose ship touches the box, if any.

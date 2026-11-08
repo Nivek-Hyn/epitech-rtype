@@ -46,6 +46,7 @@ Game::Game()
     _arsenal = loadArsenal("assets/config/weapons.json");
     _weapons.fill(_arsenal.defaultWeapon);
 
+    subscribeToEvents();
     _campaignLevels = _rules.campaignLevels;
     _currentLevelIndex = 0;
     if (!_campaignLevels.empty()) {
@@ -56,6 +57,19 @@ Game::Game()
             std::cerr << "Warning: " << error.what() << '\n';
         }
     }
+}
+
+// The reactions to a destroyed entity, independent of each other and of the collision code.
+void Game::subscribeToEvents()
+{
+    _bus.subscribe<EntityKilled>([this](const EntityKilled &event) {
+        _events.push_back(protocol::EntityDestroyed{event.netId, protocol::DestroyReason::Killed}); // to the clients
+    });
+    _bus.subscribe<EntityKilled>([this](const EntityKilled &event) { loseLifeIfShip(event.entity); });
+    _bus.subscribe<EntityKilled>([this](const EntityKilled &event) {
+        if (event.type == protocol::EntityType::Enemy)
+            dropBonusAt(event.x, event.y);
+    });
 }
 
 void Game::update(float dt)

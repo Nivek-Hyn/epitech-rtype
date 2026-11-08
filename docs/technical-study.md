@@ -138,8 +138,10 @@ an event (for example a collision) without knowing who reacts to it (damage, sco
 We kept both modes. The queued mode avoids a real bug: if a damage handler kills an entity while the collision
 system is still iterating over components, references to that entity's components would become invalid.
 Priorities and answers are candidates only if a game needs them. Brick Rush sends `BrickHit` and `BallLost`
-through the queued mode. The R-Type collision code reaches the same safety differently: it collects the entities
-to destroy during iteration and destroys them afterwards, without the bus.
+through the queued mode. The R-Type server uses it the same way: the collision code enqueues an
+`EntityKilled` event for each destroyed entity, and three independent handlers react after the iteration (the lost
+life, the `EntityDestroyed` sent to the clients, the bonus drop). Adding a reaction, such as a sound, needs no change
+to the collision code.
 
 ### Fixed timestep game loop — Implemented
 

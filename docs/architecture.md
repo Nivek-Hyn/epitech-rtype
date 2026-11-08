@@ -86,8 +86,9 @@ flowchart LR
 *Text description: the engine offers six reusable building blocks. The protocol uses the engine's
 serialization. On the server, the main loop uses the fixed timestep clock, drives the game logic and talks to
 the network layer. The current game logic uses the ECS, movement system, AABB collisions and shared components.
-The event bus is available but is not wired into Game. Both network layers use the protocol and a thread-safe
-queue. The client renders entities directly from the latest snapshot rather than keeping a local ECS.*
+When a collision destroys an entity, Game publishes it on the event bus; the loss of a life, the network event and
+the bonus drop each react on their own. Both network layers use the protocol and a thread-safe queue. The client
+draws the entities of the latest snapshots, smoothed by interpolation.*
 
 | Subsystem | Main files | Status |
 |---|---|---|
