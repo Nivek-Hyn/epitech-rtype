@@ -17,18 +17,9 @@ class ResourceManager;
 
 namespace rtype::client::ui {
 
-enum class MenuScreen {
-    Root,
-    HostGame,
-    JoinGame,
-    Settings
-};
+enum class MenuScreen { Root, HostGame, JoinGame, Settings };
 
-enum class MenuAction {
-    None,
-    Connect,
-    Exit
-};
+enum class MenuAction { None, Connect, Exit };
 
 class MainMenu {
 public:
@@ -92,4 +83,4 @@ private:
     int _rebindingAction{-1};
 };
 
-}
+} // namespace rtype::client::ui

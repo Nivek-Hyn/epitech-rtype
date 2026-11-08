@@ -34,4 +34,4 @@ private:
     bool _showCursor{true};
 };
 
-}
+} // namespace rtype::client::ui

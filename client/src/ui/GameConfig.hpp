@@ -22,7 +22,8 @@ struct GameConfig {
     sf::Keyboard::Key keyShoot{sf::Keyboard::Key::Space};
 
     static std::string keyToString(sf::Keyboard::Key key);
-    static sf::Keyboard::Key stringToKey(const std::string &str, sf::Keyboard::Key defaultKey = sf::Keyboard::Key::Unknown);
+    static sf::Keyboard::Key stringToKey(const std::string &str,
+                                         sf::Keyboard::Key defaultKey = sf::Keyboard::Key::Unknown);
 
     void applyAzerty();
     void applyQwerty();
@@ -33,4 +34,4 @@ struct GameConfig {
     bool saveToFile(const std::string &path = "config.json") const;
 };
 
-}
+} // namespace rtype::client::ui
