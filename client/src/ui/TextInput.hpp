@@ -16,7 +16,7 @@ public:
     bool handleMouseClick(sf::Vector2f mousePos);
     void handleEvent(const sf::Event &event);
     void update(float dt);
-    void draw(sf::RenderWindow &window) const;
+    void draw(sf::RenderTarget &window) const;
 
     const std::string &getValue() const;
     void setValue(const std::string &value);

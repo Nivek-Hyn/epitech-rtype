@@ -21,7 +21,7 @@ public:
     void handleMouseMove(sf::Vector2f mousePos);
     void handleKeyPress(sf::Keyboard::Key key);
 
-    void draw(sf::RenderWindow &window) const;
+    void draw(sf::RenderTarget &window) const;
 
     std::size_t getSelectedIndex() const;
     const std::string &getSelectedValue() const;

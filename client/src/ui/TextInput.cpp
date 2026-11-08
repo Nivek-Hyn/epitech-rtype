@@ -86,7 +86,7 @@ void TextInput::updateVisuals()
     _text.setPosition({_box.getPosition().x + 15.f, _box.getPosition().y + 10.f});
 }
 
-void TextInput::draw(sf::RenderWindow &window) const
+void TextInput::draw(sf::RenderTarget &window) const
 {
     window.draw(_label);
     window.draw(_box);

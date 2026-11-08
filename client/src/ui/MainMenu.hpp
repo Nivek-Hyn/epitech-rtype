@@ -30,13 +30,15 @@ public:
 
     void handleEvent(const sf::Event &event, const sf::RenderWindow &window);
     void update(float dt);
-    void draw(sf::RenderWindow &window);
+    void draw(sf::RenderTarget &window);
 
     MenuAction getAndResetAction();
     const GameConfig &getConfig() const;
     void setStatusMessage(const std::string &message, sf::Color color = sf::Color::Yellow);
     // Changes the accessibility settings from the game (F1, F2) and keeps the settings screen in sync.
     void setAccessibility(bool autoFire, bool highContrast);
+    // Makes a campaign level playable on the map, and saves it.
+    void unlockLevel(int level);
 
 private:
     void initRootScreen();
@@ -58,8 +60,8 @@ private:
     void confirmHost();
     void confirmJoin();
     void back();
-    void drawScreenTitle(sf::RenderWindow &window, const std::string &title, float y);
-    void drawSettings(sf::RenderWindow &window);
+    void drawScreenTitle(sf::RenderTarget &window, const std::string &title, float y);
+    void drawSettings(sf::RenderTarget &window);
 
     void navigateMenu(int direction);
     void triggerCurrentSelection();

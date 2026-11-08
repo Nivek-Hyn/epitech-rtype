@@ -66,7 +66,7 @@ void Button::updateVisuals()
     _text.setPosition({textX, textY});
 }
 
-void Button::draw(sf::RenderWindow &window) const
+void Button::draw(sf::RenderTarget &window) const
 {
     window.draw(_box);
     window.draw(_text);

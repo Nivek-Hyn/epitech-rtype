@@ -250,6 +250,12 @@ void MainMenu::update(float dt)
         _config.musicVolume = static_cast<float>(_musicVolumeSelector->getSelectedIndex()) * 25.f;
 }
 
+void MainMenu::unlockLevel(int level)
+{
+    _config.campaignUnlocked = std::max(_config.campaignUnlocked, level);
+    _config.saveToFile("config.json");
+}
+
 void MainMenu::setAccessibility(bool autoFire, bool highContrast)
 {
     _config.autoFire = autoFire;
@@ -539,7 +545,7 @@ void MainMenu::triggerCurrentSelection()
     _currentScreen = screens.at(index);
 }
 
-void MainMenu::drawScreenTitle(sf::RenderWindow &window, const std::string &title, float y)
+void MainMenu::drawScreenTitle(sf::RenderTarget &window, const std::string &title, float y)
 {
     _screenTitleText.setString(title);
     const auto bounds = _screenTitleText.getLocalBounds();
@@ -547,7 +553,7 @@ void MainMenu::drawScreenTitle(sf::RenderWindow &window, const std::string &titl
     window.draw(_screenTitleText);
 }
 
-void MainMenu::draw(sf::RenderWindow &window)
+void MainMenu::draw(sf::RenderTarget &window)
 {
     window.draw(_titleText);
     window.draw(_subtitleText);
@@ -575,7 +581,7 @@ void MainMenu::draw(sf::RenderWindow &window)
         window.draw(_statusText);
 }
 
-void MainMenu::drawSettings(sf::RenderWindow &window)
+void MainMenu::drawSettings(sf::RenderTarget &window)
 {
     drawScreenTitle(window, "SETTINGS", 215.f);
     for (const auto *selector : {&_sfxVolumeSelector, &_musicVolumeSelector, &_autoFireSelector, &_contrastSelector})

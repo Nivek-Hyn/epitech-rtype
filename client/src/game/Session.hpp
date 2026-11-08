@@ -45,6 +45,7 @@ public:
     const std::string &rejectionReason() const { return _rejectionReason; }
     bool isWaiting() const { return _waiting; }
     int level() const { return _level; } // index of the level being played, from the snapshots
+    bool won() const { return _gameOver && _gameWon; }
     bool isReady() const { return _isReady; }
     void setReady(bool ready = true) { _isReady = ready; }
 

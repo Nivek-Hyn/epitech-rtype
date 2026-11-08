@@ -148,7 +148,7 @@ void OptionSelector::updateVisuals()
     _valueText.setPosition({valX, valY});
 }
 
-void OptionSelector::draw(sf::RenderWindow &window) const
+void OptionSelector::draw(sf::RenderTarget &window) const
 {
     window.draw(_label);
     window.draw(_box);
