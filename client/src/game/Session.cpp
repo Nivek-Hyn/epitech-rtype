@@ -73,7 +73,7 @@ void Session::reset()
     _localPlayer.reset();
     _lives.fill(0);
     _score = 0;
-    _connected = _gameOver = _gameWon = _playerWasSpawned = _waiting = false; // settings are kept
+    _connected = _gameOver = _gameWon = _playerWasSpawned = _waiting = _isReady = false; // settings are kept
     _damageFlash = _shakeTimer = _waveBanner = _waveCooldown = _localTilt = 0.f;
     _wave = 1;
     _waveStarted = false;
@@ -128,6 +128,11 @@ void Session::sendInput(INetworkClient &network, const ui::GameConfig &config, f
                 _resources.playSound("shoot", 80.f);
                 _shootSoundCooldown = ShootSoundDelay;
             }
+        }
+        if (_waiting && (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Enter) ||
+                         sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Space) || _isReady)) {
+            _isReady = true;
+            flags |= protocol::InputFlag::Ready;
         }
         if (network.connected())
             network.send(protocol::Input{flags});

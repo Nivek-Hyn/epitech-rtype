@@ -416,7 +416,7 @@ TEST(Game, RammingKillsTheShipButNotTheBoss)
     EXPECT_EQ(countOf(game, protocol::EntityType::Enemy), 1);
 }
 
-TEST(Game, CampaignGivesNoScore)
+TEST(Game, CampaignGivesScore)
 {
     Game game;
     game.rules().lobbyDelay = 0.f; // no waiting room in rule tests
@@ -430,7 +430,7 @@ TEST(Game, CampaignGivesNoScore)
 
     EXPECT_EQ(countOf(game, protocol::EntityType::Enemy), 0); // it was shot down...
     EXPECT_EQ(countOf(game, protocol::EntityType::Player), 1);
-    EXPECT_EQ(game.snapshot().score, 0u); // ...without any points
+    EXPECT_EQ(game.snapshot().score, 100u);
 }
 
 TEST(Game, ScoreOfAnEnemyComesFromItsDefinition)
@@ -631,6 +631,28 @@ TEST(Game, WaitingRoomLetsPlayersJoinBeforeTheFirstWave)
     EXPECT_EQ(game.snapshot().state, protocol::GameState::Playing);
 }
 
+TEST(Game, WaitingRoomStartsWhenAllPlayersAreReady)
+{
+    Game game;
+    game.rules().lobbyDelay = 1000.f; // do not start on timer
+    game.loadEntitiesConfig(TestEntities);
+    game.loadLevel(OneGrunt);
+    EXPECT_EQ(game.gameState(), protocol::GameState::Waiting);
+
+    game.onPlayerJoined(0);
+    game.onPlayerJoined(1);
+    run(game, 2.f);
+    EXPECT_EQ(game.gameState(), protocol::GameState::Waiting);
+
+    game.onInput(0, protocol::InputFlag::Ready);
+    run(game, 0.1f);
+    EXPECT_EQ(game.gameState(), protocol::GameState::Waiting);
+
+    game.onInput(1, protocol::InputFlag::Ready);
+    run(game, 0.1f);
+    EXPECT_EQ(game.gameState(), protocol::GameState::Playing);
+}
+
 TEST(Game, WaitingRoomStartsAgainWhenEveryoneLeaves)
 {
     Game game;
@@ -739,7 +761,7 @@ TEST(Obstacle, CostsALifeOnContactAndStaysInPlace)
     EXPECT_EQ(countOf(game, protocol::EntityType::Obstacle), 1);
 }
 
-TEST(Obstacle, ResistsAsManyShotsAsItsHealthAndGivesNoScore)
+TEST(Obstacle, AbsorbsPlayerFireWithoutBeingDamagedAndGivesNoScore)
 {
     Game game;
     game.rules().lobbyDelay = 0.f; // no waiting room in rule tests
@@ -758,7 +780,7 @@ TEST(Obstacle, ResistsAsManyShotsAsItsHealthAndGivesNoScore)
     game.onInput(0, protocol::InputFlag::Shoot);
     game.onInput(0, 0);
     run(game, 3.f);
-    EXPECT_EQ(countOf(game, protocol::EntityType::Obstacle), 0);
+    EXPECT_EQ(countOf(game, protocol::EntityType::Obstacle), 1);
     EXPECT_EQ(game.snapshot().score, 0u);
 }
 

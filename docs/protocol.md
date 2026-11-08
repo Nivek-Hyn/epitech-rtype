@@ -40,7 +40,7 @@ A receiver **silently drops** a datagram if any of these is true:
 - `payload_size` differs from the actual number of bytes after the header;
 - `type` is unknown, or the payload size is wrong for this type;
 - an enumerated field has an unknown value.
-- an `Input` packet sets any reserved flag bit (`0xE0`).
+- an `Input` packet sets any reserved flag bit (`0xC0`).
 
 A malformed datagram **MUST NOT** crash the receiver or close the session.
 
@@ -126,7 +126,7 @@ session: the sender is served again as soon as it slows down.
 | `0x05` | Ack | `u32 reliable_number` | Confirms a reliable message. Sent by either side, never reliable (§3.2). |
 | `0x04` | Ping | `u32 timestamp_ms` | Latency measurement; the server answers with Pong. The client sends one every second while connected, which also keeps the session alive. |
 
-Input flags: `0x01` up, `0x02` down, `0x04` left, `0x08` right, `0x10` shoot.
+Input flags: `0x01` up, `0x02` down, `0x04` left, `0x08` right, `0x10` shoot, `0x20` ready.
 
 ### 4.2 Server → client
 

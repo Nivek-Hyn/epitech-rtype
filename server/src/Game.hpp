@@ -131,6 +131,7 @@ private:
     bool isInvulnerable(engine::ecs::Entity entity) const;
     bool anyPlayerConnected() const;
     bool anyPlayerStillInGame() const;
+    bool allConnectedPlayersReady() const;
     void restoreLivesOnNewWorld();
 
     // Game.cpp
@@ -186,6 +187,7 @@ private:
     std::array<engine::ecs::Entity, MaxPlayers> _players;
     std::array<float, MaxPlayers> _shootCooldowns{};
     std::array<bool, MaxPlayers> _connected{};
+    std::array<bool, MaxPlayers> _playerReady{};
     std::array<int, MaxPlayers> _lives{};
     std::array<float, MaxPlayers> _respawnTimers{};
     std::array<float, MaxPlayers> _invulnerableTimers{};

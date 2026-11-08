@@ -97,19 +97,34 @@ void Game::restartCampaign()
     clearEnemies();
     _state = protocol::GameState::Waiting;
     _lobbyTimer = 0.f;
+    _playerReady.fill(false);
     _score = 0;
     _weapons.fill(_arsenal.defaultWeapon);
     _infiniteLoopCount = 1;
     loadFirstLevel();
 }
 
-// Waiting room: the game starts lobby_delay seconds after the first player joined, so the others can join too.
+bool Game::allConnectedPlayersReady() const
+{
+    bool any = false;
+    for (std::size_t i = 0; i < MaxPlayers; ++i) {
+        if (_connected[i]) {
+            any = true;
+            if (!_playerReady[i])
+                return false;
+        }
+    }
+    return any;
+}
+
+// Waiting room: players press ready to start, or lobby_delay expires if configured.
 void Game::updateLobby(float dt)
 {
     if (_state != protocol::GameState::Waiting)
         return;
     if (!anyPlayerConnected()) {
         _lobbyTimer = 0.f;
+        _playerReady.fill(false);
         return;
     }
     _lobbyTimer += dt;
@@ -118,8 +133,15 @@ void Game::updateLobby(float dt)
 
 void Game::startIfLobbyOver()
 {
-    if (_state == protocol::GameState::Waiting && anyPlayerConnected() && _lobbyTimer >= _rules.lobbyDelay)
+    if (_state != protocol::GameState::Waiting || !anyPlayerConnected())
+        return;
+    if (_rules.lobbyDelay <= 0.f || allConnectedPlayersReady()) {
         _state = protocol::GameState::Playing;
+        return;
+    }
+    if (_rules.lobbyDelay > 0.f && _rules.lobbyDelay < 1000.f && _lobbyTimer >= _rules.lobbyDelay) {
+        _state = protocol::GameState::Playing;
+    }
 }
 
 } // namespace rtype::server

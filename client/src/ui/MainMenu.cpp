@@ -33,7 +33,7 @@ MainMenu::MainMenu(const sf::Font &font, ResourceManager *resources)
 
 void MainMenu::initRootScreen()
 {
-    const std::vector<std::string> labels = {"PLAY", "HOST GAME", "JOIN GAME", "SETTINGS", "QUIT"};
+    const std::vector<std::string> labels = {"SOLO", "HOST GAME", "JOIN GAME", "SETTINGS", "QUIT"};
     const float startY = 320.f;
     const float btnWidth = 380.f;
     const float btnHeight = 55.f;
@@ -320,11 +320,7 @@ void MainMenu::handleEvent(const sf::Event &event, const sf::RenderWindow &windo
                     _config.difficulty = static_cast<int>(_hostDifficultySelector->getSelectedIndex());
                     _config.mission = static_cast<int>(_hostMissionSelector->getSelectedIndex());
                     _config.hostPort = _hostPortInput->getValue().empty() ? "4242" : _hostPortInput->getValue();
-
-                    setStatusMessage("Server configured: [Mode: " + _hostModeSelector->getSelectedValue() +
-                                         " | Difficulty: " + _hostDifficultySelector->getSelectedValue() +
-                                         " | Port: " + _config.hostPort + "]",
-                                     sf::Color::Green);
+                    _pendingAction = MenuAction::Host;
                 } else if (_hostButtons[1]->handleMouseClick(clickedPos)) {
                     playUiSound("click");
                     _currentScreen = MenuScreen::Root;
@@ -334,6 +330,13 @@ void MainMenu::handleEvent(const sf::Event &event, const sf::RenderWindow &windo
             if (key->code == sf::Keyboard::Key::Escape) {
                 playUiSound("click");
                 _currentScreen = MenuScreen::Root;
+            } else if (key->code == sf::Keyboard::Key::Enter) {
+                playUiSound("click");
+                _config.gameMode = static_cast<int>(_hostModeSelector->getSelectedIndex());
+                _config.difficulty = static_cast<int>(_hostDifficultySelector->getSelectedIndex());
+                _config.mission = static_cast<int>(_hostMissionSelector->getSelectedIndex());
+                _config.hostPort = _hostPortInput->getValue().empty() ? "4242" : _hostPortInput->getValue();
+                _pendingAction = MenuAction::Host;
             } else {
                 _hostModeSelector->handleKeyPress(key->code);
                 _hostDifficultySelector->handleKeyPress(key->code);
@@ -559,7 +562,7 @@ void MainMenu::triggerCurrentSelection()
     playUiSound("click");
     if (_currentScreen == MenuScreen::Root) {
         if (_rootSelectedIndex == 0) {
-            _pendingAction = MenuAction::Connect;
+            _pendingAction = MenuAction::Play;
         } else if (_rootSelectedIndex == 1) {
             _currentScreen = MenuScreen::HostGame;
         } else if (_rootSelectedIndex == 2) {

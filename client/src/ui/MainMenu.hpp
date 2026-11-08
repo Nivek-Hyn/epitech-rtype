@@ -19,7 +19,7 @@ namespace rtype::client::ui {
 
 enum class MenuScreen { Root, HostGame, JoinGame, Settings };
 
-enum class MenuAction { None, Connect, Exit };
+enum class MenuAction { None, Play, Host, Connect, Exit };
 
 class MainMenu {
 public:

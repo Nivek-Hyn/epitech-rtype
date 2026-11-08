@@ -81,9 +81,6 @@ bool Game::missileHitsObstacle(CollisionFrame &frame, engine::ecs::Entity missil
             continue;
         frame.obstacleHit[i] = true;
         frame.destroyed.push_back(missile);
-        auto *health = _registry.get<rtype::components::Health>(frame.obstacles[i].first);
-        if (health && --health->hp <= 0)
-            frame.destroyed.push_back(frame.obstacles[i].first);
         return true;
     }
     return false;
@@ -117,13 +114,12 @@ void Game::damageEnemy(CollisionFrame &frame, const std::pair<engine::ecs::Entit
     _score += pointsFor(enemy.first);
 }
 
-// The campaign has no score: points only exist in infinite mode.
 std::uint32_t Game::pointsFor(engine::ecs::Entity enemy)
 {
-    if (_gameMode != GameMode::Infinite)
-        return 0;
-    const float multiplier =
-        currentDifficulty().scoreMultiplier + completedLoops() * _rules.infinite.scoreMultiplierPerLoop;
+    const float loopBonus = (_gameMode == GameMode::Infinite)
+                                ? completedLoops() * _rules.infinite.scoreMultiplierPerLoop
+                                : 0.f;
+    const float multiplier = currentDifficulty().scoreMultiplier + loopBonus;
     const auto *traits = _registry.get<rtype::components::EnemyTraits>(enemy);
     const std::uint32_t base = traits ? traits->score : 100;
     return static_cast<std::uint32_t>(std::round(static_cast<float>(base) * multiplier));

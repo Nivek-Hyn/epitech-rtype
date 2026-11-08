@@ -19,6 +19,7 @@ void Game::onPlayerJoined(PlayerId player)
     if (player >= MaxPlayers || _connected[player])
         return;
     _connected[player] = true;
+    _playerReady[player] = false;
     _lives[player] = _rules.playerLives;
     _respawnTimers[player] = 0.f;
     _invulnerableTimers[player] = 0.f;
@@ -33,6 +34,7 @@ void Game::onPlayerLeft(PlayerId player)
     if (player >= MaxPlayers)
         return;
     _connected[player] = false;
+    _playerReady[player] = false;
     _lives[player] = 0;
     // A finished game restarts from the beginning for the next players.
     if (!anyPlayerConnected() && _state != protocol::GameState::Playing)
@@ -44,6 +46,12 @@ void Game::onInput(PlayerId player, std::uint8_t flags)
 {
     if (player >= MaxPlayers || _players[player] == engine::ecs::NullEntity)
         return;
+    if (_state == protocol::GameState::Waiting) {
+        if (flags & protocol::InputFlag::Ready) {
+            _playerReady[player] = true;
+            startIfLobbyOver();
+        }
+    }
     applyMovementInput(player, flags);
     if (flags & protocol::InputFlag::Shoot)
         shootIfReady(player);
