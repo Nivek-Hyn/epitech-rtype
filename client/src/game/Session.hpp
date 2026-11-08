@@ -44,6 +44,7 @@ public:
     // Why the server refused us, after a ConnectRejected.
     const std::string &rejectionReason() const { return _rejectionReason; }
     bool isWaiting() const { return _waiting; }
+    int level() const { return _level; } // index of the level being played, from the snapshots
     bool isReady() const { return _isReady; }
     void setReady(bool ready = true) { _isReady = ready; }
 

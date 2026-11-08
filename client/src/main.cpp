@@ -5,7 +5,7 @@
 #include "game/Session.hpp"
 #include "net/AsioNetworkClient.hpp"
 #include "ui/MainMenu.hpp"
-#include "ui/Starfield.hpp"
+#include "render/WorldBackground.hpp"
 
 #include <SFML/Graphics.hpp>
 
@@ -111,6 +111,7 @@ public:
         while (_window.isOpen()) {
             const float dt = clock.restart().asSeconds();
             _time += dt;
+            _background.update(dt);
             applyVolumes();
             handleEvents();
             if (_playing)
@@ -171,8 +172,12 @@ private:
         const auto action = _menu.getAndResetAction();
         if (action == ui::MenuAction::Exit) {
             _window.close();
-        } else if (action == ui::MenuAction::Play) {
+        } else if (action == ui::MenuAction::Campaign) {
             host(server::ServerSettings{}); // the whole campaign, normal difficulty, default port
+        } else if (action == ui::MenuAction::Infinite) {
+            server::ServerSettings settings;
+            settings.mode = server::Game::GameMode::Infinite;
+            host(settings);
         } else if (action == ui::MenuAction::Host) {
             const auto &config = _menu.getConfig();
             server::ServerSettings settings;
@@ -192,7 +197,7 @@ private:
 
     void updateGame(float dt)
     {
-        _starfield.update(dt);
+        _background.setWorld(static_cast<std::size_t>(_session.level()) / 3); // three levels per world
         _session.update(dt, _network.connected());
         _session.setHighContrast(_menu.getConfig().highContrast);
         _session.sendInput(_network, _menu.getConfig(), dt, _window.hasFocus());
@@ -246,12 +251,14 @@ private:
         if (_playing) {
             _window.setView(_session.view());
             if (!_menu.getConfig().highContrast) // plain dark background in high contrast
-                _starfield.draw(_window);
+                _background.draw(_window);
             _session.draw(_window, _time, dt, _hasAssets);
             if (_showStats)
                 drawStats();
         } else {
             _window.setView(sf::View(sf::FloatRect({0.f, 0.f}, {rtype::WorldWidth, rtype::WorldHeight})));
+            _background.setWorld(static_cast<std::size_t>(_time / 12.f)); // the menu shows each world in turn
+            _background.draw(_window);
             _menu.draw(_window);
         }
         _window.display();
@@ -260,7 +267,7 @@ private:
     sf::RenderWindow _window;
     ResourceManager &_resources;
     bool _hasAssets;
-    ui::Starfield _starfield;
+    WorldBackground _background;
     ui::MainMenu _menu;
     AsioNetworkClient _network;
     Session _session;
