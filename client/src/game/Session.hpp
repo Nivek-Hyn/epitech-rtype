@@ -66,6 +66,7 @@ private:
     void drawPlayers(sf::RenderWindow &window) const;
     void drawDamageFlash(sf::RenderWindow &window) const;
     void drawWaveBanner(sf::RenderWindow &window) const;
+    void drawWaitingRoom(sf::RenderWindow &window) const;
     void drawEndScreen(sf::RenderWindow &window) const;
     sf::Text centeredText(const std::string &string, unsigned int size, sf::Color color, sf::Vector2f center) const;
 
@@ -85,6 +86,7 @@ private:
     bool _gameOver = false;
     bool _gameWon = false;
     bool _playerWasSpawned = false;
+    bool _waiting = false; // the server is in its waiting room
 
     float _damageFlash = 0.f;
     float _shakeTimer = 0.f;

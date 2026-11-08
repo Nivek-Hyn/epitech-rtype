@@ -46,6 +46,7 @@ TEST(Weapons, MissingFileKeepsTheDefaultBlaster)
 TEST(Weapons, OneShotFiresOneMissilePerAngle)
 {
     Game game;
+    game.rules().lobbyDelay = 0.f; // no waiting room in rule tests
     game.arsenal().weapons["blaster"].angles = {-10.f, 0.f, 10.f};
     game.onPlayerJoined(0);
     game.onInput(0, protocol::InputFlag::Shoot);
@@ -55,6 +56,7 @@ TEST(Weapons, OneShotFiresOneMissilePerAngle)
 TEST(Weapons, DestroyedEnemyDropsABonusThatChangesTheWeapon)
 {
     Game game;
+    game.rules().lobbyDelay = 0.f; // no waiting room in rule tests
     game.loadEntitiesConfig("tests/data/entities.json");
     game.loadLevel("tests/data/one_grunt.json");
     game.arsenal().dropChance = 1.f;

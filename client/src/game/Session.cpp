@@ -73,7 +73,7 @@ void Session::reset()
     _localPlayer.reset();
     _lives.fill(0);
     _score = 0;
-    _connected = _gameOver = _gameWon = _playerWasSpawned = false;
+    _connected = _gameOver = _gameWon = _playerWasSpawned = _waiting = false;
     _damageFlash = _shakeTimer = _waveBanner = _waveCooldown = _localTilt = 0.f;
     _wave = 1;
     _waveStarted = false;
@@ -181,6 +181,7 @@ void Session::updateGameState(const protocol::Snapshot &snapshot)
     if (std::any_of(snapshot.entities.begin(), snapshot.entities.end(),
                     [](const EntityState &entity) { return entity.type == EntityType::Player; }))
         _playerWasSpawned = true;
+    _waiting = snapshot.state == protocol::GameState::Waiting;
     if (snapshot.state == protocol::GameState::GameOver || snapshot.state == protocol::GameState::Finished) {
         _gameOver = true;
         _gameWon = snapshot.state == protocol::GameState::Finished;
@@ -193,7 +194,7 @@ void Session::updateWaveCounter(const protocol::Snapshot &snapshot)
     const int enemies =
         static_cast<int>(std::count_if(snapshot.entities.begin(), snapshot.entities.end(),
                                        [](const EntityState &e) { return e.type == EntityType::Enemy; }));
-    if (_connected && !_waveStarted) {
+    if (_connected && !_waveStarted && snapshot.state == protocol::GameState::Playing) {
         _waveStarted = true;
         _wave = 1;
         _waveBanner = WaveBannerDuration;
