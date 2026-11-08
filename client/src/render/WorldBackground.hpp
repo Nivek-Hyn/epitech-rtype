@@ -3,43 +3,44 @@
 #include <SFML/Graphics.hpp>
 
 #include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <string>
 #include <vector>
 
 namespace rtype::client {
 
-// The background of a world, drawn by code: a sky gradient, two layers of stars scrolling at different speeds
-// (parallax) and the scenery of the world. World 0 is the orbital belt (a gas giant and its rings), world 1 is Mars
-// (dunes and a pale sun), world 2 is the singularity (a black hole and its accretion disk).
+// The background of each world: layers of images listed in assets/config/backgrounds.json, each scrolling at its
+// own speed (parallax). A "fill" layer covers the screen and repeats horizontally; another layer is placed at its
+// position and comes back on the right once it has left the screen. Changing world fades from one to the other.
 class WorldBackground {
 public:
-    static constexpr std::size_t WorldCount = 3;
-
-    WorldBackground();
+    explicit WorldBackground(const std::string &configPath = "assets/config/backgrounds.json");
 
     // The world of a level: three levels per world, the infinite mode loops over them.
-    void setWorld(std::size_t world) { _world = world % WorldCount; }
+    void setWorld(std::size_t world);
     std::size_t world() const { return _world; }
     void update(float dt);
     void draw(sf::RenderTarget &target) const;
 
 private:
-    struct Star {
+    struct Layer {
+        std::shared_ptr<sf::Texture> texture;
+        bool fill = false;
         sf::Vector2f position;
-        float size;
-        float brightness;
+        float scale = 1.f;
+        float speed = 0.f; // world units per second, to the left
     };
 
-    void drawSky(sf::RenderTarget &target) const;
-    void drawStars(sf::RenderTarget &target, const std::vector<Star> &stars, float speed) const;
-    void drawOrbitalBelt(sf::RenderTarget &target) const;
-    void drawMars(sf::RenderTarget &target) const;
-    void drawDunes(sf::RenderTarget &target, float baseY, float height, float speed, sf::Color color) const;
-    void drawSingularity(sf::RenderTarget &target) const;
+    void drawWorld(sf::RenderTarget &target, std::size_t world, std::uint8_t alpha) const;
+    void drawFill(sf::RenderTarget &target, const Layer &layer, std::uint8_t alpha) const;
+    void drawProp(sf::RenderTarget &target, const Layer &layer, std::uint8_t alpha) const;
 
+    std::vector<std::vector<Layer>> _worlds;
     std::size_t _world = 0;
+    std::size_t _previous = 0; // the world fading out
+    float _fade = 1.f;         // from 0 (just changed) to 1 (only the current world)
     float _time = 0.f;
-    std::vector<Star> _farStars;
-    std::vector<Star> _nearStars;
 };
 
 } // namespace rtype::client

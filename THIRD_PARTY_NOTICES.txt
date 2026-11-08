@@ -31,5 +31,10 @@ covering public redistribution have not been recorded in this repository.
 This document records the educational source; it does not assign an asset license
 or establish permission for public redistribution.
 
+The assets/backgrounds/world1 and world2 images come from the "Space Background"
+pack by Luis Zuno (ansimuz, https://ansimuz.itch.io), released under Creative
+Commons Zero (CC0): free to use, modify and redistribute, without attribution.
+The assets/backgrounds/world3 images were drawn by the team.
+
 The repository currently declares no project-wide source-code license.
 The upstream notices do not assign a license to the project's own code or assets.

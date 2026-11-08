@@ -15,3 +15,6 @@ docs/html/
 .venv/
 config.json
 assets/levels/custom.json
+/SpaceBackground.exe
+/space_background_pack.zip
+/SpaceBackground.x86_64
