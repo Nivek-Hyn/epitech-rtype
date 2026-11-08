@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ResourceManager.hpp"
+#include "editor/LevelEditor.hpp"
 #include "game/LocalServer.hpp"
 #include "game/Session.hpp"
 #include "net/AsioNetworkClient.hpp"
@@ -24,7 +25,7 @@ public:
     void run();
 
 private:
-    enum class Screen { Menu, Campaign, Playing };
+    enum class Screen { Menu, Campaign, Editor, Playing };
 
     void host(server::ServerSettings settings, const std::string &port = "");
     void applyVolumes();
@@ -33,6 +34,7 @@ private:
     void updateMenu(float dt);
     void hostFromMenu();
     void updateCampaign(float dt);
+    void updateEditor(float dt);
     void updateGame(float dt);
     void recordCampaignProgress();
     void checkConnection();
@@ -46,12 +48,13 @@ private:
     WorldBackground _background;
     ui::MainMenu _menu;
     ui::CampaignMap _campaign;
+    LevelEditor _editor;
     AsioNetworkClient _network;
     Session _session;
     LocalServer _server;
     Screen _screen = Screen::Menu;
-    bool _campaignGame = false; // the game was started from the campaign map: back to it afterwards
-    bool _showStats = false;    // network statistics, toggled with F3
+    Screen _returnTo = Screen::Menu; // where Escape leads from a game: the menu, the campaign map or the editor
+    bool _showStats = false;         // network statistics, toggled with F3
     float _time = 0.f;
     float _lastSfxVolume = 0.f;
 };

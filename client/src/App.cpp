@@ -40,7 +40,8 @@ server::Game::Difficulty difficultyOf(int index)
 
 App::App(ResourceManager &resources, bool hasAssets)
     : _window(sf::VideoMode({1280u, 720u}), "R-Type"), _resources(resources), _hasAssets(hasAssets),
-      _menu(resources.getFont("default"), &resources), _campaign(resources.getFont("default")), _session(resources)
+      _menu(resources.getFont("default"), &resources), _campaign(resources.getFont("default")),
+      _editor(resources, resources.getFont("default")), _session(resources)
 {
     _window.setFramerateLimit(60);
     const auto &config = _menu.getConfig();
@@ -85,6 +86,8 @@ void App::run()
             updateGame(dt);
         else if (_screen == Screen::Campaign)
             updateCampaign(dt);
+        else if (_screen == Screen::Editor)
+            updateEditor(dt);
         else
             updateMenu(dt);
         _resources.updateAudio();
@@ -117,6 +120,8 @@ void App::handleEvents()
             _menu.handleEvent(*event, _window);
         else if (_screen == Screen::Campaign)
             _campaign.handleEvent(*event, _window);
+        else if (_screen == Screen::Editor)
+            _editor.handleEvent(*event, _window);
         else if (const auto *key = event->getIf<sf::Event::KeyPressed>())
             handleGameKey(key->code);
         else if (_session.isWaiting() && event->is<sf::Event::MouseButtonPressed>())
@@ -153,16 +158,20 @@ void App::updateMenu(float dt)
     case ui::MenuAction::Infinite: {
         server::ServerSettings settings;
         settings.mode = server::Game::GameMode::Infinite;
-        _campaignGame = false;
+        _returnTo = Screen::Menu;
         host(settings);
         break;
     }
     case ui::MenuAction::Host:
         hostFromMenu();
         break;
+    case ui::MenuAction::Editor:
+        _editor.open();
+        _screen = Screen::Editor;
+        break;
     case ui::MenuAction::Connect:
         try {
-            _campaignGame = false;
+            _returnTo = Screen::Menu;
             connect(_menu.getConfig().joinIp, static_cast<std::uint16_t>(std::stoul(_menu.getConfig().joinPort)));
         } catch (const std::exception &e) {
             _menu.setStatusMessage("Connection failed: " + std::string(e.what()), sf::Color::Red);
@@ -180,7 +189,7 @@ void App::hostFromMenu()
     settings.mode = config.gameMode == 0 ? server::Game::GameMode::Campaign : server::Game::GameMode::Infinite;
     settings.difficulty = difficultyOf(config.difficulty);
     settings.startLevel = static_cast<std::size_t>(config.mission) * ui::CampaignMap::LevelsPerWorld;
-    _campaignGame = false;
+    _returnTo = Screen::Menu;
     host(settings, config.hostPort);
 }
 
@@ -193,7 +202,21 @@ void App::updateCampaign(float dt)
         server::ServerSettings settings;
         settings.startLevel = choice->level;
         settings.difficulty = difficultyOf(choice->difficulty);
-        _campaignGame = true;
+        _returnTo = Screen::Campaign;
+        host(settings);
+    }
+}
+
+// The editor's Test plays the saved level on a local server; Escape comes back to the editor.
+void App::updateEditor(float dt)
+{
+    _editor.update(dt);
+    if (_editor.takeBack())
+        _screen = Screen::Menu;
+    if (const auto level = _editor.takeTest()) {
+        server::ServerSettings settings;
+        settings.level = *level;
+        _returnTo = Screen::Editor;
         host(settings);
     }
 }
@@ -205,7 +228,7 @@ void App::updateGame(float dt)
     _session.setHighContrast(_menu.getConfig().highContrast);
     _session.sendInput(_network, _menu.getConfig(), dt, _window.hasFocus());
     _session.receive(_network);
-    if (_campaignGame)
+    if (_returnTo == Screen::Campaign)
         recordCampaignProgress();
     checkConnection();
 }
@@ -243,12 +266,9 @@ void App::leaveGame(const std::string &message)
     _session.reset();
     if (!message.empty())
         _menu.setStatusMessage(message, sf::Color::Red);
-    if (_campaignGame) {
+    if (_returnTo == Screen::Campaign)
         _campaign.open(static_cast<std::size_t>(_menu.getConfig().campaignUnlocked));
-        _screen = Screen::Campaign;
-    } else {
-        _screen = Screen::Menu;
-    }
+    _screen = _returnTo;
 }
 
 // Bottom left, away from the HUD.
@@ -276,12 +296,17 @@ void App::draw(float dt)
     } else {
         _window.setView(sf::View(sf::FloatRect({0.f, 0.f}, {WorldWidth, WorldHeight})));
         // The map shows the world of the selected level; the menu shows each world in turn.
-        _background.setWorld(_screen == Screen::Campaign ? _campaign.world() : static_cast<std::size_t>(_time / 12.f));
-        _background.draw(_window);
-        if (_screen == Screen::Campaign)
-            _campaign.draw(_window);
-        else
-            _menu.draw(_window);
+        if (_screen == Screen::Editor) {
+            _editor.draw(_window, _time); // with the background of the world chosen in the editor
+        } else {
+            _background.setWorld(_screen == Screen::Campaign ? _campaign.world()
+                                                             : static_cast<std::size_t>(_time / 12.f));
+            _background.draw(_window);
+            if (_screen == Screen::Campaign)
+                _campaign.draw(_window);
+            else
+                _menu.draw(_window);
+        }
     }
     _window.display();
 }

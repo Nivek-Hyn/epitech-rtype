@@ -40,7 +40,7 @@ int shipColumn(float tilt)
     return 2;
 }
 
-void drawThruster(sf::RenderWindow &window, const EntityState &entity, float time, int column)
+void drawThruster(sf::RenderTarget &window, const EntityState &entity, float time, int column)
 {
     const int flameCycle = static_cast<int>(time * 24.f) % 3;
     sf::CircleShape glow(flameCycle == 0 ? 3.5f : (flameCycle == 1 ? 5.2f : 4.2f));
@@ -55,7 +55,7 @@ void drawThruster(sf::RenderWindow &window, const EntityState &entity, float tim
 }
 
 // Each enemy shot variant: texture rectangle, color, origin and scale, some animated.
-void drawEnemyShot(sf::RenderWindow &window, const ResourceManager &resources, const EntityState &entity, float time)
+void drawEnemyShot(sf::RenderTarget &window, const ResourceManager &resources, const EntityState &entity, float time)
 {
     const sf::Texture &bullet = resources.getTexture("bullet");
     sf::Sprite sprite(bullet);
@@ -96,7 +96,7 @@ void drawEnemyShot(sf::RenderWindow &window, const ResourceManager &resources, c
 }
 
 // Tiles of r-typesheet21: space debris, Martian rock, singularity shard.
-void drawObstacleSprite(sf::RenderWindow &window, const sf::Texture &texture, const EntityState &entity, float time)
+void drawObstacleSprite(sf::RenderTarget &window, const sf::Texture &texture, const EntityState &entity, float time)
 {
     sf::IntRect rect({1 + (static_cast<int>(time * 9.f) % 16) * 34, 363}, {32, 32});
     float size = 32.f;
@@ -114,7 +114,7 @@ void drawObstacleSprite(sf::RenderWindow &window, const sf::Texture &texture, co
 }
 
 // Without the obstacle texture, a colored square with an outline.
-void drawObstacleTile(sf::RenderWindow &window, const EntityState &entity)
+void drawObstacleTile(sf::RenderTarget &window, const EntityState &entity)
 {
     static const std::array<sf::Color, 3> colors = {sf::Color(120, 135, 150), sf::Color(165, 85, 50),
                                                     sf::Color(120, 70, 190)};
@@ -162,7 +162,7 @@ EnemyLook enemyLook(std::uint8_t variant, int frame)
 
 } // namespace
 
-void EntityRenderer::draw(sf::RenderWindow &window, const EntityState &entity, float time, float tilt,
+void EntityRenderer::draw(sf::RenderTarget &window, const EntityState &entity, float time, float tilt,
                           std::optional<std::uint8_t> localPlayer) const
 {
     switch (entity.type) {
@@ -187,7 +187,7 @@ void EntityRenderer::draw(sf::RenderWindow &window, const EntityState &entity, f
     }
 }
 
-void EntityRenderer::drawPlayer(sf::RenderWindow &window, const EntityState &entity, float time, float tilt,
+void EntityRenderer::drawPlayer(sf::RenderTarget &window, const EntityState &entity, float time, float tilt,
                                 std::optional<std::uint8_t> localPlayer) const
 {
     const int column = shipColumn(tilt);
@@ -199,7 +199,7 @@ void EntityRenderer::drawPlayer(sf::RenderWindow &window, const EntityState &ent
 }
 
 // "P1", "P2 (YOU)"... above the ship, in the player's color.
-void EntityRenderer::drawPlayerTag(sf::RenderWindow &window, const EntityState &entity,
+void EntityRenderer::drawPlayerTag(sf::RenderTarget &window, const EntityState &entity,
                                    std::optional<std::uint8_t> localPlayer) const
 {
     std::string tag = "P" + std::to_string(entity.variant + 1);
@@ -214,7 +214,7 @@ void EntityRenderer::drawPlayerTag(sf::RenderWindow &window, const EntityState &
 }
 
 // Variant 1 = laser_missile (entities.json): longer and magenta.
-void EntityRenderer::drawPlayerMissile(sf::RenderWindow &window, const EntityState &entity, float time) const
+void EntityRenderer::drawPlayerMissile(sf::RenderTarget &window, const EntityState &entity, float time) const
 {
     const bool laser = entity.variant == 1;
     const sf::IntRect rect =
@@ -225,14 +225,14 @@ void EntityRenderer::drawPlayerMissile(sf::RenderWindow &window, const EntitySta
     window.draw(sprite);
 }
 
-void EntityRenderer::drawEnemyMissile(sf::RenderWindow &window, const EntityState &entity, float time) const
+void EntityRenderer::drawEnemyMissile(sf::RenderTarget &window, const EntityState &entity, float time) const
 {
     // Shots of the same wave do not pulse in sync.
     drawEnemyShot(window, _resources, entity, time + static_cast<float>(entity.netId % 7) * 0.15f);
 }
 
 // Colored orb with a letter, so bonuses can be told apart without color: S spread, L laser, + life.
-void EntityRenderer::drawBonus(sf::RenderWindow &window, const EntityState &entity, float time) const
+void EntityRenderer::drawBonus(sf::RenderTarget &window, const EntityState &entity, float time) const
 {
     static const std::array<std::pair<sf::Color, const char *>, 3> looks = {
         {{sf::Color(80, 200, 255), "S"}, {sf::Color(255, 90, 220), "L"}, {sf::Color(90, 230, 120), "+"}}};
@@ -256,7 +256,7 @@ void EntityRenderer::drawBonus(sf::RenderWindow &window, const EntityState &enti
     window.draw(label);
 }
 
-void EntityRenderer::drawObstacle(sf::RenderWindow &window, const EntityState &entity, float time) const
+void EntityRenderer::drawObstacle(sf::RenderTarget &window, const EntityState &entity, float time) const
 {
     const float localTime = time + static_cast<float>(entity.netId % 13) * 0.31f;
     if (_resources.hasTexture("obstacles"))
@@ -265,7 +265,7 @@ void EntityRenderer::drawObstacle(sf::RenderWindow &window, const EntityState &e
         drawObstacleTile(window, entity);
 }
 
-void EntityRenderer::drawEnemy(sf::RenderWindow &window, const EntityState &entity, float time) const
+void EntityRenderer::drawEnemy(sf::RenderTarget &window, const EntityState &entity, float time) const
 {
     const float localTime = time + static_cast<float>(entity.netId % 11) * 0.23f;
     if (entity.variant == 1) {
@@ -278,7 +278,7 @@ void EntityRenderer::drawEnemy(sf::RenderWindow &window, const EntityState &enti
 }
 
 // Scout ship facing the players, with its engine glow behind it.
-void EntityRenderer::drawScout(sf::RenderWindow &window, const EntityState &entity, float time) const
+void EntityRenderer::drawScout(sf::RenderTarget &window, const EntityState &entity, float time) const
 {
     window.draw(
         makeSprite(texture({"enemy_patrol"}), sf::IntRect({1, 2}, {32, 28}), {2.0f, 2.0f}, {entity.x, entity.y}));
@@ -290,7 +290,7 @@ void EntityRenderer::drawScout(sf::RenderWindow &window, const EntityState &enti
     window.draw(glow);
 }
 
-void EntityRenderer::drawExplosion(sf::RenderWindow &window, const Explosion &explosion) const
+void EntityRenderer::drawExplosion(sf::RenderTarget &window, const Explosion &explosion) const
 {
     static const std::array<sf::IntRect, 6> frames = {
         sf::IntRect({72, 296}, {32, 24}),  sf::IntRect({109, 296}, {32, 24}), sf::IntRect({146, 296}, {32, 24}),
