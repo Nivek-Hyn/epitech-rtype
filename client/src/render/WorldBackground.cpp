@@ -16,7 +16,7 @@ namespace {
 
 using Json = nlohmann::json;
 
-// Pixel art stays sharp when scaled up. Each image is loaded once, even if several layers use it.
+// Each image is loaded once, even if several layers use it, and repeats so that it can scroll forever.
 std::shared_ptr<sf::Texture> loadTexture(const std::string &path,
                                          std::map<std::string, std::shared_ptr<sf::Texture>> &cache)
 {
@@ -27,7 +27,7 @@ std::shared_ptr<sf::Texture> loadTexture(const std::string &path,
         std::cerr << "Warning: background image " << path << " not found\n";
         texture.reset();
     } else {
-        texture->setSmooth(false);
+        texture->setSmooth(true);
         texture->setRepeated(true);
     }
     cache[path] = texture;
