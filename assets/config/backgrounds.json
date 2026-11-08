@@ -3,30 +3,30 @@
     {
       "name": "Orbital belt",
       "layers": [
-        { "image": "assets/backgrounds/world1/blue-back.png", "fill": true, "speed": 6 },
-        { "image": "assets/backgrounds/world1/blue-stars.png", "fill": true, "speed": 22 },
-        { "image": "assets/backgrounds/world1/prop-planet-big.png", "x": 1350, "y": 180, "scale": 7, "speed": 10 },
-        { "image": "assets/backgrounds/world1/prop-planet-small.png", "x": 420, "y": 760, "scale": 6, "speed": 16 },
-        { "image": "assets/backgrounds/world1/asteroid-1.png", "x": 900, "y": 330, "scale": 5, "speed": 45 },
-        { "image": "assets/backgrounds/world1/asteroid-2.png", "x": 1650, "y": 840, "scale": 5, "speed": 60 }
+        {"image": "assets/backgrounds/world1/blue-back.png", "fill": true, "speed": 6},
+        {"image": "assets/backgrounds/world1/blue-stars.png", "fill": true, "speed": 22},
+        {"image": "assets/backgrounds/world1/prop-planet-big.png", "x": 1350, "y": 180, "scale": 7, "speed": 10},
+        {"image": "assets/backgrounds/world1/prop-planet-small.png", "x": 420, "y": 760, "scale": 6, "speed": 16},
+        {"image": "assets/backgrounds/world1/asteroid-1.png", "x": 900, "y": 330, "scale": 5, "speed": 45},
+        {"image": "assets/backgrounds/world1/asteroid-2.png", "x": 1650, "y": 840, "scale": 5, "speed": 60}
       ]
     },
     {
       "name": "Mars",
       "layers": [
-        { "image": "assets/backgrounds/world2/parallax-space-backgound.png", "fill": true, "speed": 5 },
-        { "image": "assets/backgrounds/world2/parallax-space-stars.png", "fill": true, "speed": 18 },
-        { "image": "assets/backgrounds/world2/parallax-space-far-planets.png", "fill": true, "speed": 10 },
-        { "image": "assets/backgrounds/world2/parallax-space-ring-planet.png", "x": 260, "y": 160, "scale": 6, "speed": 22 },
-        { "image": "assets/backgrounds/world2/parallax-space-big-planet.png", "x": 1250, "y": 260, "scale": 7, "speed": 14 }
+        {"image": "assets/backgrounds/world2/mars-back.png", "fill": true, "speed": 6},
+        {"image": "assets/backgrounds/world2/mars-stars.png", "fill": true, "speed": 22},
+        {"image": "assets/backgrounds/world2/parallax-space-big-planet.png", "x": 1250, "y": 240, "scale": 7, "speed": 12},
+        {"image": "assets/backgrounds/world2/mars-asteroid-1.png", "x": 700, "y": 780, "scale": 5, "speed": 45},
+        {"image": "assets/backgrounds/world2/mars-asteroid-2.png", "x": 1500, "y": 120, "scale": 5, "speed": 60}
       ]
     },
     {
       "name": "Singularity",
       "layers": [
-        { "image": "assets/backgrounds/world3/space.png", "fill": true, "speed": 5 },
-        { "image": "assets/backgrounds/world3/black-hole.png", "fill": true, "speed": 0 },
-        { "image": "assets/backgrounds/world3/stars.png", "fill": true, "speed": 30 }
+        {"image": "assets/backgrounds/world3/sing-back.png", "fill": true, "speed": 6},
+        {"image": "assets/backgrounds/world3/sing-stars.png", "fill": true, "speed": 22},
+        {"image": "assets/backgrounds/world3/black-hole.png", "fill": true, "speed": 0}
       ]
     }
   ]
