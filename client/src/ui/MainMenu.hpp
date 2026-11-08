@@ -17,18 +17,9 @@ class ResourceManager;
 
 namespace rtype::client::ui {
 
-enum class MenuScreen {
-    Root,
-    HostGame,
-    JoinGame,
-    Settings
-};
+enum class MenuScreen { Root, HostGame, JoinGame, Settings };
 
-enum class MenuAction {
-    None,
-    Connect,
-    Exit
-};
+enum class MenuAction { None, Connect, Exit };
 
 class MainMenu {
 public:
@@ -42,6 +33,8 @@ public:
     MenuAction getAndResetAction();
     const GameConfig &getConfig() const;
     void setStatusMessage(const std::string &message, sf::Color color = sf::Color::Yellow);
+    // Changes the accessibility settings from the game (F1, F2) and keeps the settings screen in sync.
+    void setAccessibility(bool autoFire, bool highContrast);
 
 private:
     void initRootScreen();
@@ -84,6 +77,8 @@ private:
 
     std::unique_ptr<OptionSelector> _sfxVolumeSelector;
     std::unique_ptr<OptionSelector> _musicVolumeSelector;
+    std::unique_ptr<OptionSelector> _autoFireSelector;
+    std::unique_ptr<OptionSelector> _contrastSelector;
     sf::Text _controlsTitleText;
     std::vector<std::unique_ptr<Button>> _keyButtons;
     std::vector<std::unique_ptr<Button>> _presetButtons;
@@ -92,4 +87,4 @@ private:
     int _rebindingAction{-1};
 };
 
-}
+} // namespace rtype::client::ui

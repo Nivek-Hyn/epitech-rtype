@@ -13,6 +13,12 @@ four-player acceptance and accessibility features remain tracked work.
 - CMake 3.28+ for the client, or 3.24+ for a server-only build, and the selected generator's build tool.
 - Git and Internet access for the first dependency download. CMake/CPM fetches Asio, SFML and GoogleTest.
 - On Linux, SFML also needs platform development libraries:
+- A C++20 compiler: GCC 12+, Clang 16+ or MSVC 2022
+- CMake 3.24+
+- Git (dependencies are downloaded automatically by [CPM](https://github.com/cpm-cmake/CPM.cmake))
+- Linux is required. Windows is a project target, but has not yet been validated for this branch. See the
+  [cross-platform guide](docs/cross-platform.md).
+- On Linux, install the system packages needed by SFML:
   - Fedora: `sudo dnf install libX11-devel libXrandr-devel libXcursor-devel libXi-devel mesa-libGL-devel systemd-devel`
   - Ubuntu/Debian: `sudo apt install libx11-dev libxrandr-dev libxcursor-dev libxi-dev libgl1-mesa-dev libudev-dev`
 
@@ -30,7 +36,9 @@ cmake --build build --parallel 4
 ./r-type_client 127.0.0.1 4242
 ```
 
-On Windows, from a Developer PowerShell with MSVC 2022:
+For Windows build commands and current support status, see the [cross-platform guide](docs/cross-platform.md).
+
+## Run
 
 ```powershell
 cmake -S . -B build/windows -G "Visual Studio 17 2022" -A x64
@@ -64,7 +72,15 @@ cmake -P engine/cmake/CheckPackage.cmake
 ```
 
 See [engine/README.md](engine/README.md) and the [extension guide](docs/how-to.md).
-The separate playable second game remains its own delivery task; it is not part of this prototype's launch commands.
+
+## Other programs built with the engine
+
+The same build also produces, at the repository root (run them from there):
+
+| Program | What it is | Controls |
+|---|---|---|
+| `./brickrush` | A second, unrelated game: a brick breaker. It uses the engine only, not `common/` or the R-Type assets. Bricks, paddle and ball are prefabs of `games/brickrush/assets/bricks.json`; each level is a grid of bricks. | Left/Right or Q/D to move, Space to launch, R to restart |
+| `./r-type_level_editor assets/levels/level1.json` | R-Type level editor with a preview played by the engine | See the [how-to guides](docs/how-to.md#edit-a-level-with-the-level-editor) |
 
 ## Project and documentation
 

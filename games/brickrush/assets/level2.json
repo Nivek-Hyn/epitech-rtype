@@ -1,0 +1,11 @@
+{
+  "name": "Fortress",
+  "legend": { "R": "brick_red", "O": "brick_orange", "S": "brick_steel", "#": "brick_wall" },
+  "rows": [
+    "SSSSSSSSSSSS",
+    "S.RRRRRRRR.S",
+    "S.OOOOOOOO.S",
+    "#..##..##..#",
+    "OOOO....OOOO"
+  ]
+}

@@ -8,9 +8,8 @@ namespace rtype::client::ui {
 
 class OptionSelector {
 public:
-    OptionSelector(const sf::Font &font, const std::string &labelText,
-                   std::vector<std::string> options, sf::Vector2f position,
-                   std::size_t defaultIndex = 0);
+    OptionSelector(const sf::Font &font, const std::string &labelText, std::vector<std::string> options,
+                   sf::Vector2f position, std::size_t defaultIndex = 0);
 
     void setSelected(bool selected);
     bool isSelected() const;
@@ -46,4 +45,4 @@ private:
     bool _enabled{true};
 };
 
-}
+} // namespace rtype::client::ui

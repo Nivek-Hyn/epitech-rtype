@@ -1,7 +1,6 @@
 // Collisions: every case of a shot or a ship touching something.
 
 #include "Game.hpp"
-#include "GameConstants.hpp"
 #include "common/Components.hpp"
 #include <algorithm>
 #include <cmath>
@@ -14,19 +13,6 @@ namespace {
 
 using Box = engine::physics::Aabb;
 using BoxedEntity = std::pair<engine::ecs::Entity, Box>;
-
-constexpr float MissileWidth = 36.f;
-constexpr float MissileHeight = 24.f;
-
-Box playerBoxAt(const rtype::components::Position &position)
-{
-    return {position.x, position.y, PlayerWidth, PlayerHeight};
-}
-
-Box missileBoxAt(const rtype::components::Position &position)
-{
-    return {position.x, position.y, MissileWidth, MissileHeight};
-}
 
 bool overlapsAny(const Box &box, const std::vector<BoxedEntity> &others)
 {
@@ -43,6 +29,7 @@ struct Game::CollisionFrame {
     std::vector<bool> enemyHit;
     std::vector<bool> obstacleHit;
     std::vector<engine::ecs::Entity> destroyed;
+    std::vector<std::pair<float, float>> killedEnemies; // where a bonus may drop
 };
 
 void Game::handleCollisions()
@@ -52,6 +39,7 @@ void Game::handleCollisions()
     resolveShipContacts(frame);
     resolveEnemyMissiles(frame);
     destroyEntities(frame.destroyed);
+    dropBonuses(frame.killedEnemies);
 }
 
 Game::CollisionFrame Game::collectHitAreas()
@@ -60,13 +48,11 @@ Game::CollisionFrame Game::collectHitAreas()
     using rtype::components::Position;
 
     CollisionFrame frame;
-    _registry.each<Position, Kind>([&frame](engine::ecs::Entity entity, const Position &position, const Kind &kind) {
-        if (kind.type == protocol::EntityType::Enemy) {
-            const auto box = rtype::components::enemyHitbox(kind.variant);
-            frame.enemies.push_back({entity, {position.x, position.y + box.offsetY, box.width, box.height}});
-        } else if (kind.type == protocol::EntityType::Obstacle) {
-            frame.obstacles.push_back({entity, {position.x, position.y, ObstacleSize, ObstacleSize}});
-        }
+    _registry.each<Position, Kind>([this, &frame](engine::ecs::Entity entity, const Position &, const Kind &kind) {
+        if (kind.type == protocol::EntityType::Enemy)
+            frame.enemies.push_back({entity, hitArea(entity)});
+        else if (kind.type == protocol::EntityType::Obstacle)
+            frame.obstacles.push_back({entity, hitArea(entity)});
     });
     frame.enemyHit.assign(frame.enemies.size(), false);
     frame.obstacleHit.assign(frame.obstacles.size(), false);
@@ -79,10 +65,10 @@ void Game::resolvePlayerMissiles(CollisionFrame &frame)
     using rtype::components::Kind;
     using rtype::components::Position;
 
-    _registry.each<Position, Kind>([&](engine::ecs::Entity missile, const Position &position, const Kind &kind) {
+    _registry.each<Position, Kind>([&](engine::ecs::Entity missile, const Position &, const Kind &kind) {
         if (kind.type != protocol::EntityType::PlayerMissile)
             return;
-        const Box box = missileBoxAt(position);
+        const Box box = hitArea(missile);
         if (!missileHitsObstacle(frame, missile, box))
             missileHitsEnemy(frame, missile, box);
     });
@@ -110,21 +96,25 @@ bool Game::missileHitsEnemy(CollisionFrame &frame, engine::ecs::Entity missile, 
             continue;
         frame.enemyHit[i] = true;
         frame.destroyed.push_back(missile);
-        damageEnemy(frame, frame.enemies[i].first);
+        damageEnemy(frame, frame.enemies[i], missile);
         return true;
     }
     return false;
 }
 
-void Game::damageEnemy(CollisionFrame &frame, engine::ecs::Entity enemy)
+// The missile removes its damage from the enemy's health.
+void Game::damageEnemy(CollisionFrame &frame, const std::pair<engine::ecs::Entity, engine::physics::Aabb> &enemy,
+                       engine::ecs::Entity missile)
 {
-    if (auto *health = _registry.get<rtype::components::Health>(enemy)) {
-        health->hp -= 1;
+    const auto *damage = _registry.get<rtype::components::MissileDamage>(missile);
+    if (auto *health = _registry.get<rtype::components::Health>(enemy.first)) {
+        health->hp -= damage ? damage->damage : 1;
         if (health->hp > 0)
             return;
     }
-    frame.destroyed.push_back(enemy);
-    _score += pointsFor(enemy);
+    frame.destroyed.push_back(enemy.first);
+    frame.killedEnemies.emplace_back(enemy.second.left, enemy.second.top);
+    _score += pointsFor(enemy.first);
 }
 
 // The campaign has no score: points only exist in infinite mode.
@@ -132,7 +122,8 @@ std::uint32_t Game::pointsFor(engine::ecs::Entity enemy)
 {
     if (_gameMode != GameMode::Infinite)
         return 0;
-    const float multiplier = currentDifficulty().scoreMultiplier + completedLoops() * _rules.infinite.scoreMultiplierPerLoop;
+    const float multiplier =
+        currentDifficulty().scoreMultiplier + completedLoops() * _rules.infinite.scoreMultiplierPerLoop;
     const auto *traits = _registry.get<rtype::components::EnemyTraits>(enemy);
     const std::uint32_t base = traits ? traits->score : 100;
     return static_cast<std::uint32_t>(std::round(static_cast<float>(base) * multiplier));
@@ -143,10 +134,10 @@ void Game::resolveShipContacts(CollisionFrame &frame)
     using rtype::components::Kind;
     using rtype::components::Position;
 
-    _registry.each<Position, Kind>([&](engine::ecs::Entity ship, const Position &position, const Kind &kind) {
+    _registry.each<Position, Kind>([&](engine::ecs::Entity ship, const Position &, const Kind &kind) {
         if (kind.type != protocol::EntityType::Player || isInvulnerable(ship))
             return;
-        const Box box = playerBoxAt(position);
+        const Box box = hitArea(ship);
         shipRamsEnemies(frame, ship, box);
         // A tile destroys the ship and stays in place.
         if (overlapsAny(box, frame.obstacles))
@@ -174,10 +165,10 @@ void Game::resolveEnemyMissiles(CollisionFrame &frame)
     using rtype::components::Kind;
     using rtype::components::Position;
 
-    _registry.each<Position, Kind>([&](engine::ecs::Entity missile, const Position &position, const Kind &kind) {
+    _registry.each<Position, Kind>([&](engine::ecs::Entity missile, const Position &, const Kind &kind) {
         if (kind.type != protocol::EntityType::EnemyMissile)
             return;
-        const Box box = missileBoxAt(position);
+        const Box box = hitArea(missile);
         // A tile stops enemy fire without being damaged, so players can take cover behind it.
         if (overlapsAny(box, frame.obstacles))
             frame.destroyed.push_back(missile);
@@ -191,10 +182,10 @@ void Game::missileHitsShips(CollisionFrame &frame, engine::ecs::Entity missile, 
     using rtype::components::Kind;
     using rtype::components::Position;
 
-    _registry.each<Position, Kind>([&](engine::ecs::Entity ship, const Position &position, const Kind &kind) {
+    _registry.each<Position, Kind>([&](engine::ecs::Entity ship, const Position &, const Kind &kind) {
         if (kind.type != protocol::EntityType::Player || isInvulnerable(ship))
             return;
-        if (engine::physics::overlaps(box, playerBoxAt(position))) {
+        if (engine::physics::overlaps(box, hitArea(ship))) {
             frame.destroyed.push_back(missile);
             frame.destroyed.push_back(ship);
         }
@@ -218,6 +209,7 @@ void Game::loseLifeIfShip(engine::ecs::Entity entity)
             continue;
         _players[player] = engine::ecs::NullEntity;
         _shootCooldowns[player] = 0.f;
+        _weapons[player] = _arsenal.defaultWeapon; // a destroyed ship loses its bonus weapon
         _lives[player] = std::max(0, _lives[player] - 1);
         _respawnTimers[player] = _rules.respawnDelay;
     }

@@ -8,14 +8,9 @@
 namespace rtype::client::ui {
 
 MainMenu::MainMenu(const sf::Font &font, ResourceManager *resources)
-    : _font(font),
-      _resources(resources),
-      _config(GameConfig::loadFromFile("config.json")),
-      _titleText(font, "R - T Y P E", 80),
-      _subtitleText(font, "A SPACE SHOOTER", 22),
-      _screenTitleText(font, "", 36),
-      _statusText(font, "", 22),
-      _controlsTitleText(font, "--- CONTROLS RECONFIGURATION ---", 22)
+    : _font(font), _resources(resources), _config(GameConfig::loadFromFile("config.json")),
+      _titleText(font, "R - T Y P E", 80), _subtitleText(font, "A SPACE SHOOTER", 22), _screenTitleText(font, "", 36),
+      _statusText(font, "", 22), _controlsTitleText(font, "--- CONTROLS RECONFIGURATION ---", 22)
 {
     _titleText.setFillColor(sf::Color(255, 204, 0));
     _titleText.setLetterSpacing(1.5f);
@@ -45,7 +40,9 @@ void MainMenu::initRootScreen()
     const float posX = 960.f - (btnWidth / 2.f);
 
     for (std::size_t i = 0; i < labels.size(); ++i) {
-        auto btn = std::make_unique<Button>(_font, labels[i], sf::Vector2f(posX, startY + (static_cast<float>(i) * 75.f)), sf::Vector2f(btnWidth, btnHeight));
+        auto btn =
+            std::make_unique<Button>(_font, labels[i], sf::Vector2f(posX, startY + (static_cast<float>(i) * 75.f)),
+                                     sf::Vector2f(btnWidth, btnHeight));
         _rootButtons.push_back(std::move(btn));
     }
     _rootButtons[0]->setSelected(true);
@@ -57,20 +54,26 @@ void MainMenu::initHostScreen()
     float startY = 360.f;
     const float spacing = 80.f;
 
-    _hostModeSelector = std::make_unique<OptionSelector>(_font, "GAME MODE", std::vector<std::string>{"SCENARIO", "ENDLESS"}, sf::Vector2f(posX, startY));
+    _hostModeSelector = std::make_unique<OptionSelector>(
+        _font, "GAME MODE", std::vector<std::string>{"SCENARIO", "ENDLESS"}, sf::Vector2f(posX, startY));
     startY += spacing;
 
-    _hostDifficultySelector = std::make_unique<OptionSelector>(_font, "DIFFICULTY", std::vector<std::string>{"EASY", "NORMAL", "HARD"}, sf::Vector2f(posX, startY), 1);
+    _hostDifficultySelector = std::make_unique<OptionSelector>(
+        _font, "DIFFICULTY", std::vector<std::string>{"EASY", "NORMAL", "HARD"}, sf::Vector2f(posX, startY), 1);
     startY += spacing;
 
-    _hostMissionSelector = std::make_unique<OptionSelector>(_font, "MISSION", std::vector<std::string>{"1 : DEEP SPACE", "2 : ASTEROID BELT", "3 : ALIEN CORE"}, sf::Vector2f(posX, startY));
+    _hostMissionSelector = std::make_unique<OptionSelector>(
+        _font, "MISSION", std::vector<std::string>{"1 : DEEP SPACE", "2 : ASTEROID BELT", "3 : ALIEN CORE"},
+        sf::Vector2f(posX, startY));
     startY += spacing;
 
-    _hostPortInput = std::make_unique<TextInput>(_font, "SERVER PORT", _config.hostPort, sf::Vector2f(posX, startY), sf::Vector2f(340.f, 50.f), 6);
+    _hostPortInput = std::make_unique<TextInput>(_font, "SERVER PORT", _config.hostPort, sf::Vector2f(posX, startY),
+                                                 sf::Vector2f(340.f, 50.f), 6);
     startY += 110.f;
 
     const float btnWidth = 260.f;
-    auto startBtn = std::make_unique<Button>(_font, "LAUNCH SERVER", sf::Vector2f(680.f, startY), sf::Vector2f(btnWidth, 55.f));
+    auto startBtn =
+        std::make_unique<Button>(_font, "LAUNCH SERVER", sf::Vector2f(680.f, startY), sf::Vector2f(btnWidth, 55.f));
     auto backBtn = std::make_unique<Button>(_font, "BACK", sf::Vector2f(980.f, startY), sf::Vector2f(btnWidth, 55.f));
 
     _hostButtons.push_back(std::move(startBtn));
@@ -82,14 +85,17 @@ void MainMenu::initJoinScreen()
     const float posX = 680.f;
     float startY = 400.f;
 
-    _joinIpInput = std::make_unique<TextInput>(_font, "SERVER IP", _config.joinIp, sf::Vector2f(posX, startY), sf::Vector2f(340.f, 50.f), 20);
+    _joinIpInput = std::make_unique<TextInput>(_font, "SERVER IP", _config.joinIp, sf::Vector2f(posX, startY),
+                                               sf::Vector2f(340.f, 50.f), 20);
     startY += 90.f;
 
-    _joinPortInput = std::make_unique<TextInput>(_font, "SERVER PORT", _config.joinPort, sf::Vector2f(posX, startY), sf::Vector2f(340.f, 50.f), 6);
+    _joinPortInput = std::make_unique<TextInput>(_font, "SERVER PORT", _config.joinPort, sf::Vector2f(posX, startY),
+                                                 sf::Vector2f(340.f, 50.f), 6);
     startY += 120.f;
 
     const float btnWidth = 260.f;
-    auto connectBtn = std::make_unique<Button>(_font, "CONNECT", sf::Vector2f(680.f, startY), sf::Vector2f(btnWidth, 55.f));
+    auto connectBtn =
+        std::make_unique<Button>(_font, "CONNECT", sf::Vector2f(680.f, startY), sf::Vector2f(btnWidth, 55.f));
     auto backBtn = std::make_unique<Button>(_font, "BACK", sf::Vector2f(980.f, startY), sf::Vector2f(btnWidth, 55.f));
 
     _joinButtons.push_back(std::move(connectBtn));
@@ -101,17 +107,28 @@ void MainMenu::initSettingsScreen()
     const float posX = 680.f;
     float startY = 295.f;
 
-    const std::size_t sfxIdx = std::clamp(
-        static_cast<std::size_t>(std::round(_config.sfxVolume / 25.f)),
-        std::size_t{0}, std::size_t{4});
-    const std::size_t musicIdx = std::clamp(
-        static_cast<std::size_t>(std::round(_config.musicVolume / 25.f)),
-        std::size_t{0}, std::size_t{4});
+    const std::size_t sfxIdx =
+        std::clamp(static_cast<std::size_t>(std::round(_config.sfxVolume / 25.f)), std::size_t{0}, std::size_t{4});
+    const std::size_t musicIdx =
+        std::clamp(static_cast<std::size_t>(std::round(_config.musicVolume / 25.f)), std::size_t{0}, std::size_t{4});
 
-    _sfxVolumeSelector = std::make_unique<OptionSelector>(_font, "SFX VOLUME", std::vector<std::string>{"MUTE", "25%", "50%", "75%", "100%"}, sf::Vector2f(posX, startY), sfxIdx);
+    _sfxVolumeSelector = std::make_unique<OptionSelector>(_font, "SFX VOLUME",
+                                                          std::vector<std::string>{"MUTE", "25%", "50%", "75%", "100%"},
+                                                          sf::Vector2f(posX, startY), sfxIdx);
     startY += 70.f;
 
-    _musicVolumeSelector = std::make_unique<OptionSelector>(_font, "MUSIC VOLUME", std::vector<std::string>{"MUTE", "25%", "50%", "75%", "100%"}, sf::Vector2f(posX, startY), musicIdx);
+    _musicVolumeSelector = std::make_unique<OptionSelector>(
+        _font, "MUSIC VOLUME", std::vector<std::string>{"MUTE", "25%", "50%", "75%", "100%"},
+        sf::Vector2f(posX, startY), musicIdx);
+    startY += 70.f;
+
+    // Accessibility: also toggled in game with F1 (auto fire) and F2 (high contrast).
+    _autoFireSelector = std::make_unique<OptionSelector>(_font, "AUTO FIRE (F1)", std::vector<std::string>{"OFF", "ON"},
+                                                         sf::Vector2f(posX, startY), _config.autoFire ? 1 : 0);
+    startY += 70.f;
+    _contrastSelector =
+        std::make_unique<OptionSelector>(_font, "HIGH CONTRAST (F2)", std::vector<std::string>{"OFF", "ON"},
+                                         sf::Vector2f(posX, startY), _config.highContrast ? 1 : 0);
     startY += 85.f;
 
     _controlsTitleText.setString("--- CONTROLS RECONFIGURATION ---");
@@ -132,27 +149,36 @@ void MainMenu::initSettingsScreen()
     _settingsButtons.clear();
 
     // Row 1: UP and DOWN
-    _keyButtons.push_back(std::make_unique<Button>(_font, "", sf::Vector2f(colLeftX, keysStartY), sf::Vector2f(btnWidth, btnHeight)));
-    _keyButtons.push_back(std::make_unique<Button>(_font, "", sf::Vector2f(colRightX, keysStartY), sf::Vector2f(btnWidth, btnHeight)));
+    _keyButtons.push_back(
+        std::make_unique<Button>(_font, "", sf::Vector2f(colLeftX, keysStartY), sf::Vector2f(btnWidth, btnHeight)));
+    _keyButtons.push_back(
+        std::make_unique<Button>(_font, "", sf::Vector2f(colRightX, keysStartY), sf::Vector2f(btnWidth, btnHeight)));
 
     // Row 2: LEFT and RIGHT
-    _keyButtons.push_back(std::make_unique<Button>(_font, "", sf::Vector2f(colLeftX, keysStartY + rowSpacing), sf::Vector2f(btnWidth, btnHeight)));
-    _keyButtons.push_back(std::make_unique<Button>(_font, "", sf::Vector2f(colRightX, keysStartY + rowSpacing), sf::Vector2f(btnWidth, btnHeight)));
+    _keyButtons.push_back(std::make_unique<Button>(_font, "", sf::Vector2f(colLeftX, keysStartY + rowSpacing),
+                                                   sf::Vector2f(btnWidth, btnHeight)));
+    _keyButtons.push_back(std::make_unique<Button>(_font, "", sf::Vector2f(colRightX, keysStartY + rowSpacing),
+                                                   sf::Vector2f(btnWidth, btnHeight)));
 
     // Row 3: SHOOT centered
-    _keyButtons.push_back(std::make_unique<Button>(_font, "", sf::Vector2f(810.f, keysStartY + rowSpacing * 2.f), sf::Vector2f(btnWidth, btnHeight)));
+    _keyButtons.push_back(std::make_unique<Button>(_font, "", sf::Vector2f(810.f, keysStartY + rowSpacing * 2.f),
+                                                   sf::Vector2f(btnWidth, btnHeight)));
 
     // Presets row placed clearly lower down
     const float presetsY = keysStartY + rowSpacing * 3.f + 18.f;
     const float presetBtnWidth = 210.f;
     const float presetBtnHeight = 42.f;
 
-    _presetButtons.push_back(std::make_unique<Button>(_font, "PRESET AZERTY", sf::Vector2f(620.f, presetsY), sf::Vector2f(presetBtnWidth, presetBtnHeight)));
-    _presetButtons.push_back(std::make_unique<Button>(_font, "PRESET QWERTY", sf::Vector2f(855.f, presetsY), sf::Vector2f(presetBtnWidth, presetBtnHeight)));
-    _presetButtons.push_back(std::make_unique<Button>(_font, "RESET DEFAULTS", sf::Vector2f(1090.f, presetsY), sf::Vector2f(presetBtnWidth, presetBtnHeight)));
+    _presetButtons.push_back(std::make_unique<Button>(_font, "PRESET AZERTY", sf::Vector2f(620.f, presetsY),
+                                                      sf::Vector2f(presetBtnWidth, presetBtnHeight)));
+    _presetButtons.push_back(std::make_unique<Button>(_font, "PRESET QWERTY", sf::Vector2f(855.f, presetsY),
+                                                      sf::Vector2f(presetBtnWidth, presetBtnHeight)));
+    _presetButtons.push_back(std::make_unique<Button>(_font, "RESET DEFAULTS", sf::Vector2f(1090.f, presetsY),
+                                                      sf::Vector2f(presetBtnWidth, presetBtnHeight)));
 
     // Back button
-    auto backBtn = std::make_unique<Button>(_font, "BACK", sf::Vector2f(835.f, presetsY + 68.f), sf::Vector2f(250.f, 48.f));
+    auto backBtn =
+        std::make_unique<Button>(_font, "BACK", sf::Vector2f(835.f, presetsY + 68.f), sf::Vector2f(250.f, 48.f));
     _settingsButtons.push_back(std::move(backBtn));
 
     updateKeyButtonLabels();
@@ -160,10 +186,12 @@ void MainMenu::initSettingsScreen()
 
 void MainMenu::updateKeyButtonLabels()
 {
-    if (_keyButtons.size() < 5) return;
+    if (_keyButtons.size() < 5)
+        return;
 
     const std::vector<std::string> actionNames = {"MOVE UP", "MOVE DOWN", "MOVE LEFT", "MOVE RIGHT", "SHOOT"};
-    const std::vector<sf::Keyboard::Key> keys = {_config.keyUp, _config.keyDown, _config.keyLeft, _config.keyRight, _config.keyShoot};
+    const std::vector<sf::Keyboard::Key> keys = {_config.keyUp, _config.keyDown, _config.keyLeft, _config.keyRight,
+                                                 _config.keyShoot};
 
     for (std::size_t i = 0; i < 5; ++i) {
         if (_rebindingAction == static_cast<int>(i)) {
@@ -218,6 +246,14 @@ void MainMenu::update(float dt)
         _config.sfxVolume = static_cast<float>(_sfxVolumeSelector->getSelectedIndex()) * 25.f;
     if (_musicVolumeSelector)
         _config.musicVolume = static_cast<float>(_musicVolumeSelector->getSelectedIndex()) * 25.f;
+}
+
+void MainMenu::setAccessibility(bool autoFire, bool highContrast)
+{
+    _config.autoFire = autoFire;
+    _config.highContrast = highContrast;
+    _autoFireSelector->setSelectedIndex(autoFire ? 1 : 0);
+    _contrastSelector->setSelectedIndex(highContrast ? 1 : 0);
 }
 
 void MainMenu::handleEvent(const sf::Event &event, const sf::RenderWindow &window)
@@ -286,8 +322,9 @@ void MainMenu::handleEvent(const sf::Event &event, const sf::RenderWindow &windo
                     _config.hostPort = _hostPortInput->getValue().empty() ? "4242" : _hostPortInput->getValue();
 
                     setStatusMessage("Server configured: [Mode: " + _hostModeSelector->getSelectedValue() +
-                                     " | Difficulty: " + _hostDifficultySelector->getSelectedValue() +
-                                     " | Port: " + _config.hostPort + "]", sf::Color::Green);
+                                         " | Difficulty: " + _hostDifficultySelector->getSelectedValue() +
+                                         " | Port: " + _config.hostPort + "]",
+                                     sf::Color::Green);
                 } else if (_hostButtons[1]->handleMouseClick(clickedPos)) {
                     playUiSound("click");
                     _currentScreen = MenuScreen::Root;
@@ -342,6 +379,8 @@ void MainMenu::handleEvent(const sf::Event &event, const sf::RenderWindow &windo
         if (event.is<sf::Event::MouseMoved>()) {
             _sfxVolumeSelector->handleMouseMove(mousePos);
             _musicVolumeSelector->handleMouseMove(mousePos);
+            _autoFireSelector->handleMouseMove(mousePos);
+            _contrastSelector->handleMouseMove(mousePos);
             for (auto &btn : _keyButtons) {
                 btn->handleMouseMove(mousePos);
             }
@@ -384,6 +423,16 @@ void MainMenu::handleEvent(const sf::Event &event, const sf::RenderWindow &windo
                 if (_musicVolumeSelector->handleMouseClick(clickedPos)) {
                     playUiSound("click");
                     _config.musicVolume = static_cast<float>(_musicVolumeSelector->getSelectedIndex()) * 25.f;
+                    volumeChanged = true;
+                }
+                if (_autoFireSelector->handleMouseClick(clickedPos)) {
+                    playUiSound("click");
+                    _config.autoFire = _autoFireSelector->getSelectedIndex() == 1;
+                    volumeChanged = true;
+                }
+                if (_contrastSelector->handleMouseClick(clickedPos)) {
+                    playUiSound("click");
+                    _config.highContrast = _contrastSelector->getSelectedIndex() == 1;
                     volumeChanged = true;
                 }
                 if (volumeChanged) {
@@ -442,27 +491,39 @@ void MainMenu::handleEvent(const sf::Event &event, const sf::RenderWindow &windo
                     setStatusMessage("Rebinding cancelled", sf::Color::White);
                 } else {
                     const std::vector<std::string> names = {"Up", "Down", "Left", "Right", "Shoot"};
-                    std::string actionName = (_rebindingAction >= 0 && _rebindingAction < static_cast<int>(names.size())) ? names[_rebindingAction] : "";
+                    std::string actionName =
+                        (_rebindingAction >= 0 && _rebindingAction < static_cast<int>(names.size()))
+                            ? names[_rebindingAction]
+                            : "";
                     std::string conflict = _config.getConflictAction(key->code, actionName);
 
                     if (!conflict.empty()) {
                         playUiSound("hit");
-                        setStatusMessage("Conflict: [" + GameConfig::keyToString(key->code) + "] is already used for " + conflict + "!", sf::Color(255, 80, 80));
+                        setStatusMessage("Conflict: [" + GameConfig::keyToString(key->code) + "] is already used for " +
+                                             conflict + "!",
+                                         sf::Color(255, 80, 80));
                     } else if (key->code == sf::Keyboard::Key::Unknown) {
                         playUiSound("hit");
                         setStatusMessage("Unsupported key pressed!", sf::Color(255, 80, 80));
                     } else {
-                        if (_rebindingAction == 0) _config.keyUp = key->code;
-                        else if (_rebindingAction == 1) _config.keyDown = key->code;
-                        else if (_rebindingAction == 2) _config.keyLeft = key->code;
-                        else if (_rebindingAction == 3) _config.keyRight = key->code;
-                        else if (_rebindingAction == 4) _config.keyShoot = key->code;
+                        if (_rebindingAction == 0)
+                            _config.keyUp = key->code;
+                        else if (_rebindingAction == 1)
+                            _config.keyDown = key->code;
+                        else if (_rebindingAction == 2)
+                            _config.keyLeft = key->code;
+                        else if (_rebindingAction == 3)
+                            _config.keyRight = key->code;
+                        else if (_rebindingAction == 4)
+                            _config.keyShoot = key->code;
 
                         playUiSound("click");
                         _rebindingAction = -1;
                         _config.saveToFile("config.json");
                         updateKeyButtonLabels();
-                        setStatusMessage("Action " + actionName + " bound to [" + GameConfig::keyToString(key->code) + "]", sf::Color::Green);
+                        setStatusMessage("Action " + actionName + " bound to [" + GameConfig::keyToString(key->code) +
+                                             "]",
+                                         sf::Color::Green);
                     }
                 }
                 return;
@@ -554,6 +615,8 @@ void MainMenu::draw(sf::RenderWindow &window)
 
         _sfxVolumeSelector->draw(window);
         _musicVolumeSelector->draw(window);
+        _autoFireSelector->draw(window);
+        _contrastSelector->draw(window);
         window.draw(_controlsTitleText);
 
         for (const auto &btn : _keyButtons) {
@@ -584,4 +647,4 @@ const GameConfig &MainMenu::getConfig() const
     return _config;
 }
 
-}
+} // namespace rtype::client::ui

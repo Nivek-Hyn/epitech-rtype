@@ -46,18 +46,18 @@ void Game::resetWaves()
 
 bool Game::allWavesSpawned() const
 {
-    return !_currentLevel.waves.empty() &&
-           std::all_of(_currentLevel.waves.begin(), _currentLevel.waves.end(),
-                       [](const WaveConfig &wave) { return wave.isSpawned; });
+    return !_currentLevel.waves.empty() && std::all_of(_currentLevel.waves.begin(), _currentLevel.waves.end(),
+                                                       [](const WaveConfig &wave) { return wave.isSpawned; });
 }
 
 bool Game::anyEnemyAlive()
 {
     bool alive = false;
-    _registry.each<rtype::components::Kind>([&alive](engine::ecs::Entity /*entity*/, const rtype::components::Kind &kind) {
-        if (kind.type == protocol::EntityType::Enemy)
-            alive = true;
-    });
+    _registry.each<rtype::components::Kind>(
+        [&alive](engine::ecs::Entity /*entity*/, const rtype::components::Kind &kind) {
+            if (kind.type == protocol::EntityType::Enemy)
+                alive = true;
+        });
     return alive;
 }
 
@@ -95,10 +95,31 @@ void Game::goToNextLevel()
 void Game::restartCampaign()
 {
     clearEnemies();
-    _state = protocol::GameState::Playing;
+    _state = protocol::GameState::Waiting;
+    _lobbyTimer = 0.f;
     _score = 0;
+    _weapons.fill(_arsenal.defaultWeapon);
     _infiniteLoopCount = 1;
     loadFirstLevel();
+}
+
+// Waiting room: the game starts lobby_delay seconds after the first player joined, so the others can join too.
+void Game::updateLobby(float dt)
+{
+    if (_state != protocol::GameState::Waiting)
+        return;
+    if (!anyPlayerConnected()) {
+        _lobbyTimer = 0.f;
+        return;
+    }
+    _lobbyTimer += dt;
+    startIfLobbyOver();
+}
+
+void Game::startIfLobbyOver()
+{
+    if (_state == protocol::GameState::Waiting && anyPlayerConnected() && _lobbyTimer >= _rules.lobbyDelay)
+        _state = protocol::GameState::Playing;
 }
 
 } // namespace rtype::server

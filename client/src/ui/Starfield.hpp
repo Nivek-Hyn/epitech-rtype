@@ -26,4 +26,4 @@ private:
     std::vector<Star> _stars;
 };
 
-}
+} // namespace rtype::client::ui

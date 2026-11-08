@@ -10,11 +10,10 @@ Status labels used below:
 - **Designed**: the interface and expected behavior exist (headers, tests, specification), the implementation is in progress.
 - **Planned**: not started, candidate for part 2.
 
-This revision updates the engine and build choices against the combined local work. Network measurements,
-complete campaign behavior, persistence and accessibility results still need contributions from their owners.
-The server now loads the first level's wave timing, positions and speed from JSON using nlohmann/json 3.11.3.
-Content changes need no recompile for those supported values; new movement behaviors still require code.
-Only the initial level is selected, and validation of all configuration bounds remains incomplete.
+This revision describes the part 2 delivery merged into `main`: data-driven entities (prefabs), a nine-level
+campaign and an infinite mode, configurable weapons and bonuses, a level editor and a second game built on the
+engine. Game content is read from JSON with nlohmann/json 3.11.3 (see section 3). Network measurements under
+loss and latency still need the network track to be merged; they are not claimed here.
 
 ## 1. Language and tooling
 
@@ -25,6 +24,7 @@ Only the initial level is selected, and validation of all configuration bounds r
 | Dependencies | **CPM** | vcpkg, Conan | Keeps version declarations in CMake ([ADR 0001](adr/0001-cpp20-cmake-cpm.md)). The first build downloads and compiles application libraries. Compilers, SDKs and documented platform libraries such as X11/OpenGL remain prerequisites; builds are not assumed identical on every machine. |
 | Unit tests | **GoogleTest** | Catch2, doctest | Widely used, integrated with CTest (`gtest_discover_tests`), good failure messages. Catch2 or doctest would also fit; the choice is mostly familiarity. |
 | Continuous integration | **GitHub Actions**, run on demand + `scripts/check.sh` locally | GitLab CI, Jenkins | The repository is on GitHub. The manual workflow builds and tests on Linux and Windows and checks formatting. Local checks additionally run clang-tidy; they do not use Actions credits. |
+| Level editing | **Graphical editor** (`tools/level-editor`, SFML) writing the level JSON | Editing JSON by hand, in-game editor | Placing enemies on a time × height timeline is faster and less error-prone than typing coordinates. A separate tool keeps editing code out of the client. Its preview reuses the engine (Registry, movement, fixed timestep) but replays straight-line timing only, not movement patterns or shots. |
 
 ## 2. Libraries
 
@@ -84,7 +84,32 @@ installed package provide the reuse boundary. Binaries still need a compatible O
 configuration. Module flags operate at build time; there is no dynamic plugin API.
 
 The separate basic consumer tests movement and a user-defined Lifetime component/system. Linux and Windows
-package checks are recorded in [validation.md](validation.md). A second playable game remains a separate task.
+package checks are recorded in [validation.md](validation.md).
+
+**Second game.** `games/brickrush/` is a brick breaker, deliberately unlike R-Type: fixed screen, no network,
+bouncing physics. It links only the engine, nlohmann/json and SFML, never `common/`. It reuses the Registry,
+the prefabs, the movement system, AABB overlaps, the event bus and the fixed timestep with its own components.
+A Pong prototype was set aside because it showed less of the engine. `tests/test_brickrush.cpp` covers its rules,
+including a 60-second automatic game that checks the ball never gets stuck.
+
+### Data-driven entities: prefabs — Implemented
+
+Game content is described by data: `assets/config/entities.json` lists each entity (ship, missiles, enemies,
+tiles, bonuses) as a set of components with their values. The server creates entities from these **prefabs**;
+its systems produce the behavior. `weapons.json` names the missile prefab of each weapon; levels name prefabs.
+
+| Option | What it offers | Cost or limit |
+|---|---|---|
+| One C++ class or function per enemy type | Everything in one place | Every new enemy needs a recompile; data and logic mixed. |
+| JSON with game-specific fields (our first version) | Content changes without recompiling | Each field had to be parsed by hand in the game; sizes stayed hard-coded by sprite number. |
+| **Prefabs: components described by data** | A new entity combining existing components needs no C++; the same mechanism serves any game | A new behavior still needs a component and a system; components are named by strings. |
+| Scripting (Lua, Python) | Behaviors without recompiling | An interpreter to embed, bind and secure; too large for the delivery time. |
+
+`engine::ecs::Prefabs<Data>` is generic: the game registers each component under a name with a function reading
+it from its data, so the engine does not depend on JSON. Data is read when a prefab is added: an unknown
+component or invalid value is reported at startup and that prefab is skipped, instead of failing mid-game.
+Brick Rush uses the same class with other components, which shows the mechanism is not tied to R-Type.
+Tests: `tests/test_prefabs.cpp` (engine), `tests/test_game.cpp` and `tests/test_weapons.cpp` (game data).
 
 ### Entity-Component-System ([ADR 0006](adr/0006-ecs-sparse-arrays.md)) — Implemented
 
@@ -112,8 +137,9 @@ an event (for example a collision) without knowing who reacts to it (damage, sco
 
 We kept both modes. The queued mode avoids a real bug: if a damage handler kills an entity while the collision
 system is still iterating over components, references to that entity's components would become invalid.
-Priorities and answers are candidates only if a game needs them. The bus is available in the engine;
-the current R-Type collision code collects destructions directly rather than using this bus.
+Priorities and answers are candidates only if a game needs them. Brick Rush sends `BrickHit` and `BallLost`
+through the queued mode. The R-Type collision code reaches the same safety differently: it collects the entities
+to destroy during iteration and destroys them afterwards, without the bus.
 
 ### Fixed timestep game loop — Implemented
 
@@ -136,12 +162,14 @@ keeping the fraction. Without this limit a slow server could accumulate an endle
 | Free list (LIFO stack of ids) | `_freeIds` in Registry | O(1) amortized push/pop | Reuses killed ids and reduces future growth. It does not shrink existing component arrays. |
 | Entity destruction | `Registry::kill` | O(number of component storages), plus component destruction costs | Every storage must clear that entity's slot before the id can be reused. |
 | `std::unordered_map<std::type_index, ...>` | component storages, event handlers | O(1) average | One storage per component type, created on first use, found by type at run time. |
+| `std::unordered_map<std::string, ...>` of ready components | `Prefabs` | O(1) average lookup; spawning is O(components of the prefab) | Components are read once at load time, so spawning only copies values. |
+| Name → function table | enemy movement patterns (`server/src/MovementSystem.cpp`) | O(1) average | Each pattern is a small function; a new pattern is one function and one table entry. |
 | Type erasure (`ISparseArray`, `IHandlerList`) | `Registry`, `EventBus` | — | Lets one container hold storages of different types; `kill` can clear every component of an entity. |
 | Filtered iteration | `Registry::each<A, B>` | Expected O(allocated ids × requested component types), excluding callback work | No secondary index to maintain. Empty/dead ids still contribute to the scan; no performance benchmark is claimed. |
 | AABB overlap test | `engine::physics::overlaps` | O(1) per pair | Four comparisons; sprites in a shoot'em up are well approximated by rectangles. |
-| Nested missile/enemy checks | `Game::handleCollisions` | O(missiles × enemies), plus ECS scans | Simple implementation for player-missile/enemy collisions. A grid or quadtree is a candidate if profiling shows this becomes expensive; no negligible-cost claim has been measured. |
+| Nested missile/enemy checks | `Game::handleCollisions` | O(missiles × enemies), plus ECS scans | Simple implementation; each box comes from the entity's Position and Hitbox components. A grid or quadtree is a candidate if profiling shows this becomes expensive; no negligible-cost claim has been measured. |
 | Accumulator with catch-up limit | `FixedTimestep::advance` | O(steps) | See section 3. |
-| Thread-safe queue | network thread → game thread | Queue operations are constant-time apart from allocation and mutex waiting | `tryPop` does not wait for a new message, but can wait to acquire its mutex. Lock-free alternatives add implementation constraints; no speed comparison has been measured. |
+| Thread-safe queue | network thread → game thread (`engine/core/ThreadSafeQueue.hpp`) | Constant time apart from allocation and mutex waiting | `tryPop` does not wait for a new message, but can wait to acquire its mutex. The queue has no capacity limit: the per-sender rate limits bound what reaches it. Lock-free alternatives add implementation constraints; no speed comparison has been measured. |
 
 ### Known limits
 
@@ -158,16 +186,17 @@ keeping the fraction. Without this limit a slow server could accumulate an endle
 
 | Choice | Alternatives | Why |
 |---|---|---|
-| **UDP** | TCP | Required by the subject for in-game traffic. UDP does not retransmit lost packets; ordering and stale-state rejection remain application responsibilities. |
+| **UDP** | TCP | Required by the subject for in-game traffic. UDP does not retransmit lost packets; ordering and stale-state rejection remain application responsibilities. We do them ourselves, for the few messages that need them ([ADR 0009](adr/0009-reliable-messages-over-udp.md)). |
 | **Authoritative server**, clients send inputs only ([ADR 0007](adr/0007-authoritative-snapshots.md)) | Peer-to-peer, client authority | The server decides everything: a modified client cannot move faster or teleport, it can only send key presses. |
-| **Snapshots every tick** | Delta snapshots, events only | A later received snapshot can replace lost state. The next datagram can also be lost or reordered; this does not make individual events reliable. |
-| **Binary protocol** ([ADR 0008](adr/0008-binary-protocol.md), [specification](protocol.md)) | JSON, text | Compact and fast to parse. One entity takes 14 bytes in binary, about 50 to 60 bytes in JSON. |
+| **Full snapshots, 30 per second**, smoothed by the client ([ADR 0010](adr/0010-snapshot-rate-and-interpolation.md)) | 60 per second, delta snapshots ([ADR 0011](adr/0011-delta-snapshots-not-adopted.md)), events only | A lost snapshot is replaced by the next one about 33 ms later and the client hides the gap by interpolation. Measured on a real game: 98 % of the entities move at every tick, so sending only what changed would save almost nothing. |
+| **Reliable messages** for `EntityDestroyed`, `PlayerLeft` and `Disconnect` ([ADR 0009](adr/0009-reliable-messages-over-udp.md)) | A TCP channel, everything reliable | Only what nothing replaces is acknowledged and repeated, with a delay that follows the measured round-trip time. Snapshots and inputs stay unreliable: a newer one replaces them. |
+| **Binary protocol** ([ADR 0008](adr/0008-binary-protocol.md), [specification](protocol.md)) | JSON, text | Compact and fast to parse. One entity takes 10 bytes in binary (two quantized 16-bit positions), about 50 to 60 bytes in JSON. |
 
-Bandwidth estimate, worst case (a full snapshot packet: 10-byte header + 15 bytes + 83 entities × 14 bytes = 1,187 bytes):
-60 packets per second ≈ 71 KB/s ≈ 570 kbit/s per client, about 2.3 Mbit/s for 4 clients. This is a theoretical
-payload estimate, not a measured bandwidth result. It excludes UDP/IP overhead and retransmitted connection
-attempts; the cross-play exercise did not measure this worst-case load. Delta snapshots and a lower send rate with
-client interpolation remain network-track work to assess separately.
+Bandwidth, worst case (a full snapshot packet: 10-byte header + 15 bytes + 117 entities × 10 bytes = 1,195 bytes):
+30 packets per second ≈ 36 KB/s ≈ 287 kbit/s per client, about 1.15 Mbit/s for 4 clients. This is a payload
+estimate: it excludes UDP/IP overhead. Measured on a campaign game with 27 to 28 entities per snapshot, one client
+receives 8.4 KB/s, against 24.3 KB/s with the first protocol (14-byte entities, 60 snapshots per second): the
+measurements and how they were made are in [networking.md](networking.md) §9 to §11.
 
 The 1,200-byte payload cap reduces fragmentation risk; it does not guarantee that every network path can carry
 the resulting IP packet without fragmentation. Path MTU and encapsulation still matter. See the
@@ -181,7 +210,8 @@ The game has very little data to keep, so we compared options against what we ac
 |---|---|---|
 | Game state (entities, score) | Server memory (the ECS) | No: a game lasts a few minutes; if the server stops, the game ends. |
 | Assets (sprites, sounds) | Read-only files in `assets/` | Already persistent, never modified. |
-| Settings (key bindings, volume) | None yet | Yes, once reconfigurable keys exist (**planned**). |
+| Settings (key bindings, volume) | `config.json` next to the client | Yes: written when the client closes, read at startup. |
+| Game content (prefabs, levels, weapons, rules) | Read-only JSON in `assets/` | Edited by designers or the level editor; never written by the game. |
 | High scores | None yet | Possibly in part 2 (**planned**). |
 
 | Technique | Persistence | Reliability | Constraints |
@@ -194,16 +224,18 @@ The game has very little data to keep, so we compared options against what we ac
 
 **Decision for part 1:** no persistence. Nothing in the current game must survive a restart, and keeping
 everything in memory removes a whole class of corruption and security problems.
-**For settings:** a small text file per client, written to a temporary file and renamed, is the simplest reliable option.
+**For settings:** a small JSON file per client (`config.json`). It is currently written in place: writing to a
+temporary file and renaming it would protect against a crash during the write. An invalid file falls back to defaults.
 **For high scores:** SQLite remains a candidate if durable score storage is added. No database is required
 by the current implementation, and this comparison does not add high scores to the delivery scope.
 
 ### Accessibility settings and ownership
 
 The [accessibility study](accessibility.md) maps current behavior and tracked features to physical/motor,
-visual/audio and cognitive barriers. The action-based input protocol lets the client own key mapping;
-it does not implement remapping, toggle auto-fire or a settings file automatically. Those client changes
-remain tracked work. A shared game-speed/difficulty setting would additionally need server/gameplay agreement.
+visual/audio and cognitive barriers. The action-based input protocol lets the client own key mapping:
+keys can be remapped and are saved with the volumes in `config.json`, together with toggle auto-fire and a
+high-contrast mode (plain background, outlined HUD, circled enemy shots, softer flash). Bonuses carry a letter and
+ships a player tag besides their color. A shared game-speed/difficulty setting would additionally need server/gameplay agreement.
 Platform/cross-play tests are not an accessibility audit; no compliance certification is claimed.
 
 ## 7. Security
@@ -215,13 +247,14 @@ it chose to connect to.
 
 | Threat | Mitigation | Status |
 |---|---|---|
-| Malformed or malicious packet (crash, buffer overflow) | Size, magic, version, payload and enum checks; decoding returns `std::optional` and invalid packets are dropped. Tests cover malformed examples, not every possible input. | Implemented; see `tests/test_protocol.cpp`. |
-| Reading past the end of a buffer | `ByteReader` returns 0 and marks itself as failed instead of reading out of bounds. Fields are read one by one, never with `memcpy` of structs. | Implemented; this alone is not a proof of all memory safety properties. |
+| Malformed or malicious packet (crash, buffer overflow) | Strict validation: size between 10 and 1,200 bytes, magic, version, exact payload size, known type and enum values. Decoding returns `std::optional`; invalid packets are dropped. Unit tests cover truncated packets and lying counts. | Implemented and tested |
+| Reading past the end of a buffer | `ByteReader` returns 0 and marks itself as failed instead of reading out of bounds. Fields are read one by one, never with `memcpy` of structs. | Implemented |
 | Cheating with a modified client | Authoritative server: clients only send input flags. Positions, damage and score are computed on the server. | Implemented in the architecture |
-| Too many clients / resource exhaustion | At most 4 players; a client silent for 5 seconds is removed. The player cap does not bound queue growth or packet rate. | Cap and timeout implemented; further bounds remain separate work. |
-| Flooding the server with packets | Invalid packets are dropped before any game logic. Rate limiting per address is **planned**. | Partial |
+| Too many clients / resource exhaustion | At most 4 players; a client silent for 5 seconds is removed. Integration tests cover the four-player limit and fifth-client rejection. | Implemented; timeout behavior is not integration-tested yet |
+| Flooding the server with packets | Invalid packets are dropped before any game logic. Each client, and all unknown senders together, have a packet budget (`engine::net::RateLimiter`, a token bucket): packets over it are dropped before being queued, so a flood cannot grow the queues. | Implemented; `tests/test_rate_limiter.cpp` |
 | Spoofed source address (sending inputs as another player) | Not covered: UDP has no authentication. A random session token returned in `ConnectAccepted` and required in every packet is **planned**. | Planned |
 | Eavesdropping | Not covered: traffic is not encrypted. The game exchanges no personal data, so the risk is low. | Accepted |
+| Modified content files (`assets/config`, `assets/levels`) | Files are local and read only at startup; JSON errors and unknown components are reported and skipped. Value ranges are not all validated. | Partial: content files are trusted like the executable. |
 
 ### Vulnerabilities of the technologies
 
@@ -254,3 +287,6 @@ the network maintainer; no checks were disabled. This is separate from the succe
 | Event bus with immediate and queued modes | Decoupled systems, safe deferred reactions | Events must be copyable; no priorities yet |
 | Full snapshots over UDP | Robust to packet loss, simple | Higher bandwidth than deltas |
 | No persistence | No corruption or disk security issues | Nothing survives a server restart |
+| Prefabs described by components | Content and new entities without recompiling, in any game | New behaviors still need C++; component names are strings checked at load time |
+| Separate graphical level editor | Fast, visual level design writing the server's format | Preview replays timing only, not patterns or shots |
+| A brick breaker as second game | Shows the engine on a very different game | A small game: it proves reuse, not every engine feature |

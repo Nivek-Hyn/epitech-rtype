@@ -1,7 +1,9 @@
 #pragma once
 
 #include "common/Protocol.hpp"
+#include "engine/net/TrafficStats.hpp"
 
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <variant>
@@ -42,6 +44,17 @@ public:
     // Thread-safe. Send to one player or to every connected player.
     virtual void send(PlayerId player, const protocol::Message &message) = 0;
     virtual void broadcast(const protocol::Message &message) = 0;
+
+    // Thread-safe. Same, for a message that must arrive (EntityDestroyed...): it is numbered, acknowledged by the
+    // client and sent again until it is. Not for Snapshot, which is never split into reliable parts.
+    virtual void sendReliable(PlayerId player, const protocol::Message &message) = 0;
+    virtual void broadcastReliable(const protocol::Message &message) = 0;
+
+    // Thread-safe. Datagrams and bytes exchanged with every client since start(), and the current bandwidth.
+    virtual engine::net::TrafficStats traffic() const = 0;
+
+    // Thread-safe. Number of connected clients.
+    virtual std::size_t clientCount() const = 0;
 };
 
 } // namespace rtype::server

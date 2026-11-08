@@ -1,6 +1,9 @@
 add_executable(r-type_client
     src/main.cpp
     src/ResourceManager.cpp
+    src/game/Session.cpp
+    src/game/SessionHud.cpp
+    src/render/EntityRenderer.cpp
     src/net/AsioNetworkClient.cpp
     src/ui/Starfield.cpp
     src/ui/Button.cpp
