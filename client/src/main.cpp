@@ -71,11 +71,11 @@ public:
     ~LocalServer() { stop(); }
 
     void start(std::uint16_t port, const std::string &mode = "campaign", const std::string &difficulty = "normal",
-               const std::string &level = "")
+               const std::string &level = "", bool noLobby = false)
     {
         stop();
         _running = true;
-        _thread = std::thread([this, port, mode, difficulty, level]() { run(port, mode, difficulty, level); });
+        _thread = std::thread([this, port, mode, difficulty, level, noLobby]() { run(port, mode, difficulty, level, noLobby); });
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
 
@@ -87,10 +87,13 @@ public:
     }
 
 private:
-    void run(std::uint16_t port, const std::string &mode, const std::string &difficulty, const std::string &level)
+    void run(std::uint16_t port, const std::string &mode, const std::string &difficulty, const std::string &level,
+             bool noLobby)
     {
         try {
             rtype::server::Game game;
+            if (noLobby)
+                game.rules().lobbyDelay = 0.f;
             game.setGameMode(mode == "infinite" ? rtype::server::Game::GameMode::Infinite
                                                 : rtype::server::Game::GameMode::Campaign);
             if (difficulty == "easy")
@@ -234,7 +237,7 @@ private:
             _window.close();
         } else if (action == ui::MenuAction::Play) {
             try {
-                _server.start(rtype::DefaultPort, "campaign", "normal", "assets/levels/level1.json");
+                _server.start(rtype::DefaultPort, "campaign", "normal", "assets/levels/level1.json", true);
                 connect("127.0.0.1", rtype::DefaultPort);
             } catch (const std::exception &e) {
                 _menu.setStatusMessage("Failed to start local game: " + std::string(e.what()), sf::Color::Red);
