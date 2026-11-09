@@ -27,7 +27,7 @@ void Game::updateWaves(float dt)
         return;
     }
 
-    _levelTimer += dt;
+    _levelTimer += dt * currentDifficulty().speedMultiplier;
     for (auto &wave : _currentLevel.waves) {
         if (!wave.isSpawned && _levelTimer >= wave.delay)
             spawnWave(wave);
@@ -93,8 +93,11 @@ void Game::applyDifficulty(engine::ecs::Entity entity)
     auto *velocity = _registry.get<rtype::components::Velocity>(entity);
     if (velocity)
         velocity->x = -scaledSpeed(-velocity->x);
-    if (auto *pattern = _registry.get<rtype::components::MovementPattern>(entity); pattern && velocity)
-        pattern->baseSpeed = -velocity->x;
+    if (auto *pattern = _registry.get<rtype::components::MovementPattern>(entity)) {
+        if (velocity)
+            pattern->baseSpeed = -velocity->x;
+        pattern->frequency *= currentDifficulty().speedMultiplier;
+    }
     if (auto *attack = _registry.get<rtype::components::EnemyAttack>(entity)) {
         for (auto &entry : attack->attacks) {
             entry.fireRate = scaledFireRate(entry.fireRate);

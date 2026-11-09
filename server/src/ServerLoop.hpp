@@ -20,6 +20,7 @@ struct ServerSettings {
     std::string level;          // a single level instead of the campaign (empty: the campaign)
     std::size_t startLevel = 0; // first campaign level, from 0
     int snapshotEvery = SnapshotEveryTicks;
+    bool noLobby = false; // When true (solo mode), skip the waiting room and start immediately
 };
 
 // Applies the settings. Every level the game may load is read now: a broken file stops the start with

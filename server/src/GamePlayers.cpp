@@ -60,7 +60,8 @@ void Game::onInput(PlayerId player, std::uint8_t flags)
 void Game::applyMovementInput(std::size_t player, std::uint8_t flags)
 {
     const auto *control = _registry.get<rtype::components::PlayerControl>(_players[player]);
-    const float speed = control ? control->speed : rtype::components::PlayerControl{}.speed;
+    const float baseSpeed = control ? control->speed : rtype::components::PlayerControl{}.speed;
+    const float speed = baseSpeed * (1.0f + (currentDifficulty().speedMultiplier - 1.0f) * 0.4f);
     float vx = 0.0f;
     float vy = 0.0f;
     if (flags & protocol::InputFlag::Up)

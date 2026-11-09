@@ -27,6 +27,7 @@ private:
     struct Layer {
         std::shared_ptr<sf::Texture> texture;
         bool fill = false;
+        bool repeatX = false;
         sf::Vector2f position;
         float scale = 1.f;
         float speed = 0.f; // world units per second, to the left
@@ -34,6 +35,7 @@ private:
 
     void drawWorld(sf::RenderTarget &target, std::size_t world, std::uint8_t alpha) const;
     void drawFill(sf::RenderTarget &target, const Layer &layer, std::uint8_t alpha) const;
+    void drawRepeatX(sf::RenderTarget &target, const Layer &layer, std::uint8_t alpha) const;
     void drawProp(sf::RenderTarget &target, const Layer &layer, std::uint8_t alpha) const;
 
     std::vector<std::vector<Layer>> _worlds;

@@ -40,7 +40,7 @@ void printTraffic(const rtype::server::AsioNetworkServer &network)
     std::fflush(stdout);
 }
 
-const char *const Usage = " [port] [level_path] [--mode campaign|infinite] [--difficulty easy|normal|hard]"
+const char *const Usage = " [port] [level_path] [--mode campaign|infinite] [--difficulty easy|normal|hard] [--no-lobby]"
                           " [--level path] [--start-level index] [--stats] [--snapshot-every ticks]\n";
 
 // A number in [minimum, maximum], or std::invalid_argument.
@@ -101,6 +101,8 @@ Options parseArguments(int argc, char **argv)
             settings.mode = parseMode(value(i, arg));
         else if (arg == "--difficulty")
             settings.difficulty = parseDifficulty(value(i, arg));
+        else if (arg == "--no-lobby")
+            settings.noLobby = true;
         else if (arg == "--level")
             settings.level = value(i, arg);
         else if (arg == "--start-level")

@@ -52,6 +52,7 @@ WorldBackground::WorldBackground(const std::string &configPath)
             if (texture)
                 layers.push_back({texture,
                                   layer.value("fill", false),
+                                  layer.value("repeat_x", false),
                                   {layer.value("x", 0.f), layer.value("y", 0.f)},
                                   layer.value("scale", 1.f),
                                   layer.value("speed", 0.f)});
@@ -96,6 +97,8 @@ void WorldBackground::drawWorld(sf::RenderTarget &target, std::size_t world, std
     for (const Layer &layer : _worlds[world]) {
         if (layer.fill)
             drawFill(target, layer, alpha);
+        else if (layer.repeatX)
+            drawRepeatX(target, layer, alpha);
         else
             drawProp(target, layer, alpha);
     }
@@ -106,11 +109,31 @@ void WorldBackground::drawFill(sf::RenderTarget &target, const Layer &layer, std
 {
     const sf::Vector2f size(layer.texture->getSize());
     const float scale = std::max(WorldWidth / size.x, WorldHeight / size.y);
-    const int offset = static_cast<int>(std::fmod(_time * layer.speed / scale, size.x));
+    const float rawOffset = std::fmod(_time * layer.speed / scale, size.x);
+    const int offset = static_cast<int>(rawOffset < 0.f ? rawOffset + size.x : rawOffset);
     sf::Sprite sprite(*layer.texture);
     sprite.setTextureRect(
         sf::IntRect({offset, 0}, {static_cast<int>(std::ceil(WorldWidth / scale)), static_cast<int>(size.y)}));
     sprite.setScale({scale, scale});
+    sprite.setColor(sf::Color(255, 255, 255, alpha));
+    target.draw(sprite);
+}
+
+// Repeats horizontally across the screen at layer.position.y (ground, ceiling, mountain ranges).
+void WorldBackground::drawRepeatX(sf::RenderTarget &target, const Layer &layer, std::uint8_t alpha) const
+{
+    const sf::Vector2f size(layer.texture->getSize());
+    const float scale = layer.scale > 0.f ? layer.scale : 1.f;
+    const float scaledWidth = size.x * scale;
+    const float scaledOffset = std::fmod(_time * layer.speed - layer.position.x, scaledWidth);
+    const float effectiveOffset = scaledOffset < 0.f ? scaledOffset + scaledWidth : scaledOffset;
+    const int textureOffset = static_cast<int>(effectiveOffset / scale);
+
+    sf::Sprite sprite(*layer.texture);
+    sprite.setTextureRect(
+        sf::IntRect({textureOffset, 0}, {static_cast<int>(std::ceil(WorldWidth / scale)) + 2, static_cast<int>(size.y)}));
+    sprite.setScale({scale, scale});
+    sprite.setPosition({0.f, layer.position.y});
     sprite.setColor(sf::Color(255, 255, 255, alpha));
     target.draw(sprite);
 }

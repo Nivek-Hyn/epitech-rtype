@@ -50,6 +50,8 @@ void configureGame(Game &game, const ServerSettings &settings)
         game.loadLevel(settings.level);
     game.checkLevels();
     game.startAtLevel(settings.startLevel);
+    if (settings.noLobby)
+        game.rules().lobbyDelay = 0.f;
 }
 
 void runServer(Game &game, INetworkServer &network, const ServerSettings &settings, const std::atomic<bool> &running,

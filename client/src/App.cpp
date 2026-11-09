@@ -66,6 +66,8 @@ void App::host(server::ServerSettings settings, const std::string &port)
             settings.port = static_cast<std::uint16_t>(std::stoul(port));
         _server.start(settings);
         connect("127.0.0.1", settings.port);
+        if (settings.noLobby)
+            _session.setReady(true);
     } catch (const std::exception &e) {
         _server.stop();
         _screen = Screen::Menu;
@@ -79,7 +81,12 @@ void App::run()
     while (_window.isOpen()) {
         const float dt = clock.restart().asSeconds();
         _time += dt;
-        _background.update(dt);
+        float bgSpeedFactor = 1.0f;
+        if (_screen == Screen::Playing) {
+            const int diff = _menu.getConfig().difficulty;
+            bgSpeedFactor = diff == 0 ? 0.8f : (diff == 2 ? 1.45f : 1.0f);
+        }
+        _background.update(dt * bgSpeedFactor);
         applyVolumes();
         handleEvents();
         if (_screen == Screen::Playing)
@@ -158,6 +165,8 @@ void App::updateMenu(float dt)
     case ui::MenuAction::Infinite: {
         server::ServerSettings settings;
         settings.mode = server::Game::GameMode::Infinite;
+        settings.difficulty = difficultyOf(_menu.getConfig().difficulty);
+        settings.noLobby = true;
         _returnTo = Screen::Menu;
         host(settings);
         break;
@@ -202,6 +211,7 @@ void App::updateCampaign(float dt)
         server::ServerSettings settings;
         settings.startLevel = choice->level;
         settings.difficulty = difficultyOf(choice->difficulty);
+        settings.noLobby = true;
         _returnTo = Screen::Campaign;
         host(settings);
     }
@@ -216,6 +226,7 @@ void App::updateEditor(float dt)
     if (const auto level = _editor.takeTest()) {
         server::ServerSettings settings;
         settings.level = *level;
+        settings.noLobby = true;
         _returnTo = Screen::Editor;
         host(settings);
     }
