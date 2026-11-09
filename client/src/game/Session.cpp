@@ -70,7 +70,6 @@ void Session::update(float dt, bool connected)
     countDown(_damageFlash, dt);
     countDown(_shakeTimer, dt);
     countDown(_waveBanner, dt);
-    countDown(_waveCooldown, dt);
     countDown(_weaponBannerTimer, dt);
     countDown(_leftTimer, dt);
     for (auto &explosion : _explosions)
@@ -106,8 +105,21 @@ void Session::sendInput(INetworkClient &network, const ui::GameConfig &config, f
         if (pressed(config.keyRight, Key::Right))
             flags |= protocol::InputFlag::Right;
 
+        _shootSoundCooldown -= dt;
         if (config.autoFire || sf::Keyboard::isKeyPressed(config.keyShoot)) {
             flags |= protocol::InputFlag::Shoot;
+            if (_shootSoundCooldown <= 0.f) {
+                if (_currentWeapon == "LASER") {
+                    _resources.playSound("shoot", 95.f, 0.72f);
+                    _shootSoundCooldown = ShootSoundDelay * 1.5f;
+                } else if (_currentWeapon == "SPREAD") {
+                    _resources.playSound("shoot", 85.f, 1.15f);
+                    _shootSoundCooldown = ShootSoundDelay;
+                } else {
+                    _resources.playSound("shoot", 80.f, 1.0f);
+                    _shootSoundCooldown = ShootSoundDelay;
+                }
+            }
         }
         if (_waiting && (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Enter) ||
                          sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Space) || _isReady)) {
@@ -145,32 +157,27 @@ void Session::handle(const protocol::Message &message, bool &gotSnapshot)
         _entities.clear();
         gotSnapshot = false;
     } else if (const auto *snapshot = std::get_if<protocol::Snapshot>(&message)) {
-        gotSnapshot = _world.add(*snapshot) || gotSnapshot;
+        gotSnapshot = _world.add(*snapshot);
     } else if (const auto *rejected = std::get_if<protocol::ConnectRejected>(&message)) {
-        _rejectionReason = rejected->reason == protocol::RejectReason::ServerFull ? "the server is full"
-                                                                                  : "the protocol versions differ";
-        std::cerr << "Server rejected connection: " << _rejectionReason << ".\n";
+        _rejectionReason = rejected->reason == protocol::RejectReason::ServerFull ? "server is full"
+                                                                                  : "version mismatch";
     } else if (const auto *destroyed = std::get_if<protocol::EntityDestroyed>(&message)) {
         onDestroyed(*destroyed);
-    } else if (const auto *left = std::get_if<protocol::PlayerLeft>(&message)) {
-        onPlayerLeft(*left);
+    } else if (const auto *playerLeft = std::get_if<protocol::PlayerLeft>(&message)) {
+        onPlayerLeft(*playerLeft);
     }
 }
 
+// Drops whatever the current snapshot no longer contains: its explosion has already been placed.
 void Session::onSnapshot(const protocol::Snapshot &snapshot)
 {
     _score = snapshot.score;
     _lives = snapshot.lives;
-    _level = snapshot.level;
-    if (snapshot.wave > _wave && snapshot.state == protocol::GameState::Playing)
+    if (snapshot.level != _level || snapshot.wave != _wave)
         _waveBanner = WaveBannerDuration; // a new wave has come
     _wave = snapshot.wave;
+    _level = snapshot.level;
     updateGameState(snapshot);
-    updateWaveCounter(snapshot);
-    if (!_entities.empty()) {
-        playDestroyEffects(snapshot);
-        playSpawnEffects(snapshot);
-    }
     _entities = snapshot.entities;
     // A destroyed entity stays hidden until it is gone from the snapshots too.
     std::erase_if(_destroyed, [this](std::uint32_t netId) {
@@ -203,40 +210,6 @@ std::optional<EntityState> Session::lastSeen(std::uint32_t netId) const
     return std::nullopt;
 }
 
-void Session::playSpawnEffects(const protocol::Snapshot &snapshot)
-{
-    std::unordered_set<std::uint32_t> oldEntities;
-    for (const auto &entity : _entities)
-        oldEntities.insert(entity.netId);
-
-    int newBlasterMissiles = 0;
-    int newLaserMissiles = 0;
-
-    for (const auto &entity : snapshot.entities) {
-        if (!oldEntities.contains(entity.netId) && entity.type == protocol::EntityType::PlayerMissile) {
-            if (entity.variant == 1)
-                newLaserMissiles++;
-            else
-                newBlasterMissiles++;
-        }
-    }
-
-    if (newLaserMissiles > 0) {
-        // Laser fires slower (0.45s) with a deeper, heavy sound
-        _resources.playSound("shoot", 95.f, 0.72f);
-        _currentWeapon = "LASER";
-    } else if (newBlasterMissiles > 0) {
-        if (newBlasterMissiles >= 3) {
-            _resources.playSound("shoot", 85.f, 1.15f);
-            _currentWeapon = "SPREAD";
-        } else {
-            _resources.playSound("shoot", 80.f, 1.0f);
-        }
-    }
-}
-
-void Session::onDestroyed(const EntityState &entity, const protocol::Snapshot &snapshot,
-                          const std::vector<sf::Vector2f> &ships)
 // The server tells why each entity disappeared: only a destroyed one explodes.
 void Session::onDestroyed(const protocol::EntityDestroyed &event)
 {
@@ -269,13 +242,13 @@ void Session::onDestroyed(const protocol::EntityDestroyed &event)
         addExplosion(*entity, 0.2f);
         break;
     case EntityType::Bonus:
-        if (entity.x > 30.f && entity.x < WorldWidth - 30.f) {
+        if (event.reason == protocol::DestroyReason::Collected || event.reason == protocol::DestroyReason::Killed) {
             _resources.playSound("hit", 90.f, 1.5f);
-            if (entity.variant == 0) {
+            if (entity->variant == 0) {
                 _currentWeapon = "SPREAD";
                 _weaponBannerText = "+ SPREAD SHOT (3-WAY) !";
                 _weaponBannerTimer = 2.0f;
-            } else if (entity.variant == 1) {
+            } else if (entity->variant == 1) {
                 _currentWeapon = "LASER";
                 _weaponBannerText = "+ LASER BEAM (3x DAMAGE) !";
                 _weaponBannerTimer = 2.0f;

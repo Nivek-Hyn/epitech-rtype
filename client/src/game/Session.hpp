@@ -57,13 +57,6 @@ private:
     void handle(const protocol::Message &message, bool &gotSnapshot);
     void onSnapshot(const protocol::Snapshot &snapshot);
     void updateGameState(const protocol::Snapshot &snapshot);
-    void updateWaveCounter(const protocol::Snapshot &snapshot);
-    void playDestroyEffects(const protocol::Snapshot &snapshot);
-    void playSpawnEffects(const protocol::Snapshot &snapshot);
-    void onDestroyed(const protocol::EntityState &entity, const protocol::Snapshot &snapshot,
-                     const std::vector<sf::Vector2f> &ships);
-    void onShipHit(const protocol::EntityState &shot, const std::vector<sf::Vector2f> &ships);
-    void onEnemyHit(const protocol::EntityState &missile, const protocol::Snapshot &snapshot);
     std::optional<protocol::EntityState> lastSeen(std::uint32_t netId) const;
     void onDestroyed(const protocol::EntityDestroyed &event);
     void onPlayerLeft(const protocol::PlayerLeft &event);
