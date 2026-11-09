@@ -1,6 +1,6 @@
 {
   "stage": 99,
-  "level_name": "Test Boss Multi-Attaques",
+  "level_name": "Test: boss with several attacks",
   "waves": [
     {
       "wave_id": 1,

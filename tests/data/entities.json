@@ -1,33 +1,49 @@
 {
-  "obstacles": {
-    "test_tile": { "variant": 1, "health": 2, "speed": 120.0 },
-    "test_shield": { "variant": 0, "health": 1, "speed": 120.0 }
-  },
-  "enemies": {
+  "prefabs": {
     "test_shooter": {
-      "health": 100,
-      "speed": 1.0,
-      "pattern": "straight",
-      "attack": { "fire_rate": 0.5, "bullet_speed": 300.0, "bullet_pattern": "straight" }
+      "Kind": {"type": "enemy", "variant": 0},
+      "Hitbox": {"width": 66, "height": 72},
+      "Health": {"hp": 100},
+      "Velocity": {"x": -1.0},
+      "MovementPattern": {"type": "straight"},
+      "EnemyAttack": [{"fire_rate": 0.5, "bullet_speed": 300.0, "bullet_pattern": "straight"}],
+      "EnemyTraits": {"score": 100}
     },
     "test_grunt": {
-      "health": 1,
-      "speed": 120.0,
-      "pattern": "straight"
+      "Kind": {"type": "enemy", "variant": 0},
+      "Hitbox": {"width": 66, "height": 72},
+      "Health": {"hp": 1},
+      "Velocity": {"x": -120.0},
+      "MovementPattern": {"type": "straight"},
+      "EnemyTraits": {"score": 100}
     },
     "test_sprite": {
-      "variant": 3,
-      "health": 1,
-      "speed": 120.0,
-      "pattern": "straight"
+      "Kind": {"type": "enemy", "variant": 3},
+      "Hitbox": {"width": 56, "height": 46},
+      "Health": {"hp": 1},
+      "Velocity": {"x": -120.0},
+      "MovementPattern": {"type": "straight"},
+      "EnemyTraits": {"score": 100}
     },
     "test_boss": {
-      "health": 2,
-      "speed": 400.0,
-      "pattern": "straight",
-      "is_boss": true,
-      "hold_x": 300.0,
-      "score": 1000
+      "Kind": {"type": "enemy", "variant": 0},
+      "Hitbox": {"width": 66, "height": 72},
+      "Health": {"hp": 2},
+      "Velocity": {"x": -400.0},
+      "MovementPattern": {"type": "straight", "hold_x": 300.0},
+      "EnemyTraits": {"score": 1000, "is_boss": true}
+    },
+    "test_tile": {
+      "Kind": {"type": "obstacle", "variant": 1},
+      "Hitbox": {"width": 72, "height": 72},
+      "Health": {"hp": 2},
+      "Velocity": {"x": -120.0}
+    },
+    "test_shield": {
+      "Kind": {"type": "obstacle", "variant": 0},
+      "Hitbox": {"width": 72, "height": 72},
+      "Health": {"hp": 1},
+      "Velocity": {"x": -120.0}
     }
   }
 }

@@ -1,10 +1,10 @@
 #include "GameConfig.hpp"
 
-#include <nlohmann/json.hpp>
 #include <algorithm>
 #include <cctype>
 #include <fstream>
 #include <iostream>
+#include <nlohmann/json.hpp>
 #include <vector>
 
 namespace rtype::client::ui {
@@ -12,32 +12,51 @@ namespace rtype::client::ui {
 std::string GameConfig::keyToString(sf::Keyboard::Key key)
 {
     if (key >= sf::Keyboard::Key::A && key <= sf::Keyboard::Key::Z) {
-        return std::string(1, static_cast<char>('A' + (static_cast<int>(key) - static_cast<int>(sf::Keyboard::Key::A))));
+        return std::string(1,
+                           static_cast<char>('A' + (static_cast<int>(key) - static_cast<int>(sf::Keyboard::Key::A))));
     }
     if (key >= sf::Keyboard::Key::Num0 && key <= sf::Keyboard::Key::Num9) {
-        return std::string(1, static_cast<char>('0' + (static_cast<int>(key) - static_cast<int>(sf::Keyboard::Key::Num0))));
+        return std::string(
+            1, static_cast<char>('0' + (static_cast<int>(key) - static_cast<int>(sf::Keyboard::Key::Num0))));
     }
     if (key >= sf::Keyboard::Key::Numpad0 && key <= sf::Keyboard::Key::Numpad9) {
-        return "Num" + std::string(1, static_cast<char>('0' + (static_cast<int>(key) - static_cast<int>(sf::Keyboard::Key::Numpad0))));
+        return "Num" + std::string(1, static_cast<char>('0' + (static_cast<int>(key) -
+                                                               static_cast<int>(sf::Keyboard::Key::Numpad0))));
     }
 
     switch (key) {
-        case sf::Keyboard::Key::Up: return "Up";
-        case sf::Keyboard::Key::Down: return "Down";
-        case sf::Keyboard::Key::Left: return "Left";
-        case sf::Keyboard::Key::Right: return "Right";
-        case sf::Keyboard::Key::Space: return "Space";
-        case sf::Keyboard::Key::Enter: return "Enter";
-        case sf::Keyboard::Key::Escape: return "Escape";
-        case sf::Keyboard::Key::Tab: return "Tab";
-        case sf::Keyboard::Key::Backspace: return "Backspace";
-        case sf::Keyboard::Key::LShift: return "LShift";
-        case sf::Keyboard::Key::RShift: return "RShift";
-        case sf::Keyboard::Key::LControl: return "LCtrl";
-        case sf::Keyboard::Key::RControl: return "RCtrl";
-        case sf::Keyboard::Key::LAlt: return "LAlt";
-        case sf::Keyboard::Key::RAlt: return "RAlt";
-        default: return "Unknown";
+    case sf::Keyboard::Key::Up:
+        return "Up";
+    case sf::Keyboard::Key::Down:
+        return "Down";
+    case sf::Keyboard::Key::Left:
+        return "Left";
+    case sf::Keyboard::Key::Right:
+        return "Right";
+    case sf::Keyboard::Key::Space:
+        return "Space";
+    case sf::Keyboard::Key::Enter:
+        return "Enter";
+    case sf::Keyboard::Key::Escape:
+        return "Escape";
+    case sf::Keyboard::Key::Tab:
+        return "Tab";
+    case sf::Keyboard::Key::Backspace:
+        return "Backspace";
+    case sf::Keyboard::Key::LShift:
+        return "LShift";
+    case sf::Keyboard::Key::RShift:
+        return "RShift";
+    case sf::Keyboard::Key::LControl:
+        return "LCtrl";
+    case sf::Keyboard::Key::RControl:
+        return "RCtrl";
+    case sf::Keyboard::Key::LAlt:
+        return "LAlt";
+    case sf::Keyboard::Key::RAlt:
+        return "RAlt";
+    default:
+        return "Unknown";
     }
 }
 
@@ -62,21 +81,36 @@ sf::Keyboard::Key GameConfig::stringToKey(const std::string &str, sf::Keyboard::
         }
     }
 
-    if (upper == "UP" || upper == "ARROWUP") return sf::Keyboard::Key::Up;
-    if (upper == "DOWN" || upper == "ARROWDOWN") return sf::Keyboard::Key::Down;
-    if (upper == "LEFT" || upper == "ARROWLEFT") return sf::Keyboard::Key::Left;
-    if (upper == "RIGHT" || upper == "ARROWRIGHT") return sf::Keyboard::Key::Right;
-    if (upper == "SPACE" || upper == "SPACEBAR") return sf::Keyboard::Key::Space;
-    if (upper == "ENTER" || upper == "RETURN") return sf::Keyboard::Key::Enter;
-    if (upper == "ESCAPE" || upper == "ESC") return sf::Keyboard::Key::Escape;
-    if (upper == "TAB") return sf::Keyboard::Key::Tab;
-    if (upper == "BACKSPACE") return sf::Keyboard::Key::Backspace;
-    if (upper == "LSHIFT" || upper == "SHIFT") return sf::Keyboard::Key::LShift;
-    if (upper == "RSHIFT") return sf::Keyboard::Key::RShift;
-    if (upper == "LCTRL" || upper == "LCONTROL" || upper == "CTRL") return sf::Keyboard::Key::LControl;
-    if (upper == "RCTRL" || upper == "RCONTROL") return sf::Keyboard::Key::RControl;
-    if (upper == "LALT" || upper == "ALT") return sf::Keyboard::Key::LAlt;
-    if (upper == "RALT") return sf::Keyboard::Key::RAlt;
+    if (upper == "UP" || upper == "ARROWUP")
+        return sf::Keyboard::Key::Up;
+    if (upper == "DOWN" || upper == "ARROWDOWN")
+        return sf::Keyboard::Key::Down;
+    if (upper == "LEFT" || upper == "ARROWLEFT")
+        return sf::Keyboard::Key::Left;
+    if (upper == "RIGHT" || upper == "ARROWRIGHT")
+        return sf::Keyboard::Key::Right;
+    if (upper == "SPACE" || upper == "SPACEBAR")
+        return sf::Keyboard::Key::Space;
+    if (upper == "ENTER" || upper == "RETURN")
+        return sf::Keyboard::Key::Enter;
+    if (upper == "ESCAPE" || upper == "ESC")
+        return sf::Keyboard::Key::Escape;
+    if (upper == "TAB")
+        return sf::Keyboard::Key::Tab;
+    if (upper == "BACKSPACE")
+        return sf::Keyboard::Key::Backspace;
+    if (upper == "LSHIFT" || upper == "SHIFT")
+        return sf::Keyboard::Key::LShift;
+    if (upper == "RSHIFT")
+        return sf::Keyboard::Key::RShift;
+    if (upper == "LCTRL" || upper == "LCONTROL" || upper == "CTRL")
+        return sf::Keyboard::Key::LControl;
+    if (upper == "RCTRL" || upper == "RCONTROL")
+        return sf::Keyboard::Key::RControl;
+    if (upper == "LALT" || upper == "ALT")
+        return sf::Keyboard::Key::LAlt;
+    if (upper == "RALT")
+        return sf::Keyboard::Key::RAlt;
 
     if (upper.rfind("NUM", 0) == 0 && upper.size() == 4 && std::isdigit(upper[3])) {
         int idx = upper[3] - '0';
@@ -114,11 +148,16 @@ std::string GameConfig::getConflictAction(sf::Keyboard::Key key, const std::stri
     if (key == sf::Keyboard::Key::Unknown) {
         return "";
     }
-    if (excludeAction != "Up" && keyUp == key) return "Up";
-    if (excludeAction != "Down" && keyDown == key) return "Down";
-    if (excludeAction != "Left" && keyLeft == key) return "Left";
-    if (excludeAction != "Right" && keyRight == key) return "Right";
-    if (excludeAction != "Shoot" && keyShoot == key) return "Shoot";
+    if (excludeAction != "Up" && keyUp == key)
+        return "Up";
+    if (excludeAction != "Down" && keyDown == key)
+        return "Down";
+    if (excludeAction != "Left" && keyLeft == key)
+        return "Left";
+    if (excludeAction != "Right" && keyRight == key)
+        return "Right";
+    if (excludeAction != "Shoot" && keyShoot == key)
+        return "Shoot";
     return "";
 }
 
@@ -146,6 +185,9 @@ GameConfig GameConfig::loadFromFile(const std::string &path)
             config.musicVolume = std::clamp(j["musicVolume"].get<float>(), 0.f, 100.f);
         }
 
+        config.autoFire = j.value("auto_fire", false);
+        config.highContrast = j.value("high_contrast", false);
+        config.campaignUnlocked = std::max(0, j.value("campaign_unlocked", 0));
         if (j.contains("join_ip") && j["join_ip"].is_string()) {
             config.joinIp = j["join_ip"].get<std::string>();
         }
@@ -172,7 +214,8 @@ GameConfig GameConfig::loadFromFile(const std::string &path)
             config.keyShoot = stringToKey(j["key_shoot"].get<std::string>(), sf::Keyboard::Key::Unknown);
         }
 
-        std::vector<sf::Keyboard::Key> keys = {config.keyUp, config.keyDown, config.keyLeft, config.keyRight, config.keyShoot};
+        std::vector<sf::Keyboard::Key> keys = {config.keyUp, config.keyDown, config.keyLeft, config.keyRight,
+                                               config.keyShoot};
         bool hasInvalidOrDuplicate = false;
         for (std::size_t i = 0; i < keys.size(); ++i) {
             if (keys[i] == sf::Keyboard::Key::Unknown) {
@@ -188,7 +231,8 @@ GameConfig GameConfig::loadFromFile(const std::string &path)
         }
 
         if (hasInvalidOrDuplicate) {
-            std::cerr << "[Config] Warning: Keybinding conflict or invalid key detected in " << path << ". Resetting controls to defaults.\n";
+            std::cerr << "[Config] Warning: Keybinding conflict or invalid key detected in " << path
+                      << ". Resetting controls to defaults.\n";
             config.resetToDefaults();
         }
 
@@ -206,6 +250,9 @@ bool GameConfig::saveToFile(const std::string &path) const
         nlohmann::json j;
         j["sfx_volume"] = sfxVolume;
         j["music_volume"] = musicVolume;
+        j["auto_fire"] = autoFire;
+        j["high_contrast"] = highContrast;
+        j["campaign_unlocked"] = campaignUnlocked;
         j["host_port"] = hostPort;
         j["join_ip"] = joinIp;
         j["join_port"] = joinPort;
@@ -228,4 +275,4 @@ bool GameConfig::saveToFile(const std::string &path) const
     }
 }
 
-}
+} // namespace rtype::client::ui

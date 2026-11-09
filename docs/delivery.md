@@ -4,29 +4,43 @@ Use this page to coordinate the remaining work and prepare a repeatable demonstr
 acceptance criteria, not new features or deadlines. Follow the owner shown in each GitHub issue;
 this page does not reassign another member's work.
 
-## Local work ready for review
+## What is delivered
 
-| Area | Evidence available | What prevents calling the whole delivery complete |
-|---|---|---|
-| Standalone engine, #102 | Independent build, module selection, installation and separate consumer tested on Linux/Windows | Review and integrate the selected branches; the playable second game is a separate task. |
-| Quality checks, #8 and #12 | Pinned format/tidy configuration, local runner, successful Linux checks | Windows Asio diagnostics remain unresolved; do not suppress them to report success. |
-| Installation/archives, #15 | Runtime installation, notices, Linux archives and Windows Release ZIP inspected and exercised | Windows server Ctrl+C and a second Windows runtime environment remain unverified. Main notices are not a complete license audit. |
-| README and documentation, #58 and #64 | Setup instructions, module/API guides, generated site and validation record | Each domain must update its page when its branch changes the implementation. |
-| Extension guide, #63 | Compilable custom component/system example and current JSON/wave recipe | Another member must follow the guides; update the recipe when new gameplay fields become active. |
-| Technical study, #115 | Engine alternatives, costs, storage/security limits and accessibility status | Include actual network measurements and final configurable gameplay results when those tasks land. |
+| Area | Where to see it |
+|---|---|
+| Standalone engine: ECS, prefabs, fixed timestep, event bus, AABB, network building blocks | [Engine](engine.md); `cmake -P engine/cmake/CheckPackage.cmake` |
+| Second game made with the engine only | `./brickrush` ([engine page](engine.md#a-second-game-brick-rush)) |
+| Data-driven content: prefabs, levels, weapons, rules | `assets/config/*.json`, `assets/levels/*.json` ([how-to guides](how-to.md)) |
+| Campaign of 9 levels in 3 worlds, infinite mode, difficulties, bosses, tiles, weapons and bonuses | [Campaign game design](GameDesign/game-design-campaign.md) |
+| Waiting room, then playing, victory or game over, decided by the server | `lobby_delay` in `game_rules.json`; snapshot `state` ([protocol](protocol.md)) |
+| Level editor in the game, with the real sprites and a Test button | Menu: CREATE A LEVEL ([how-to](how-to.md#edit-a-level-with-the-level-editor)) |
+| Reliable UDP protocol: acknowledgements, duplicates, split snapshots, quantization, 30 Hz with interpolation, rate limits | [Protocol](protocol.md), [networking](networking.md), [network guide](network-guide.md) |
+| Accessibility: remappable keys, auto fire, high contrast, letters and tags besides colors | Settings screen, F1/F2 in game ([accessibility](accessibility.md)) |
 
 All new work must be reviewed at a named revision. A successful test of a private branch is not evidence
 that its changes are present in `main`. Do not close an issue merely because its documentation exists.
 
-## Group decisions still needed
+## Demonstration scenarios
 
-- Confirm who delivers and explains the second playable game (#103), including the discussion with Katia.
-  A console consumer proves package use but is not that playable demonstration.
-- Agree the data needed for health, HUD, game states and levels across gameplay, networking and client (#101, #23).
-  Start with the [existing shared data](shared-data.md), not assumed future fields.
-- Finish and demonstrate snapshot completion/reassembly, sequencing and measured network improvements with their owners.
-- Integrate the gameplay content and client/accessibility work before claiming campaign, boss, menus, remapping or sound.
-- Keep optional ideas separate from the tracked delivery scope. A new idea is not automatically a new requirement.
+Run every command from the repository root (or the installed game directory) after a Release build.
+
+1. **The engine is reusable.** Start `./brickrush`: a brick breaker built from the same Registry, prefabs,
+   movement system, AABB and event bus, without `common/`. Show `games/brickrush/assets/bricks.json`: its entities
+   are described by components, like R-Type's.
+2. **The campaign.** `./r-type_client`, CAMPAIGN: the map shows the three worlds, the locked levels and the
+   difficulty. Play a level: the background and the HUD show its world; reaching a level unlocks it on the map.
+3. **Four players and the waiting room.** `./r-type_server 4242 --stats`, then up to four
+   `./r-type_client <host> 4242` on Linux and Windows. Each player presses Space when ready; a fifth client is
+   refused ("the server is full"). When a player leaves, the others see "P2 LEFT THE GAME".
+4. **Content without recompiling.** Change the `Health` or `Velocity` of a prefab in `assets/config/entities.json`,
+   or place enemies in the level editor (CREATE A LEVEL) and press TEST to play the level at once.
+5. **A bad network.** `python3 scripts/netsim.py --listen 5000 --server 127.0.0.1:4242 --loss 10 --delay 80 --jitter 30 --dup 2`,
+   connect a client to port 5000 and press F3: the game stays smooth, losses and resent packets are counted.
+6. **The protocol by hand.** Decode the two datagrams of [protocol §7](protocol.md#7-example-datagrams): header,
+   big-endian fields, quantized positions. Explain why UDP, why the server keeps the authority, and how losses,
+   duplicates and split snapshots are handled.
+7. **Accessibility.** In Settings, remap a key and enable auto fire and high contrast; in game, F1 and F2 toggle
+   them. Restart the client: the settings are kept.
 
 ## Before the demonstration
 
@@ -52,7 +66,7 @@ These are remaining acceptance actions; unchecked items are not implied failures
 - [ ] Exercise packet loss, latency, duplication and reordering with the network owner's procedure; record measurements.
 - [ ] Verify each delivered accessibility setting and saved preference using its issue's acceptance test.
 - [ ] Close clients normally and use Ctrl+C in each server console; record exit status rather than closing the terminal.
-- [ ] Check the second playable game's startup, controls, restart and actual engine reuse.
+- [ ] Check Brick Rush: startup, controls, restart and actual engine reuse.
 - [ ] Have another domain member follow the engine and content guides from the documented prerequisites.
 - [ ] Make sure every member can explain the common protocol and the main architectural decisions.
 

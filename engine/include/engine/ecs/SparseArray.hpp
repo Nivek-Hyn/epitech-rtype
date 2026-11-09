@@ -33,44 +33,39 @@ public:
     /// @return The new component.
     template <typename... Args> C &emplace(Entity entity, Args &&...args)
     {
-        if (entity >= _data.size())
-            _data.resize(static_cast<std::size_t>(entity) + 1);
-        return _data[entity].emplace(std::forward<Args>(args)...);
+        const std::size_t slot = indexOf(entity);
+        if (slot >= _data.size())
+            _data.resize(slot + 1);
+        return _data[slot].emplace(std::forward<Args>(args)...);
     }
 
     /// @brief Empty the slot of @p entity. Other slots keep their index.
     void erase(Entity entity) override
     {
-        if (entity < _data.size())
-            _data[entity].reset();
+        if (indexOf(entity) < _data.size())
+            _data[indexOf(entity)].reset();
     }
 
     /// @brief True if @p entity has a component in this array.
-    bool has(Entity entity) const
-    {
-        if (entity < _data.size())
-            return _data[entity].has_value();
-        else
-            return false;
-    }
+    bool has(Entity entity) const { return indexOf(entity) < _data.size() && _data[indexOf(entity)].has_value(); }
 
     /// @brief Borrow the component of @p entity.
     ///
     /// @return A pointer to the component, or `nullptr` if @p entity has none. The array keeps ownership.
     C *get(Entity entity)
     {
-        if (entity >= _data.size() || !_data[entity].has_value())
+        const std::size_t slot = indexOf(entity);
+        if (slot >= _data.size() || !_data[slot].has_value())
             return nullptr;
-        else
-            return &(*_data[entity]);
+        return &(*_data[slot]);
     }
     /// @copydoc get(Entity)
     const C *get(Entity entity) const
     {
-        if (entity >= _data.size() || !_data[entity].has_value())
+        const std::size_t slot = indexOf(entity);
+        if (slot >= _data.size() || !_data[slot].has_value())
             return nullptr;
-        else
-            return &(*_data[entity]);
+        return &(*_data[slot]);
     }
 
     /// @brief Number of slots, including empty ones.

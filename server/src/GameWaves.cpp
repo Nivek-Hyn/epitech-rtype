@@ -1,26 +1,12 @@
 // Waves: making enemies and tiles appear, and detecting the game over.
 
 #include "Game.hpp"
-#include "common/Components.hpp"
+#include "GameComponents.hpp"
+#include <algorithm>
 #include <iostream>
 #include <random>
-#include <utility>
-#include <vector>
 
 namespace rtype::server {
-
-namespace {
-
-// Used when a level asks for a negative spawn_y.
-float randomSpawnY()
-{
-    static std::random_device device;
-    static std::mt19937 generator(device());
-    static std::uniform_real_distribution<float> distribution(50.0f, 650.0f);
-    return distribution(generator);
-}
-
-} // namespace
 
 void Game::updateWaves(float dt)
 {
@@ -28,9 +14,11 @@ void Game::updateWaves(float dt)
         return;
 
     if (!anyPlayerConnected()) {
-        // The level restarts for the next player: nothing may stay from the previous attempt.
+        // The level restarts in the waiting room: nothing may stay from the previous attempt.
         clearEnemies();
         resetWaves();
+        _state = protocol::GameState::Waiting;
+        _lobbyTimer = 0.f;
         return;
     }
     if (!anyPlayerStillInGame()) {
@@ -41,7 +29,7 @@ void Game::updateWaves(float dt)
 
     _levelTimer += dt;
     for (auto &wave : _currentLevel.waves) {
-        if (!wave.isSpawned && _levelTimer >= wave.delay_before_start)
+        if (!wave.isSpawned && _levelTimer >= wave.delay)
             spawnWave(wave);
     }
 }
@@ -49,73 +37,70 @@ void Game::updateWaves(float dt)
 void Game::spawnWave(WaveConfig &wave)
 {
     for (const auto &enemy : wave.enemies)
-        spawnEnemy(enemy);
+        spawnFromLevel(enemy);
     for (const auto &obstacle : wave.obstacles)
-        spawnObstacle(obstacle);
+        spawnFromLevel(obstacle);
     wave.isSpawned = true;
 }
 
-// The enemy type from entities.json, with what the level overrides. 0 keeps the value of the type.
-Game::EnemyDefinition Game::resolveEnemy(const EnemySpawnConfig &config)
+// The prefab named by the level appears on the right edge, with what the level overrides.
+// Wherever a level gives a negative spawn_y, and from the second loop of infinite mode, the height is random.
+void Game::spawnFromLevel(const EnemySpawnConfig &config)
 {
-    EnemyDefinition enemy;
-    const auto known = _entityDefinitions.find(config.type);
-    if (known != _entityDefinitions.end()) {
-        enemy = known->second;
-        if (config.health > 0)
-            enemy.health = config.health;
-    } else {
-        std::cerr << "Warning: unknown enemy type '" << config.type << "' in level '" << _currentLevel.level_name << "'\n";
-    }
-    if (config.speed > 0.f)
-        enemy.speed = config.speed;
-    if (config.amplitude > 0.f)
-        enemy.amplitude = config.amplitude;
-    if (config.frequency > 0.f)
-        enemy.frequency = config.frequency;
-    return enemy;
-}
-
-void Game::spawnEnemy(const EnemySpawnConfig &config)
-{
-    const EnemyDefinition definition = resolveEnemy(config);
-    const float speed = scaledSpeed(definition.speed);
-    const float spawnY = config.spawn_y < 0.f ? randomSpawnY() : config.spawn_y;
-
-    const engine::ecs::Entity enemy = spawnNetworked(protocol::EntityType::Enemy, definition.variant, WorldWidth, spawnY);
-    _registry.emplace<rtype::components::Velocity>(enemy, -speed, 0.f);
-    _registry.emplace<rtype::components::Health>(enemy, scaledHealth(definition.health));
-    _registry.emplace<rtype::components::MovementPattern>(
-        enemy, rtype::components::MovementPattern{definition.pattern, definition.amplitude, definition.frequency, speed,
-                                                  definition.holdX, 0.f, 0.f, false, 0.f});
-    _registry.emplace<rtype::components::EnemyTraits>(enemy, rtype::components::EnemyTraits{definition.score, definition.isBoss});
-    if (definition.hasAttack && !definition.attacks.empty())
-        giveAttacks(enemy, definition.attacks);
-}
-
-void Game::giveAttacks(engine::ecs::Entity enemy, const std::vector<AttackDefinition> &attacks)
-{
-    std::vector<rtype::components::AttackEntry> entries;
-    for (const auto &attack : attacks) {
-        entries.push_back(rtype::components::AttackEntry{0.f, scaledFireRate(attack.fireRate), scaledBulletSpeed(attack.bulletSpeed),
-                                                         attack.bulletVariant, attack.bulletPattern, attack.offsetY});
-    }
-    _registry.emplace<rtype::components::EnemyAttack>(enemy, rtype::components::EnemyAttack{std::move(entries)});
-}
-
-void Game::spawnObstacle(const EnemySpawnConfig &config)
-{
-    const auto definition = _obstacleDefinitions.find(config.type);
-    if (definition == _obstacleDefinitions.end()) {
-        std::cerr << "Warning: unknown obstacle type '" << config.type << "' in level '" << _currentLevel.level_name << "'\n";
+    const auto entity = spawnPrefab(config.type, WorldWidth, config.spawnY);
+    if (!entity) {
+        std::cerr << "Warning: unknown prefab '" << config.type << "' in level '" << _currentLevel.name << "'\n";
         return;
     }
-    const int health = config.health > 0 ? config.health : definition->second.health;
-    const float speed = config.speed > 0.f ? config.speed : definition->second.speed;
-    const engine::ecs::Entity obstacle =
-        spawnNetworked(protocol::EntityType::Obstacle, definition->second.variant, WorldWidth, config.spawn_y);
-    _registry.emplace<rtype::components::Velocity>(obstacle, -scaledSpeed(speed), 0.f);
-    _registry.emplace<rtype::components::Health>(obstacle, scaledHealth(health));
+    if (config.spawnY < 0.f || completedLoops() > 0.f)
+        placeAtRandomHeight(*entity);
+    applyLevelOverrides(*entity, config);
+    applyDifficulty(*entity);
+}
+
+// Anywhere on the right edge where the whole hit area stays on screen.
+void Game::placeAtRandomHeight(engine::ecs::Entity entity)
+{
+    const engine::physics::Aabb area = hitArea(entity);
+    auto *position = _registry.get<rtype::components::Position>(entity);
+    const float offset = area.top - position->y; // a boss hit area can start above its position
+    const float lowest = std::max(0.f, WorldHeight - area.height);
+    position->y = std::uniform_real_distribution<float>(0.f, lowest)(_random) - offset;
+}
+
+// A value of 0 in the level keeps the value of the prefab.
+void Game::applyLevelOverrides(engine::ecs::Entity entity, const EnemySpawnConfig &config)
+{
+    auto *health = _registry.get<rtype::components::Health>(entity);
+    if (health && config.health > 0)
+        health->hp = config.health;
+    auto *velocity = _registry.get<rtype::components::Velocity>(entity);
+    if (velocity && config.speed > 0.f)
+        velocity->x = -config.speed;
+    if (auto *pattern = _registry.get<rtype::components::MovementPattern>(entity)) {
+        if (config.amplitude > 0.f)
+            pattern->amplitude = config.amplitude;
+        if (config.frequency > 0.f)
+            pattern->frequency = config.frequency;
+    }
+}
+
+// Health, speeds and attacks scaled by the difficulty and the infinite mode loops.
+void Game::applyDifficulty(engine::ecs::Entity entity)
+{
+    if (auto *health = _registry.get<rtype::components::Health>(entity))
+        health->hp = scaledHealth(health->hp);
+    auto *velocity = _registry.get<rtype::components::Velocity>(entity);
+    if (velocity)
+        velocity->x = -scaledSpeed(-velocity->x);
+    if (auto *pattern = _registry.get<rtype::components::MovementPattern>(entity); pattern && velocity)
+        pattern->baseSpeed = -velocity->x;
+    if (auto *attack = _registry.get<rtype::components::EnemyAttack>(entity)) {
+        for (auto &entry : attack->attacks) {
+            entry.fireRate = scaledFireRate(entry.fireRate);
+            entry.bulletSpeed = scaledBulletSpeed(entry.bulletSpeed);
+        }
+    }
 }
 
 } // namespace rtype::server

@@ -23,18 +23,22 @@ flowchart BT
     server --> engine
     client --> common
     client --> engine
+    client -. "hosts a local game" .-> server
 ```
 
 *Text description: `engine` is at the bottom and depends on nothing but the standard library.
 `common` depends on `engine` (the protocol uses its serialization). `server` and `client` each depend directly on
-both `common` (the protocol they share) and `engine` (ECS, game loop), but never on each other.*
+both `common` (the protocol they share) and `engine` (ECS, game loop). The server never depends on the client. The
+client links the server library for one purpose: hosting a solo or local game (a "listen server"). It runs the same
+`ServerLoop` as `r-type_server` on its own thread and talks to it through UDP like any remote server, so the game
+logic still runs only on the server side.*
 
 | Module | Responsibility | Third-party libraries | CMake target |
 |---|---|---|---|
 | `engine/` | Generic game engine: knows nothing about R-Type | none | `rtype_engine` / `RTypeEngine::Engine` (interface target grouping enabled modules) |
 | `common/` | What the server and the client must agree on: protocol, components, constants | none | `rtype_common` (static library) |
 | `server/` | Authoritative game simulation and server networking | Asio | `rtype_server_lib` (game logic, tested) + `r-type_server` |
-| `client/` | Display, keyboard input and client networking; sound integration remains pending | SFML, Asio | `r-type_client` |
+| `client/` | Display, menus, sound, keyboard input and client networking; hosts a local server for solo games | SFML, Asio, server library | `r-type_client` |
 
 The engine is also a separate CMake project. ECS and Core are static libraries; Physics, Net and Systems
 are header-only targets. Systems depends on ECS, and Core provides the platform thread dependency.
@@ -86,8 +90,9 @@ flowchart LR
 *Text description: the engine offers six reusable building blocks. The protocol uses the engine's
 serialization. On the server, the main loop uses the fixed timestep clock, drives the game logic and talks to
 the network layer. The current game logic uses the ECS, movement system, AABB collisions and shared components.
-The event bus is available but is not wired into Game. Both network layers use the protocol and a thread-safe
-queue. The client renders entities directly from the latest snapshot rather than keeping a local ECS.*
+When a collision destroys an entity, Game publishes it on the event bus; the loss of a life, the network event and
+the bonus drop each react on their own. Both network layers use the protocol and a thread-safe queue. The client
+draws the entities of the latest snapshots, smoothed by interpolation.*
 
 | Subsystem | Main files | Status |
 |---|---|---|
@@ -102,12 +107,14 @@ queue. The client renders entities directly from the latest snapshot rather than
 | Game logic | `server/src/Game.hpp`, `server/src/Game.cpp` and `server/src/Game*.cpp` (one file per part of the game) | Player movement, shooting, enemy spawning, missile/enemy collisions, score and snapshots |
 | Server network | `server/src/net/INetworkServer.hpp`, `server/src/net/AsioNetworkServer.cpp` | Implemented; UDP handshake, inputs, snapshots, ping/pong and timeout handling |
 | Client network | `client/src/net/INetworkClient.hpp`, `client/src/net/AsioNetworkClient.cpp` | Implemented; UDP connection retry, input sending and server timeout detection |
-| Rendering | `client/src/main.cpp`, `client/src/ResourceManager.cpp` | Sprites for players, missiles and enemies; no starfield or audio integration yet |
+| Client application | `client/src/main.cpp`, `client/src/ui/` | Menu, settings saved in `config.json`, then a game session; Escape returns to the menu |
+| Game session | `client/src/game/Session.cpp`, `client/src/game/SessionHud.cpp` | Last snapshot, inputs sent, effects of destroyed entities (explosions, sounds, flash, shake), HUD and end screen |
+| Rendering | `client/src/render/EntityRenderer.cpp`, `client/src/ResourceManager.cpp` | One drawing function per entity type and variant; starfield, music and sound effects |
 
 ## 3. Client–server model
 
 The server is the only authority on the game. Clients send what the player presses; the server sends back
-the whole state of the game, 60 times per second.
+the whole state of the game, 30 times per second (the simulation runs at 60 steps per second).
 
 ```mermaid
 sequenceDiagram

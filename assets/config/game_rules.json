@@ -25,7 +25,10 @@
   "player": {
     "lives": 3,
     "respawn_delay": 2.0,
-    "invulnerability": 2.0
+    "invulnerability": 2.0,
+    "lobby_delay": 3600.0,
+    "max_lives": 5,
+    "restart_delay": 10.0
   },
   "infinite_mode": {
     "health_growth_per_loop": 0.2,

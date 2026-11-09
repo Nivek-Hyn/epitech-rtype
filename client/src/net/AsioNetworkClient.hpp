@@ -1,6 +1,11 @@
 #pragma once
 
+#include "common/Constants.hpp"
 #include "engine/core/ThreadSafeQueue.hpp"
+#include "engine/net/LossTracker.hpp"
+#include "engine/net/ReliableQueue.hpp"
+#include "engine/net/SequenceWindow.hpp"
+#include "engine/net/TrafficStats.hpp"
 #include "net/INetworkClient.hpp"
 
 #include <asio.hpp>
@@ -15,36 +20,79 @@ namespace rtype::client {
 
 class AsioNetworkClient final : public INetworkClient {
 public:
+    /// Timings of the connection; the defaults are the game's. Tests use shorter ones.
+    struct Options {
+        std::chrono::milliseconds connectRetryInterval = rtype::ConnectRetryInterval;
+        int maxConnectAttempts = rtype::MaxConnectAttempts;
+        std::chrono::milliseconds serverTimeout =
+            std::chrono::duration_cast<std::chrono::milliseconds>(rtype::ClientTimeout);
+        std::chrono::milliseconds pingInterval =
+            std::chrono::duration_cast<std::chrono::milliseconds>(rtype::PingInterval);
+        std::chrono::milliseconds closeTimeout{
+            500}; ///< How long disconnect() waits for the Disconnect to be acknowledged.
+    };
+
     AsioNetworkClient();
     ~AsioNetworkClient() override;
+
+    /// Must be called before connect().
+    void setOptions(const Options &options) { _options = options; }
 
     void connect(const std::string &host, std::uint16_t port) override;
     void disconnect() override;
     bool connected() const override;
+    ConnectionState state() const override;
     std::optional<protocol::Message> poll() override;
     void send(const protocol::Message &message) override;
+    void sendReliable(const protocol::Message &message) override;
+    NetworkStats stats() const override;
 
 private:
     using Udp = asio::ip::udp;
     using Clock = std::chrono::steady_clock;
 
+    void runIo();
     void receive();
+    void handlePacket(const protocol::Packet &packet, Clock::time_point now);
     void scheduleConnectRetry();
-    void scheduleTimeoutCheck();
-    void sendDatagram(protocol::Message message);
+    void scheduleHousekeeping();
+    void scheduleReliableTick();
+    void flushReliable();
+    void beginClose();
+    void finishClose();
+    void housekeep();
+    void sendDatagram(protocol::Message message, std::optional<std::uint32_t> reliableId = std::nullopt);
+    std::uint32_t nowMs() const;
 
     asio::io_context _io;
     Udp::socket _socket;
     Udp::endpoint _server;
     Udp::endpoint _sender;
     asio::steady_timer _connectTimer;
-    asio::steady_timer _timeoutTimer;
+    asio::steady_timer _housekeepingTimer;
+    asio::steady_timer _reliableTimer;
     std::array<std::uint8_t, protocol::MaxPacketSize> _receiveBuffer{};
     engine::core::ThreadSafeQueue<protocol::Message> _messages;
-    std::atomic<bool> _connected{false};
+    Options _options;
+    std::atomic<ConnectionState> _state{ConnectionState::Idle};
     std::atomic<bool> _running{false};
     std::atomic<std::uint32_t> _nextSequence{0};
     Clock::time_point _lastReceive{};
+    Clock::time_point _lastPing{};
+    int _connectAttempts = 0; // I/O thread only
+
+    engine::net::TrafficCounter _traffic;
+    engine::net::RateMeter _rateMeter;     // I/O thread only
+    engine::net::LossTracker _loss;        // I/O thread only
+    engine::net::SequenceWindow _incoming; // I/O thread only: spots duplicated and reordered server packets
+    engine::net::ReliableQueue<protocol::Message> _reliable; // I/O thread only: messages awaiting the server's Ack
+    engine::net::SequenceWindow _incomingReliable;           // I/O thread only: reliable numbers already received
+    bool _closing = false;                                   // I/O thread only: waiting for the Disconnect's Ack
+    Clock::time_point _closeDeadline{};
+    std::atomic<double> _sentRate{0.0};
+    std::atomic<double> _receivedRate{0.0};
+    std::atomic<double> _lossPercent{0.0};
+    std::atomic<double> _rttMs{-1.0}; // negative until the first Pong
     std::thread _thread;
 };
 

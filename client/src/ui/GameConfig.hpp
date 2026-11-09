@@ -14,6 +14,9 @@ struct GameConfig {
     std::string joinPort{"4242"};
     float sfxVolume{100.f};
     float musicVolume{100.f};
+    bool autoFire{false};     // shoot without holding the fire key (the server keeps its fire rate)
+    bool highContrast{false}; // plain background, outlined shots and HUD, softer flashes
+    int campaignUnlocked{0};  // last level playable on the campaign map, from 0
 
     sf::Keyboard::Key keyUp{sf::Keyboard::Key::Z};
     sf::Keyboard::Key keyDown{sf::Keyboard::Key::S};
@@ -22,7 +25,8 @@ struct GameConfig {
     sf::Keyboard::Key keyShoot{sf::Keyboard::Key::Space};
 
     static std::string keyToString(sf::Keyboard::Key key);
-    static sf::Keyboard::Key stringToKey(const std::string &str, sf::Keyboard::Key defaultKey = sf::Keyboard::Key::Unknown);
+    static sf::Keyboard::Key stringToKey(const std::string &str,
+                                         sf::Keyboard::Key defaultKey = sf::Keyboard::Key::Unknown);
 
     void applyAzerty();
     void applyQwerty();
@@ -33,4 +37,4 @@ struct GameConfig {
     bool saveToFile(const std::string &path = "config.json") const;
 };
 
-}
+} // namespace rtype::client::ui

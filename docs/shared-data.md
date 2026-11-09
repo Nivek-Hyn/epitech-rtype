@@ -26,6 +26,8 @@ local Entity can happen to have the same numeric value, but their meaning is dif
 | Velocity | `float x`, `float y` | World units per second | No; the server uses it for movement. |
 | NetworkId | `std::uint32_t id` | Network object identity | Yes, as `netId`. |
 | Kind | `EntityType type`, `std::uint8_t variant` | Broad object category and game-defined subtype | Yes. |
+| Hitbox | `float width`, `float height`, `float offsetY` | Area that can be hit, relative to Position | No. |
+| Health, MovementPattern, EnemyAttack, EnemyTraits, MissileDamage, BonusEffect, PlayerControl | see the [how-to guides](how-to.md#add-an-enemy-a-tile-or-a-bonus) | Gameplay data read from prefabs | No. |
 
 The origin is top-left: x grows rightwards and y downwards. The world is 1920×1080 units; the client scales
 it to its window. A simulation update receives seconds, so movement adds velocity multiplied by that duration.
@@ -33,9 +35,8 @@ Window pixels and world units are not interchangeable without that view conversi
 
 Shared components belong in `common/`; game-independent operations remain in `engine/`. Data used only by
 server gameplay belongs in `server/`, while textures, UI and SFML objects belong in `client/`.
-Health, configurable hitbox and control-state structs are not already supplied by Components.hpp.
-The current missile/enemy and player/enemy collision code builds AABBs from positions and fixed
-dimensions in GameCollisions.cpp and Components.hpp. A player killed by a collision loses its local player/entity association before
+Every component above can appear in a prefab of `assets/config/entities.json`. Collisions build AABBs from
+the Position and Hitbox of each entity (GameCollisions.cpp). A player killed by a collision loses its local player/entity association before
 the id is recycled; a dead player's inputs are ignored.
 
 ## Input and state flow

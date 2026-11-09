@@ -1,7 +1,7 @@
 // Players: connection, controls, lives and respawn.
 
 #include "Game.hpp"
-#include "common/Components.hpp"
+#include "GameComponents.hpp"
 #include <algorithm>
 
 namespace rtype::server {
@@ -10,9 +10,6 @@ namespace {
 
 constexpr float PlayerSpawnX = 100.f;
 constexpr float PlayerSpawnY = 300.f;
-constexpr float PlayerSpeed = 200.f;
-constexpr float PlayerShootCooldown = 0.25f;
-constexpr float PlayerMissileSpeed = 400.f;
 constexpr float PlayerMissileOffsetX = 30.f;
 
 } // namespace
@@ -22,12 +19,14 @@ void Game::onPlayerJoined(PlayerId player)
     if (player >= MaxPlayers || _connected[player])
         return;
     _connected[player] = true;
+    _playerReady[player] = false;
     _lives[player] = _rules.playerLives;
     _respawnTimers[player] = 0.f;
     _invulnerableTimers[player] = 0.f;
-    if (_state != protocol::GameState::Playing)
-        return; // the game has ended: no ship until it restarts
-    spawnPlayerShip(player);
+    if (_state == protocol::GameState::GameOver || _state == protocol::GameState::Finished)
+        return;              // the game has ended: no ship until it restarts
+    spawnPlayerShip(player); // in the waiting room too, so the player can try the controls
+    startIfLobbyOver();
 }
 
 void Game::onPlayerLeft(PlayerId player)
@@ -35,6 +34,7 @@ void Game::onPlayerLeft(PlayerId player)
     if (player >= MaxPlayers)
         return;
     _connected[player] = false;
+    _playerReady[player] = false;
     _lives[player] = 0;
     // A finished game restarts from the beginning for the next players.
     if (!anyPlayerConnected() && _state != protocol::GameState::Playing)
@@ -46,6 +46,12 @@ void Game::onInput(PlayerId player, std::uint8_t flags)
 {
     if (player >= MaxPlayers || _players[player] == engine::ecs::NullEntity)
         return;
+    if (_state == protocol::GameState::Waiting) {
+        if (flags & protocol::InputFlag::Ready) {
+            _playerReady[player] = true;
+            startIfLobbyOver();
+        }
+    }
     applyMovementInput(player, flags);
     if (flags & protocol::InputFlag::Shoot)
         shootIfReady(player);
@@ -53,16 +59,18 @@ void Game::onInput(PlayerId player, std::uint8_t flags)
 
 void Game::applyMovementInput(std::size_t player, std::uint8_t flags)
 {
+    const auto *control = _registry.get<rtype::components::PlayerControl>(_players[player]);
+    const float speed = control ? control->speed : rtype::components::PlayerControl{}.speed;
     float vx = 0.0f;
     float vy = 0.0f;
     if (flags & protocol::InputFlag::Up)
-        vy -= PlayerSpeed;
+        vy -= speed;
     if (flags & protocol::InputFlag::Down)
-        vy += PlayerSpeed;
+        vy += speed;
     if (flags & protocol::InputFlag::Left)
-        vx -= PlayerSpeed;
+        vx -= speed;
     if (flags & protocol::InputFlag::Right)
-        vx += PlayerSpeed;
+        vx += speed;
     _registry.emplace<rtype::components::Velocity>(_players[player], vx, vy);
 }
 
@@ -73,16 +81,15 @@ void Game::shootIfReady(std::size_t player)
     const auto *position = _registry.get<rtype::components::Position>(_players[player]);
     if (!position)
         return;
-    const engine::ecs::Entity missile =
-        spawnNetworked(protocol::EntityType::PlayerMissile, 0, position->x + PlayerMissileOffsetX, position->y);
-    _registry.emplace<rtype::components::Velocity>(missile, PlayerMissileSpeed, 0.0f);
-    _shootCooldowns[player] = PlayerShootCooldown;
+    fire(player, position->x + PlayerMissileOffsetX, position->y);
 }
 
 void Game::spawnPlayerShip(std::size_t player)
 {
-    _players[player] =
-        spawnNetworked(protocol::EntityType::Player, static_cast<std::uint8_t>(player), PlayerSpawnX, PlayerSpawnY);
+    const auto variant = static_cast<std::uint8_t>(player);
+    const auto ship = spawnPrefab("player_ship", PlayerSpawnX, PlayerSpawnY);
+    _players[player] = ship ? *ship : spawnNetworked(protocol::EntityType::Player, variant, PlayerSpawnX, PlayerSpawnY);
+    _registry.get<rtype::components::Kind>(_players[player])->variant = variant; // the player's color
 }
 
 void Game::removePlayerShip(std::size_t player)

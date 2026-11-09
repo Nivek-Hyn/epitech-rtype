@@ -1,12 +1,12 @@
 // The game itself: its creation, one step of the simulation, and what is sent to the clients.
 
 #include "Game.hpp"
-#include "GameConstants.hpp"
-#include "common/Components.hpp"
-#include "engine/systems/Movement.hpp"
-#include "MovementSystem.hpp"
 #include "EnemyShootSystem.hpp"
+#include "GameComponents.hpp"
+#include "MovementSystem.hpp"
+#include "engine/systems/Movement.hpp"
 #include <algorithm>
+#include <iostream>
 #include <utility>
 #include <vector>
 
@@ -16,18 +16,17 @@ namespace {
 
 using NetworkedEntity = std::pair<engine::ecs::Entity, std::uint32_t>;
 
-constexpr float EnemyWidth = 66.f;
-
-bool isOutOfScreen(const rtype::components::Kind &kind, const rtype::components::Position &position)
+bool isOutOfScreen(const rtype::components::Kind &kind, const rtype::components::Position &position, float width)
 {
     switch (kind.type) {
     case protocol::EntityType::PlayerMissile:
     case protocol::EntityType::EnemyMissile:
         return position.x > WorldWidth || position.x < 0.f || position.y > WorldHeight || position.y < 0.f;
     case protocol::EntityType::Enemy:
-        return position.x < -EnemyWidth || position.y > WorldHeight;
+        return position.x < -width || position.y > WorldHeight;
     case protocol::EntityType::Obstacle:
-        return position.x < -ObstacleSize;
+    case protocol::EntityType::Bonus:
+        return position.x < -width;
     default:
         return false;
     }
@@ -41,31 +40,55 @@ Game::Game()
     _registry.addSystem(engine::systems::movement<rtype::components::Position, rtype::components::Velocity>);
 
     applyDefaultRules();
+    registerGameComponents(_prefabs);
     loadEntitiesConfig("assets/config/entities.json");
     loadRules("assets/config/game_rules.json");
+    _arsenal = loadArsenal("assets/config/weapons.json");
+    _weapons.fill(_arsenal.defaultWeapon);
 
+    subscribeToEvents();
     _campaignLevels = _rules.campaignLevels;
     _currentLevelIndex = 0;
     if (!_campaignLevels.empty()) {
         try {
             loadCurrentLevel();
-        } catch (...) {
-            // Level file might not be found in some test environments
+        } catch (const std::exception &error) {
+            // Not fatal here: tests load their own levels. A server checks every level before starting.
+            std::cerr << "Warning: " << error.what() << '\n';
         }
     }
 }
 
+// The reactions to a destroyed entity, independent of each other and of the collision code.
+void Game::subscribeToEvents()
+{
+    _bus.subscribe<EntityKilled>([this](const EntityKilled &event) {
+        _events.push_back(protocol::EntityDestroyed{event.netId, protocol::DestroyReason::Killed}); // to the clients
+    });
+    _bus.subscribe<EntityKilled>([this](const EntityKilled &event) { loseLifeIfShip(event.entity); });
+    _bus.subscribe<EntityKilled>([this](const EntityKilled &event) {
+        if (event.type == protocol::EntityType::Enemy)
+            dropBonusAt(event.x, event.y);
+    });
+}
+
 void Game::update(float dt)
 {
+    updateLobby(dt);
+    restartAfterEnd(dt);
     updatePlayerLives(dt);
     updateWaves(dt);
     updateEnemyMovements(_registry, dt);
-    updateEnemyShooting(_registry, [this](protocol::EntityType type, std::uint8_t variant, float x, float y) {
-        return spawnNetworked(type, variant, x, y);
-    }, dt);
+    updateEnemyShooting(
+        _registry,
+        [this](protocol::EntityType type, std::uint8_t variant, float x, float y) {
+            return spawnShot(type, variant, x, y);
+        },
+        dt);
     _registry.update(dt);
     keepPlayersOnScreen();
     handleCollisions();
+    collectBonuses();
     updateShootCooldowns(dt);
     updateLevelProgression(dt);
     removeEntitiesOutOfScreen();
@@ -75,11 +98,12 @@ void Game::update(float dt)
 void Game::keepPlayersOnScreen()
 {
     _registry.each<rtype::components::Position, rtype::components::Kind>(
-        [](engine::ecs::Entity /*entity*/, rtype::components::Position &position, const rtype::components::Kind &kind) {
+        [this](engine::ecs::Entity entity, rtype::components::Position &position, const rtype::components::Kind &kind) {
             if (kind.type != protocol::EntityType::Player)
                 return;
-            position.x = std::clamp(position.x, 0.f, WorldWidth - PlayerWidth);
-            position.y = std::clamp(position.y, 0.f, WorldHeight - PlayerHeight);
+            const engine::physics::Aabb box = hitArea(entity);
+            position.x = std::clamp(position.x, 0.f, WorldWidth - box.width);
+            position.y = std::clamp(position.y, 0.f, WorldHeight - box.height);
         });
 }
 
@@ -93,9 +117,9 @@ void Game::removeEntitiesOutOfScreen()
 {
     std::vector<NetworkedEntity> outOfScreen;
     _registry.each<rtype::components::Position, rtype::components::Kind, rtype::components::NetworkId>(
-        [&outOfScreen](engine::ecs::Entity entity, const rtype::components::Position &position,
-                       const rtype::components::Kind &kind, const rtype::components::NetworkId &networkId) {
-            if (isOutOfScreen(kind, position))
+        [this, &outOfScreen](engine::ecs::Entity entity, const rtype::components::Position &position,
+                             const rtype::components::Kind &kind, const rtype::components::NetworkId &networkId) {
+            if (isOutOfScreen(kind, position, hitArea(entity).width))
                 outOfScreen.emplace_back(entity, networkId.id);
         });
     removeAsOutOfBounds(outOfScreen);
@@ -108,7 +132,7 @@ void Game::clearEnemies()
         [&toRemove](engine::ecs::Entity entity, const rtype::components::Kind &kind,
                     const rtype::components::NetworkId &networkId) {
             if (kind.type == protocol::EntityType::Enemy || kind.type == protocol::EntityType::EnemyMissile ||
-                kind.type == protocol::EntityType::Obstacle)
+                kind.type == protocol::EntityType::Obstacle || kind.type == protocol::EntityType::Bonus)
                 toRemove.emplace_back(entity, networkId.id);
         });
     removeAsOutOfBounds(toRemove);
@@ -132,12 +156,51 @@ engine::ecs::Entity Game::spawnNetworked(protocol::EntityType type, std::uint8_t
     return entity;
 }
 
+// The prefab, made visible to the clients at the given position. Nothing is created for an unknown name.
+std::optional<engine::ecs::Entity> Game::spawnPrefab(const std::string &name, float x, float y)
+{
+    if (!_prefabs.contains(name))
+        return std::nullopt;
+    const engine::ecs::Entity entity = _prefabs.spawn(_registry, name);
+    _registry.emplace<rtype::components::NetworkId>(entity, _nextNetId++);
+    _registry.emplace<rtype::components::Position>(entity, x, y);
+    if (!_registry.has<rtype::components::Kind>(entity))
+        _registry.emplace<rtype::components::Kind>(entity);
+    if (!_registry.has<rtype::components::Velocity>(entity))
+        _registry.emplace<rtype::components::Velocity>(entity);
+    return entity;
+}
+
+// A missile from the prefab of its type, with the sprite variant chosen by the shooter.
+engine::ecs::Entity Game::spawnShot(protocol::EntityType type, std::uint8_t variant, float x, float y)
+{
+    const char *prefab = type == protocol::EntityType::PlayerMissile ? "player_missile" : "enemy_missile";
+    const auto shot = spawnPrefab(prefab, x, y);
+    if (!shot)
+        return spawnNetworked(type, variant, x, y);
+    _registry.get<rtype::components::Kind>(*shot)->variant = variant;
+    return *shot;
+}
+
+// Where the entity can be hit this tick, from its Position and Hitbox. Empty without a Hitbox.
+engine::physics::Aabb Game::hitArea(engine::ecs::Entity entity)
+{
+    const auto *position = _registry.get<rtype::components::Position>(entity);
+    const auto *hitbox = _registry.get<rtype::components::Hitbox>(entity);
+    if (!position || !hitbox)
+        return {};
+    return {position->x, position->y + hitbox->offsetY, hitbox->width, hitbox->height};
+}
+
 protocol::Snapshot Game::snapshot()
 {
     protocol::Snapshot snap;
     snap.tick = _tick;
     snap.state = _state;
     snap.score = _score;
+    snap.level = static_cast<std::uint8_t>(std::min<std::size_t>(_currentLevelIndex, 255));
+    snap.wave = static_cast<std::uint8_t>(std::count_if(_currentLevel.waves.begin(), _currentLevel.waves.end(),
+                                                        [](const WaveConfig &wave) { return wave.isSpawned; }));
     for (std::size_t player = 0; player < _lives.size(); player++)
         snap.lives[player] = static_cast<std::uint8_t>(std::clamp(_lives[player], 0, 255));
 

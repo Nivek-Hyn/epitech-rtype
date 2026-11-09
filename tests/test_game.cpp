@@ -1,7 +1,7 @@
-#include "Game.hpp"
 #include "EnemyShootSystem.hpp"
+#include "Game.hpp"
+#include "GameComponents.hpp"
 #include "MovementSystem.hpp"
-#include "common/Components.hpp"
 
 #include <gtest/gtest.h>
 
@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <array>
 #include <fstream>
+#include <set>
 #include <string>
 
 using namespace rtype;
@@ -41,6 +42,7 @@ long countOf(Game &game, protocol::EntityType type)
 TEST(Game, PlayerJoinAppearsInSnapshot)
 {
     Game game;
+    game.rules().lobbyDelay = 0.f; // no waiting room in rule tests
     game.onPlayerJoined(0);
     const auto snap = game.snapshot();
     ASSERT_EQ(snap.entities.size(), 1u);
@@ -50,6 +52,7 @@ TEST(Game, PlayerJoinAppearsInSnapshot)
 TEST(Game, InputMovesPlayer)
 {
     Game game;
+    game.rules().lobbyDelay = 0.f; // no waiting room in rule tests
     game.onPlayerJoined(1);
     const auto before = game.snapshot();
     ASSERT_EQ(before.entities.size(), 1u);
@@ -63,6 +66,7 @@ TEST(Game, InputMovesPlayer)
 TEST(Game, PlayerLeftProducesDestroyEvent)
 {
     Game game;
+    game.rules().lobbyDelay = 0.f; // no waiting room in rule tests
     game.onPlayerJoined(2);
     game.onPlayerLeft(2);
     EXPECT_TRUE(game.snapshot().entities.empty());
@@ -74,6 +78,7 @@ TEST(Game, PlayerLeftProducesDestroyEvent)
 TEST(Game, RejoiningPlayerGetsANewNetworkIdentityAndFreshMovement)
 {
     Game game;
+    game.rules().lobbyDelay = 0.f; // no waiting room in rule tests
     game.onPlayerJoined(2);
     const auto initial = game.snapshot();
     ASSERT_EQ(initial.entities.size(), 1u);
@@ -104,6 +109,7 @@ TEST(Game, RejoiningPlayerGetsANewNetworkIdentityAndFreshMovement)
 TEST(Game, HoldingShootKeepsSnapshotsWithinDatagramLimit)
 {
     Game game;
+    game.rules().lobbyDelay = 0.f; // no waiting room in rule tests
     game.onPlayerJoined(0);
 
     for (int tick = 0; tick < 600; ++tick) {
@@ -117,6 +123,7 @@ TEST(Game, HoldingShootKeepsSnapshotsWithinDatagramLimit)
 TEST(Game, EnemiesAppearOnlyWhilePlayersAreConnected)
 {
     Game game;
+    game.rules().lobbyDelay = 0.f; // no waiting room in rule tests
     game.loadEntitiesConfig(TestEntities);
     game.loadLevel(OneGrunt);
     for (int tick = 0; tick < 240; tick++)
@@ -136,6 +143,7 @@ TEST(Game, EnemiesAppearOnlyWhilePlayersAreConnected)
 TEST(Game, DeadPlayerCannotControlAReusedEntity)
 {
     Game game;
+    game.rules().lobbyDelay = 0.f; // no waiting room in rule tests
     game.loadEntitiesConfig(TestEntities);
     game.loadLevel(OneGrunt);
     game.rules().intermissionDelay = 1000.f; // the game must still be running when the others join
@@ -167,6 +175,7 @@ TEST(Game, DeadPlayerCannotControlAReusedEntity)
 TEST(Game, PlayerMissileDestroysEnemyAndScores)
 {
     Game game;
+    game.rules().lobbyDelay = 0.f; // no waiting room in rule tests
     game.loadEntitiesConfig(TestEntities);
     game.loadLevel(OneGrunt);
     game.setGameMode(Game::GameMode::Infinite);
@@ -194,13 +203,16 @@ TEST(Game, EnemyZigzagShootingAppliesMovementPattern)
     registry.emplace<rtype::components::EnemyAttack>(enemy, 0.f, 0.5f, 300.f, 0, "zigzag");
 
     engine::ecs::Entity spawnedBullet = engine::ecs::NullEntity;
-    updateEnemyShooting(registry, [&](protocol::EntityType type, std::uint8_t variant, float x, float y) {
-        spawnedBullet = registry.spawn();
-        registry.emplace<rtype::components::Kind>(spawnedBullet, type, variant);
-        registry.emplace<rtype::components::Position>(spawnedBullet, x, y);
-        registry.emplace<rtype::components::Velocity>(spawnedBullet, 0.f, 0.f);
-        return spawnedBullet;
-    }, 0.6f);
+    updateEnemyShooting(
+        registry,
+        [&](protocol::EntityType type, std::uint8_t variant, float x, float y) {
+            spawnedBullet = registry.spawn();
+            registry.emplace<rtype::components::Kind>(spawnedBullet, type, variant);
+            registry.emplace<rtype::components::Position>(spawnedBullet, x, y);
+            registry.emplace<rtype::components::Velocity>(spawnedBullet, 0.f, 0.f);
+            return spawnedBullet;
+        },
+        0.6f);
 
     ASSERT_NE(spawnedBullet, engine::ecs::NullEntity);
     const auto *pattern = registry.get<rtype::components::MovementPattern>(spawnedBullet);
@@ -215,6 +227,7 @@ TEST(Game, EnemyZigzagShootingAppliesMovementPattern)
 TEST(Game, GameRulesLoadedCorrectlyForGameDesigner)
 {
     Game game;
+    game.rules().lobbyDelay = 0.f; // no waiting room in rule tests
     const auto &rules = game.rules();
     EXPECT_GE(rules.campaignLevels.size(), 3u);
     EXPECT_GT(rules.infinite.maxBulletSpeed, 0.f);
@@ -228,6 +241,7 @@ TEST(Game, GameRulesLoadedCorrectlyForGameDesigner)
 TEST(Game, DifficultySettingsChangeGameModeAndDifficulty)
 {
     Game game;
+    game.rules().lobbyDelay = 0.f; // no waiting room in rule tests
     EXPECT_EQ(game.gameMode(), Game::GameMode::Campaign);
     EXPECT_EQ(game.difficulty(), Game::Difficulty::Normal);
 
@@ -241,6 +255,7 @@ TEST(Game, DifficultySettingsChangeGameModeAndDifficulty)
 TEST(Game, CampaignProgressionAdvancesLevelsAndFinishes)
 {
     Game game;
+    game.rules().lobbyDelay = 0.f; // no waiting room in rule tests
     game.loadCampaign({"assets/levels/level1.json", "assets/levels/level2.json", "assets/levels/level3.json"});
     game.setGameMode(Game::GameMode::Campaign);
     game.loadEntitiesConfig(TestEntities);
@@ -285,6 +300,7 @@ TEST(Game, CampaignProgressionAdvancesLevelsAndFinishes)
 TEST(Game, InfiniteModeLoopsAndIncrementsLoopCount)
 {
     Game game;
+    game.rules().lobbyDelay = 0.f; // no waiting room in rule tests
     game.loadCampaign({"assets/levels/level1.json", "assets/levels/level2.json", "assets/levels/level3.json"});
     game.setGameMode(Game::GameMode::Infinite);
     game.loadEntitiesConfig(TestEntities);
@@ -325,21 +341,22 @@ TEST(Game, EnemyMultipleAttacksShootSimultaneously)
     registry.emplace<rtype::components::Position>(enemy, 500.f, 200.f);
     registry.emplace<rtype::components::Kind>(enemy, protocol::EntityType::Enemy, 0);
 
-    std::vector<rtype::components::AttackEntry> attacks = {
-        {0.f, 0.5f, 400.f, 1, "straight", 0.f},
-        {0.f, 0.5f, 250.f, 0, "zigzag", 30.f}
-    };
+    std::vector<rtype::components::AttackEntry> attacks = {{0.f, 0.5f, 400.f, 1, "straight", 0.f},
+                                                           {0.f, 0.5f, 250.f, 0, "zigzag", 30.f}};
     registry.emplace<rtype::components::EnemyAttack>(enemy, rtype::components::EnemyAttack{attacks});
 
     std::vector<engine::ecs::Entity> spawnedBullets;
-    updateEnemyShooting(registry, [&](protocol::EntityType type, std::uint8_t variant, float x, float y) {
-        auto bullet = registry.spawn();
-        registry.emplace<rtype::components::Kind>(bullet, type, variant);
-        registry.emplace<rtype::components::Position>(bullet, x, y);
-        registry.emplace<rtype::components::Velocity>(bullet, 0.f, 0.f);
-        spawnedBullets.push_back(bullet);
-        return bullet;
-    }, 0.6f);
+    updateEnemyShooting(
+        registry,
+        [&](protocol::EntityType type, std::uint8_t variant, float x, float y) {
+            auto bullet = registry.spawn();
+            registry.emplace<rtype::components::Kind>(bullet, type, variant);
+            registry.emplace<rtype::components::Position>(bullet, x, y);
+            registry.emplace<rtype::components::Velocity>(bullet, 0.f, 0.f);
+            spawnedBullets.push_back(bullet);
+            return bullet;
+        },
+        0.6f);
 
     ASSERT_EQ(spawnedBullets.size(), 2u);
 
@@ -367,6 +384,7 @@ TEST(Game, EnemyMultipleAttacksShootSimultaneously)
 TEST(Game, BossStopsAtItsPositionAndTheLevelWaitsForItsDeath)
 {
     Game game;
+    game.rules().lobbyDelay = 0.f; // no waiting room in rule tests
     game.loadEntitiesConfig(TestEntities);
     game.loadLevel(OneBoss);
     game.rules().intermissionDelay = 0.0f;
@@ -374,9 +392,8 @@ TEST(Game, BossStopsAtItsPositionAndTheLevelWaitsForItsDeath)
     run(game, 60.f);
 
     const auto snap = game.snapshot();
-    const auto boss = std::find_if(snap.entities.begin(), snap.entities.end(), [](const auto &entity) {
-        return entity.type == protocol::EntityType::Enemy;
-    });
+    const auto boss = std::find_if(snap.entities.begin(), snap.entities.end(),
+                                   [](const auto &entity) { return entity.type == protocol::EntityType::Enemy; });
     ASSERT_NE(boss, snap.entities.end());
     EXPECT_NEAR(boss->x, 300.f, 10.f);
     EXPECT_EQ(game.gameState(), protocol::GameState::Playing);
@@ -385,6 +402,7 @@ TEST(Game, BossStopsAtItsPositionAndTheLevelWaitsForItsDeath)
 TEST(Game, RammingKillsTheShipButNotTheBoss)
 {
     Game game;
+    game.rules().lobbyDelay = 0.f; // no waiting room in rule tests
     game.loadEntitiesConfig(TestEntities);
     game.loadLevel(OneBoss);
     game.onPlayerJoined(0);
@@ -399,9 +417,10 @@ TEST(Game, RammingKillsTheShipButNotTheBoss)
     EXPECT_EQ(countOf(game, protocol::EntityType::Enemy), 1);
 }
 
-TEST(Game, CampaignGivesNoScore)
+TEST(Game, CampaignGivesScore)
 {
     Game game;
+    game.rules().lobbyDelay = 0.f; // no waiting room in rule tests
     game.loadEntitiesConfig(TestEntities);
     game.loadLevel(OneGrunt);
     game.setGameMode(Game::GameMode::Campaign);
@@ -412,12 +431,13 @@ TEST(Game, CampaignGivesNoScore)
 
     EXPECT_EQ(countOf(game, protocol::EntityType::Enemy), 0); // it was shot down...
     EXPECT_EQ(countOf(game, protocol::EntityType::Player), 1);
-    EXPECT_EQ(game.snapshot().score, 0u); // ...without any points
+    EXPECT_EQ(game.snapshot().score, 100u);
 }
 
 TEST(Game, ScoreOfAnEnemyComesFromItsDefinition)
 {
     Game game;
+    game.rules().lobbyDelay = 0.f; // no waiting room in rule tests
     game.loadEntitiesConfig(TestEntities);
     game.loadLevel(OneBoss);
     game.setGameMode(Game::GameMode::Infinite);
@@ -434,6 +454,7 @@ TEST(Game, ScoreOfAnEnemyComesFromItsDefinition)
 TEST(Game, LevelRestartsCleanlyWhenNoPlayerIsLeft)
 {
     Game game;
+    game.rules().lobbyDelay = 0.f; // no waiting room in rule tests
     game.loadEntitiesConfig(TestEntities);
     game.loadLevel(OneBoss);
     game.onPlayerJoined(0);
@@ -452,6 +473,7 @@ TEST(Game, LevelRestartsCleanlyWhenNoPlayerIsLeft)
 TEST(Game, PlayerStartsWithTheConfiguredLives)
 {
     Game game;
+    game.rules().lobbyDelay = 0.f; // no waiting room in rule tests
     game.rules().playerLives = 5;
     game.onPlayerJoined(0);
     EXPECT_EQ(game.playerLives(0), 5);
@@ -460,6 +482,7 @@ TEST(Game, PlayerStartsWithTheConfiguredLives)
 TEST(Game, DeadPlayerLosesALifeAndRespawnsAfterTheDelay)
 {
     Game game;
+    game.rules().lobbyDelay = 0.f; // no waiting room in rule tests
     game.loadEntitiesConfig(TestEntities);
     game.loadLevel(OneBoss);
     game.onPlayerJoined(0);
@@ -510,6 +533,7 @@ float ramTheBossUntilOutOfLives(Game &game, std::uint8_t player)
 TEST(Game, InvulnerabilityProtectsAndGameIsOverWhenLivesRunOut)
 {
     Game game;
+    game.rules().lobbyDelay = 0.f; // no waiting room in rule tests
     game.loadEntitiesConfig(TestEntities);
     game.loadLevel(OneBoss);
     game.onPlayerJoined(0);
@@ -522,16 +546,23 @@ TEST(Game, InvulnerabilityProtectsAndGameIsOverWhenLivesRunOut)
     EXPECT_EQ(game.snapshot().state, protocol::GameState::GameOver);
     EXPECT_EQ(countOf(game, protocol::EntityType::Enemy), 0);
 
-    // It stays over: nothing comes back while the players look at the screen.
-    run(game, 10.f);
+    // It stays over while the players look at the end screen...
+    run(game, game.rules().restartDelay - 1.f);
     EXPECT_EQ(game.gameState(), protocol::GameState::GameOver);
     EXPECT_EQ(countOf(game, protocol::EntityType::Enemy), 0);
     EXPECT_EQ(countOf(game, protocol::EntityType::Player), 0);
+
+    // ...then a new game starts in the waiting room, with a ship and full lives for the players still here.
+    run(game, 1.5f);
+    EXPECT_NE(game.gameState(), protocol::GameState::GameOver);
+    EXPECT_EQ(countOf(game, protocol::EntityType::Player), 1);
+    EXPECT_EQ(game.playerLives(0), 3);
 }
 
 TEST(Game, DeathWithLivesLeftIsNotGameOver)
 {
     Game game;
+    game.rules().lobbyDelay = 0.f; // no waiting room in rule tests
     game.loadEntitiesConfig(TestEntities);
     game.loadLevel(OneBoss);
     game.onPlayerJoined(0);
@@ -549,6 +580,7 @@ TEST(Game, DeathWithLivesLeftIsNotGameOver)
 TEST(Game, GameGoesOnWhileAnotherPlayerHasLives)
 {
     Game game;
+    game.rules().lobbyDelay = 0.f; // no waiting room in rule tests
     game.loadEntitiesConfig(TestEntities);
     game.loadLevel(OneBoss);
     game.onPlayerJoined(0);
@@ -564,6 +596,7 @@ TEST(Game, GameGoesOnWhileAnotherPlayerHasLives)
 TEST(Game, NextPlayersStartAgainFromTheFirstLevelAfterAGameOver)
 {
     Game game;
+    game.rules().lobbyDelay = 0.f; // no waiting room in rule tests
     game.loadEntitiesConfig(TestEntities);
     game.loadCampaign({OneGrunt, OneBoss});
     game.rules().intermissionDelay = 0.f;
@@ -576,12 +609,73 @@ TEST(Game, NextPlayersStartAgainFromTheFirstLevelAfterAGameOver)
     ASSERT_EQ(game.gameState(), protocol::GameState::GameOver);
 
     game.onPlayerLeft(0);
-    EXPECT_EQ(game.gameState(), protocol::GameState::Playing);
+    EXPECT_EQ(game.gameState(), protocol::GameState::Waiting);
     EXPECT_EQ(game.currentLevelIndex(), 0u);
 
     game.onPlayerJoined(0);
+    EXPECT_EQ(game.gameState(), protocol::GameState::Playing);
     EXPECT_EQ(game.playerLives(0), 3);
     EXPECT_EQ(countOf(game, protocol::EntityType::Player), 1);
+}
+
+TEST(Game, WaitingRoomLetsPlayersJoinBeforeTheFirstWave)
+{
+    Game game;
+    game.rules().lobbyDelay = 5.f;
+    game.loadEntitiesConfig(TestEntities);
+    game.loadLevel(OneGrunt);
+    EXPECT_EQ(game.gameState(), protocol::GameState::Waiting);
+
+    game.onPlayerJoined(0);
+    run(game, 3.f);
+    EXPECT_EQ(game.gameState(), protocol::GameState::Waiting);
+    EXPECT_EQ(countOf(game, protocol::EntityType::Player), 1); // the ship can already move
+    EXPECT_EQ(countOf(game, protocol::EntityType::Enemy), 0);  // but no wave comes
+
+    game.onPlayerJoined(1);
+    run(game, 3.f);
+    EXPECT_EQ(game.gameState(), protocol::GameState::Playing);
+    EXPECT_EQ(game.snapshot().state, protocol::GameState::Playing);
+}
+
+TEST(Game, WaitingRoomStartsWhenAllPlayersAreReady)
+{
+    Game game;
+    game.rules().lobbyDelay = 1000.f; // do not start on timer
+    game.loadEntitiesConfig(TestEntities);
+    game.loadLevel(OneGrunt);
+    EXPECT_EQ(game.gameState(), protocol::GameState::Waiting);
+
+    game.onPlayerJoined(0);
+    game.onPlayerJoined(1);
+    run(game, 2.f);
+    EXPECT_EQ(game.gameState(), protocol::GameState::Waiting);
+
+    game.onInput(0, protocol::InputFlag::Ready);
+    run(game, 0.1f);
+    EXPECT_EQ(game.gameState(), protocol::GameState::Waiting);
+
+    game.onInput(1, protocol::InputFlag::Ready);
+    run(game, 0.1f);
+    EXPECT_EQ(game.gameState(), protocol::GameState::Playing);
+}
+
+TEST(Game, WaitingRoomStartsAgainWhenEveryoneLeaves)
+{
+    Game game;
+    game.rules().lobbyDelay = 5.f;
+    game.loadEntitiesConfig(TestEntities);
+    game.loadLevel(OneGrunt);
+    game.onPlayerJoined(0);
+    run(game, 6.f);
+    ASSERT_EQ(game.gameState(), protocol::GameState::Playing);
+
+    game.onPlayerLeft(0);
+    run(game, 0.1f);
+    EXPECT_EQ(game.gameState(), protocol::GameState::Waiting);
+    game.onPlayerJoined(0);
+    run(game, 3.f);
+    EXPECT_EQ(game.gameState(), protocol::GameState::Waiting); // the full delay again
 }
 
 namespace {
@@ -599,6 +693,7 @@ void runUntilLevel(Game &game, std::size_t level)
 TEST(Game, LivesComeBackToTheFullCountOnlyWhenANewWorldStarts)
 {
     Game game;
+    game.rules().lobbyDelay = 0.f; // no waiting room in rule tests
     game.loadEntitiesConfig(TestEntities);
     game.loadCampaign({OneGrunt, OneGrunt, OneGrunt});
     game.rules().levelsPerWorld = 2;
@@ -615,6 +710,7 @@ TEST(Game, LivesComeBackToTheFullCountOnlyWhenANewWorldStarts)
 TEST(Game, PlayerOutOfLivesComesBackInTheNextWorld)
 {
     Game game;
+    game.rules().lobbyDelay = 0.f; // no waiting room in rule tests
     game.loadEntitiesConfig(TestEntities);
     game.loadCampaign({OneGrunt, OneGrunt});
     game.rules().levelsPerWorld = 1;
@@ -637,6 +733,7 @@ TEST(Game, PlayerOutOfLivesComesBackInTheNextWorld)
 TEST(Game, GameRulesGiveThreeLevelsPerWorld)
 {
     Game game;
+    game.rules().lobbyDelay = 0.f; // no waiting room in rule tests
     EXPECT_EQ(game.rules().levelsPerWorld, 3u);
     EXPECT_EQ(game.rules().playerLives, 3);
 }
@@ -644,6 +741,7 @@ TEST(Game, GameRulesGiveThreeLevelsPerWorld)
 TEST(Game, SnapshotTellsTheLivesLeftOfEachPlayer)
 {
     Game game;
+    game.rules().lobbyDelay = 0.f; // no waiting room in rule tests
     game.loadEntitiesConfig(TestEntities);
     game.loadLevel(OneBoss);
     game.onPlayerJoined(0);
@@ -659,6 +757,7 @@ TEST(Game, SnapshotTellsTheLivesLeftOfEachPlayer)
 TEST(Obstacle, CostsALifeOnContactAndStaysInPlace)
 {
     Game game;
+    game.rules().lobbyDelay = 0.f; // no waiting room in rule tests
     game.loadEntitiesConfig(TestEntities);
     game.loadLevel("tests/data/one_tile.json");
     game.rules().intermissionDelay = 1000.f;
@@ -669,9 +768,10 @@ TEST(Obstacle, CostsALifeOnContactAndStaysInPlace)
     EXPECT_EQ(countOf(game, protocol::EntityType::Obstacle), 1);
 }
 
-TEST(Obstacle, ResistsAsManyShotsAsItsHealthAndGivesNoScore)
+TEST(Obstacle, AbsorbsPlayerFireWithoutBeingDamagedAndGivesNoScore)
 {
     Game game;
+    game.rules().lobbyDelay = 0.f; // no waiting room in rule tests
     game.loadEntitiesConfig(TestEntities);
     game.loadLevel("tests/data/one_tile.json");
     game.setGameMode(Game::GameMode::Infinite);
@@ -687,13 +787,14 @@ TEST(Obstacle, ResistsAsManyShotsAsItsHealthAndGivesNoScore)
     game.onInput(0, protocol::InputFlag::Shoot);
     game.onInput(0, 0);
     run(game, 3.f);
-    EXPECT_EQ(countOf(game, protocol::EntityType::Obstacle), 0);
+    EXPECT_EQ(countOf(game, protocol::EntityType::Obstacle), 1);
     EXPECT_EQ(game.snapshot().score, 0u);
 }
 
 TEST(Obstacle, StopsEnemyFireWithoutBeingDamaged)
 {
     Game game;
+    game.rules().lobbyDelay = 0.f; // no waiting room in rule tests
     game.loadEntitiesConfig(TestEntities);
     game.loadLevel("tests/data/tile_shield.json");
     game.onPlayerJoined(0);
@@ -706,6 +807,7 @@ TEST(Obstacle, StopsEnemyFireWithoutBeingDamaged)
 TEST(Obstacle, DoesNotHoldTheLevelBack)
 {
     Game game;
+    game.rules().lobbyDelay = 0.f; // no waiting room in rule tests
     game.loadEntitiesConfig(TestEntities);
     game.loadLevel("tests/data/one_tile.json");
     game.rules().intermissionDelay = 0.f;
@@ -718,6 +820,7 @@ TEST(Obstacle, DoesNotHoldTheLevelBack)
 TEST(Obstacle, LeavesTheGameAtTheLeftOfTheScreen)
 {
     Game game;
+    game.rules().lobbyDelay = 0.f; // no waiting room in rule tests
     game.loadEntitiesConfig(TestEntities);
     game.loadLevel("tests/data/one_tile.json");
     game.rules().intermissionDelay = 1000.f;
@@ -733,7 +836,7 @@ TEST(Obstacle, EveryTileOfTheCampaignExistsAndEveryWorldHasItsOwn)
 {
     std::ifstream configFile("assets/config/entities.json");
     ASSERT_TRUE(configFile.is_open());
-    const auto obstacles = nlohmann::json::parse(configFile).at("obstacles");
+    const auto prefabs = nlohmann::json::parse(configFile).at("prefabs");
 
     const std::array<std::string, 3> themes = {"satellite_debris", "mars_rock", "singularity_shard"};
     for (int level = 1; level <= 9; ++level) {
@@ -745,7 +848,8 @@ TEST(Obstacle, EveryTileOfTheCampaignExistsAndEveryWorldHasItsOwn)
             for (const auto &tile : wave.value("obstacles", nlohmann::json::array())) {
                 tiles++;
                 const auto type = tile.at("type").get<std::string>();
-                EXPECT_TRUE(obstacles.contains(type)) << type;
+                ASSERT_TRUE(prefabs.contains(type)) << type;
+                EXPECT_EQ(prefabs[type].at("Kind").at("type"), "obstacle") << type;
                 EXPECT_EQ(type, themes[static_cast<std::size_t>((level - 1) / 3)]) << "level " << level;
             }
         }
@@ -756,6 +860,7 @@ TEST(Obstacle, EveryTileOfTheCampaignExistsAndEveryWorldHasItsOwn)
 TEST(Game, PlayerJoiningAFinishedGameGetsNoShip)
 {
     Game game;
+    game.rules().lobbyDelay = 0.f; // no waiting room in rule tests
     game.loadEntitiesConfig(TestEntities);
     game.loadLevel(OneBoss);
     game.onPlayerJoined(0);
@@ -822,6 +927,7 @@ Flight fly(const std::string &pattern, float startX, float startY, float speed, 
     registry.emplace<rtype::components::Kind>(enemy, protocol::EntityType::Enemy, 0);
     registry.emplace<rtype::components::MovementPattern>(
         enemy, rtype::components::MovementPattern{pattern, 0.f, 0.f, speed, 0.f, 0.f, 0.f, false});
+    registry.emplace<rtype::components::Hitbox>(enemy, 66.f, 72.f);
 
     Flight flight;
     const float dt = 1.f / 60.f;
@@ -885,13 +991,16 @@ TEST(Game, GravityWellBulletCurvesTowardTheCentralLine)
     registry.emplace<rtype::components::EnemyAttack>(enemy, 0.f, 0.5f, 300.f, 0, "gravity_well");
 
     engine::ecs::Entity bullet = engine::ecs::NullEntity;
-    updateEnemyShooting(registry, [&](protocol::EntityType type, std::uint8_t variant, float x, float y) {
-        bullet = registry.spawn();
-        registry.emplace<rtype::components::Kind>(bullet, type, variant);
-        registry.emplace<rtype::components::Position>(bullet, x, y);
-        registry.emplace<rtype::components::Velocity>(bullet, 0.f, 0.f);
-        return bullet;
-    }, 0.6f);
+    updateEnemyShooting(
+        registry,
+        [&](protocol::EntityType type, std::uint8_t variant, float x, float y) {
+            bullet = registry.spawn();
+            registry.emplace<rtype::components::Kind>(bullet, type, variant);
+            registry.emplace<rtype::components::Position>(bullet, x, y);
+            registry.emplace<rtype::components::Velocity>(bullet, 0.f, 0.f);
+            return bullet;
+        },
+        0.6f);
 
     ASSERT_NE(bullet, engine::ecs::NullEntity);
     EXPECT_GT(registry.get<rtype::components::Velocity>(bullet)->y, 0.f); // pulled down, toward y = 540
@@ -906,6 +1015,7 @@ TEST(Movement, StoppedBossNeverLeavesTheScreen)
     registry.emplace<rtype::components::Kind>(boss, protocol::EntityType::Enemy, 0);
     registry.emplace<rtype::components::MovementPattern>(
         boss, rtype::components::MovementPattern{"dive", 0.f, 0.f, 30.f, 1500.f, 0.f, 0.f});
+    registry.emplace<rtype::components::Hitbox>(boss, 66.f, 72.f);
 
     updateEnemyMovements(registry, 1.f / 60.f);
     const auto *velocity = registry.get<rtype::components::Velocity>(boss);
@@ -917,28 +1027,31 @@ TEST(Movement, StoppedBossNeverLeavesTheScreen)
 TEST(Game, EnemyKeepsTheSpriteOfItsDefinition)
 {
     Game game;
+    game.rules().lobbyDelay = 0.f; // no waiting room in rule tests
     game.loadEntitiesConfig(TestEntities);
     game.loadLevel(OneSprite);
     game.onPlayerJoined(0);
     run(game, 0.1f);
 
     const auto snap = game.snapshot();
-    const auto enemy = std::find_if(snap.entities.begin(), snap.entities.end(), [](const auto &entity) {
-        return entity.type == protocol::EntityType::Enemy;
-    });
+    const auto enemy = std::find_if(snap.entities.begin(), snap.entities.end(),
+                                    [](const auto &entity) { return entity.type == protocol::EntityType::Enemy; });
     ASSERT_NE(enemy, snap.entities.end());
     EXPECT_EQ(enemy->variant, 3);
 }
 
-TEST(Game, EveryEnemyOfTheGameDeclaresItsSprite)
+TEST(Game, EveryEnemyOfTheGameDeclaresItsSpriteAndHitbox)
 {
     std::ifstream file("assets/config/entities.json");
     ASSERT_TRUE(file.is_open());
     const auto config = nlohmann::json::parse(file);
-    for (const auto &[name, enemy] : config.at("enemies").items()) {
-        ASSERT_TRUE(enemy.contains("variant")) << name;
-        if (enemy.value("is_boss", false)) {
-            EXPECT_GE(enemy.at("variant").get<int>(), 5) << name;
+    for (const auto &[name, prefab] : config.at("prefabs").items()) {
+        if (prefab.at("Kind").at("type") != "enemy")
+            continue;
+        ASSERT_TRUE(prefab.at("Kind").contains("variant")) << name;
+        EXPECT_GT(prefab.at("Hitbox").value("width", 0.f), 0.f) << name;
+        if (prefab.value("EnemyTraits", nlohmann::json::object()).value("is_boss", false)) {
+            EXPECT_GE(prefab.at("Kind").at("variant").get<int>(), 5) << name;
         }
     }
 }
@@ -952,8 +1065,8 @@ TEST(Movement, BossSpriteStaysOnScreenWhileBouncing)
     registry.emplace<rtype::components::Kind>(boss, protocol::EntityType::Enemy, 6);
     registry.emplace<rtype::components::MovementPattern>(
         boss, rtype::components::MovementPattern{"martian_bounce", 60.f, 0.f, 35.f, 1200.f});
-
-    const auto box = rtype::components::enemyHitbox(6);
+    const rtype::components::Hitbox box{280.f, 222.f, -60.f};
+    registry.emplace<rtype::components::Hitbox>(boss, box);
     const float dt = 1.f / 60.f;
     for (int tick = 0; tick < 60 * 60; ++tick) {
         updateEnemyMovements(registry, dt);
@@ -964,4 +1077,29 @@ TEST(Movement, BossSpriteStaysOnScreenWhileBouncing)
         EXPECT_LE(position->y + box.offsetY + box.height, WorldHeight + 5.f);
         EXPECT_GE(position->y + box.offsetY, -5.f);
     }
+}
+
+TEST(Game, LaterInfiniteLoopsSpawnEnemiesAtRandomHeightsOnTheRight)
+{
+    std::set<int> heights;
+    for (int attempt = 0; attempt < 5; ++attempt) {
+        Game game;
+        game.rules().lobbyDelay = 0.f;
+        game.loadEntitiesConfig(TestEntities);
+        game.loadLevel(OneGrunt); // the grunt is placed at y = 300 by the level, after 1 second
+        game.setGameMode(Game::GameMode::Infinite);
+        game.setInfiniteLoopCount(2);
+        game.onPlayerJoined(0);
+        game.onInput(0, protocol::InputFlag::Down); // out of the enemy's way
+        run(game, 1.05f);
+        const auto snap = game.snapshot();
+        const auto enemy = std::find_if(snap.entities.begin(), snap.entities.end(),
+                                        [](const auto &entity) { return entity.type == protocol::EntityType::Enemy; });
+        ASSERT_NE(enemy, snap.entities.end());
+        EXPECT_GE(enemy->y, 0.f);
+        EXPECT_LE(enemy->y, WorldHeight - 72.f);
+        EXPECT_GT(enemy->x, WorldWidth - 100.f); // it appeared on the right edge
+        heights.insert(static_cast<int>(enemy->y));
+    }
+    EXPECT_GT(heights.size(), 1u); // not always the height written in the level
 }

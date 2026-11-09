@@ -1,7 +1,7 @@
-#include <gtest/gtest.h>
 #include "ui/GameConfig.hpp"
 #include <filesystem>
 #include <fstream>
+#include <gtest/gtest.h>
 
 using rtype::client::ui::GameConfig;
 using Key = sf::Keyboard::Key;
@@ -102,6 +102,23 @@ TEST(GameConfigTest, SaveAndLoadValidConfig)
     EXPECT_FLOAT_EQ(loaded.sfxVolume, 75.f);
     EXPECT_FLOAT_EQ(loaded.musicVolume, 50.f);
 
+    std::filesystem::remove(testPath);
+}
+
+TEST(GameConfigTest, AccessibilitySettingsAreSavedAndOffByDefault)
+{
+    const std::string testPath = "test_accessibility_config.json";
+    EXPECT_FALSE(GameConfig{}.autoFire);
+    EXPECT_FALSE(GameConfig{}.highContrast);
+
+    GameConfig original;
+    original.autoFire = true;
+    original.highContrast = true;
+    ASSERT_TRUE(original.saveToFile(testPath));
+
+    const GameConfig loaded = GameConfig::loadFromFile(testPath);
+    EXPECT_TRUE(loaded.autoFire);
+    EXPECT_TRUE(loaded.highContrast);
     std::filesystem::remove(testPath);
 }
 

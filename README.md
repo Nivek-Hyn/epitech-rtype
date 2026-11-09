@@ -1,48 +1,50 @@
 # R-Type
 
-A C++ multiplayer shoot'em up built with our own reusable game engine. Up to four players connect to an
-authoritative UDP server. The current prototype includes movement, shooting, enemies and missile collisions.
+A multiplayer shoot'em up in C++20, built on our own reusable game engine. Up to four players join an
+authoritative UDP server, alone or together, on Linux and Windows.
 
-Linux and native Windows builds and two-player cross-play have been tested. See the
-[validation record](docs/validation.md) for exact revisions and outstanding checks. The final campaign,
-four-player acceptance and accessibility features remain tracked work.
+- **Game**: a campaign of 9 levels in 3 worlds with bosses, an infinite mode with random spawns, three difficulties,
+  weapons and bonuses, a waiting room, lives and respawns. All content is data: entities are prefabs described by
+  their components in `assets/config/entities.json`, and levels are JSON files.
+- **Network**: binary protocol over UDP ([specification](docs/protocol.md)), reliable messages with
+  acknowledgements, split snapshots, 16-bit positions, 30 snapshots per second with client interpolation,
+  rate limits, live statistics (F3).
+- **Engine**: ECS with prefabs and entity generations, fixed timestep, event bus, AABB physics, network building
+  blocks. It builds and installs on its own, and a second game (`brickrush`) uses it without any R-Type code.
+- **Accessibility**: remappable keys, auto fire, high contrast, shapes and letters besides colors.
 
 ## Requirements
 
-- A C++20 compiler; tested with GCC 15 and MSVC 2022. See the validation record for exact versions.
-- CMake 3.28+ for the client, or 3.24+ for a server-only build, and the selected generator's build tool.
-- Git and Internet access for the first dependency download. CMake/CPM fetches Asio, SFML and GoogleTest.
-- On Linux, SFML also needs platform development libraries:
+- A C++20 compiler (tested: GCC 15 on Linux, MSVC 2022 on Windows), CMake 3.28+ (3.24+ for a server-only build).
+- Git and Internet access for the first build: [CPM](https://github.com/cpm-cmake/CPM.cmake) downloads Asio,
+  SFML, nlohmann/json and GoogleTest.
+- On Linux, the system libraries SFML needs:
   - Fedora: `sudo dnf install libX11-devel libXrandr-devel libXcursor-devel libXi-devel mesa-libGL-devel systemd-devel`
   - Ubuntu/Debian: `sudo apt install libx11-dev libxrandr-dev libxcursor-dev libxi-dev libgl1-mesa-dev libudev-dev`
 
-These platform libraries and graphics drivers are separate from application dependencies managed by CPM.
+## Build and play
 
-## Build and run
-
-From a clone of this repository, on Linux:
+Linux:
 
 ```sh
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --parallel 4
-./r-type_server 4242
-# In another terminal, from the same repository directory:
-./r-type_client 127.0.0.1 4242
+./r-type_client            # menu: SOLO starts a local game, JOIN connects to a server
 ```
 
-On Windows, from a Developer PowerShell with MSVC 2022:
+Windows (Developer PowerShell for Visual Studio 2022):
 
 ```powershell
 cmake -S . -B build/windows -G "Visual Studio 17 2022" -A x64
 cmake --build build/windows --config Release --parallel 4
-.\Release\r-type_server.exe 4242
-# In another terminal, from the same repository directory:
-.\Release\r-type_client.exe 127.0.0.1 4242
+.\Release\r-type_client.exe
 ```
 
-Run the client from the repository directory so it finds `assets/`. Default host/port are `127.0.0.1:4242`.
-Use arrows or ZQSD to move and Space to shoot. Close the client window to quit; use Ctrl+C in the server terminal.
-For another computer, replace the host with the server's LAN address and allow its UDP port on the private network.
+The menu also opens the campaign map and the level editor (CREATE A LEVEL). A dedicated server for a LAN game: `./r-type_server 4242`, then `./r-type_client <server address> 4242` on each
+player's computer (allow the UDP port in the firewall). `./r-type_server --help` lists its options (mode,
+difficulty, first level, statistics). Run the programs from the repository or installed directory, where `assets/`
+is. Arrows or ZQSD move, Space shoots, F1 auto fire, F2 high contrast, F3 network statistics, Escape returns to
+the menu. More details: [cross-platform guide](docs/cross-platform.md), [build guide](docs/build-and-run.md).
 
 For a server-only build, add `-DRTYPE_BUILD_CLIENT=OFF`. To omit tests, add `-DRTYPE_BUILD_TESTS=OFF`.
 See [build, installation and archive instructions](docs/build-and-run.md) for downloads, output paths and troubleshooting.
@@ -64,22 +66,34 @@ cmake -P engine/cmake/CheckPackage.cmake
 ```
 
 See [engine/README.md](engine/README.md) and the [extension guide](docs/how-to.md).
-The separate playable second game remains its own delivery task; it is not part of this prototype's launch commands.
+
+## Other programs built with the engine
+
+The same build also produces, at the repository root (run them from there):
+
+| Program | What it is | Controls |
+|---|---|---|
+| `./brickrush` | A second, unrelated game: a brick breaker. It uses the engine only, not `common/` or the R-Type assets. Bricks, paddle and ball are prefabs of `games/brickrush/assets/bricks.json`; each level is a grid of bricks. | Left/Right or Q/D to move, Space to launch, R to restart |
 
 ## Project and documentation
 
 | Directory | Responsibility |
 |---|---|
-| `engine/` | Generic ECS, timing, events, physics, binary buffers and queues; standard library only. |
+| `engine/` | Generic ECS and prefabs, timing, events, physics, binary buffers, reliable delivery helpers; standard library only. |
 | `common/` | R-Type protocol, components and constants shared between client and server. |
 | `server/` | Authoritative simulation and Asio transport. |
-| `client/` | SFML rendering, input and Asio transport. |
+| `client/` | SFML rendering, menus, input and Asio transport; hosts a local server for solo games. |
+| `games/brickrush/` | Second game made with the engine only. |
+| `tools/level-editor/` | Reading and writing of level files, used by the level editor of the client. |
 | `tests/` | GoogleTest tests. |
 | `docs/` | [Documentation index](docs/index.md), [architecture](docs/architecture.md), [study](docs/technical-study.md) and [protocol](docs/protocol.md). |
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the workflow and [THIRD_PARTY_NOTICES.txt](THIRD_PARTY_NOTICES.txt)
 for dependency notices and asset provenance. Sprites were supplied by Epitech for this student project.
-No project-wide source license or public asset redistribution permission is declared here.
+## License
+
+No license has been chosen yet: until the team picks one, the source code is all rights reserved by its authors.
+The sprites were supplied by Epitech and must not be redistributed.
 
 ## Team
 

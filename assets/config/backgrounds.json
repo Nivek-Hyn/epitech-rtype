@@ -1,0 +1,25 @@
+{
+  "worlds": [
+    {
+      "name": "Orbital belt",
+      "layers": [
+        { "image": "assets/backgrounds/orbital-belt.png", "fill": true, "speed": 12 },
+        { "image": "assets/backgrounds/stars.png", "fill": true, "speed": 45 }
+      ]
+    },
+    {
+      "name": "Mars",
+      "layers": [
+        { "image": "assets/backgrounds/mars.png", "fill": true, "speed": 12 },
+        { "image": "assets/backgrounds/stars.png", "fill": true, "speed": 45 }
+      ]
+    },
+    {
+      "name": "Singularity",
+      "layers": [
+        { "image": "assets/backgrounds/singularity.png", "fill": true, "speed": 12 },
+        { "image": "assets/backgrounds/stars.png", "fill": true, "speed": 45 }
+      ]
+    }
+  ]
+}

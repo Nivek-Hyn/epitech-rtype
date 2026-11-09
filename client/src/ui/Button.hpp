@@ -17,7 +17,7 @@ public:
     void handleMouseMove(sf::Vector2f mousePos);
     bool handleMouseClick(sf::Vector2f mousePos);
 
-    void draw(sf::RenderWindow &window) const;
+    void draw(sf::RenderTarget &window) const;
 
     const std::string &getLabel() const;
     void setLabel(const std::string &label);
@@ -31,4 +31,4 @@ private:
     bool _selected{false};
 };
 
-}
+} // namespace rtype::client::ui
