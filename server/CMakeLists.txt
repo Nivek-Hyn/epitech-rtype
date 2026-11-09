@@ -8,10 +8,11 @@ add_library(rtype_server_lib STATIC
     src/GamePlayers.cpp
     src/GameWaves.cpp
     src/net/AsioNetworkServer.cpp
-    src/levelLoader.cpp
+    src/LevelLoader.cpp
     src/MovementSystem.cpp
     src/EnemyShootSystem.cpp
     src/Prefabs.cpp
+    src/ServerLoop.cpp
     src/Weapons.cpp
     src/GameWeapons.cpp
 )

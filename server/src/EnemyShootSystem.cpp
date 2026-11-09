@@ -1,5 +1,5 @@
 #include "EnemyShootSystem.hpp"
-#include "common/Components.hpp"
+#include "GameComponents.hpp"
 #include "common/Constants.hpp"
 #include <cmath>
 
@@ -43,7 +43,7 @@ void updateEnemyShooting(
         }
     }
 
-    // Traitement des trajectoires spéciales des tirs ennemis (ex: shoot zigzag)
+    // Special trajectories of enemy shots (zigzag, sine wave, gravity well)
     registry.each<rtype::components::Position, rtype::components::Velocity, rtype::components::Kind,
                   rtype::components::MovementPattern>(
         [dt](engine::ecs::Entity /*entity*/, const rtype::components::Position &pos, rtype::components::Velocity &vel,
@@ -56,7 +56,7 @@ void updateEnemyShooting(
             } else if (pattern.type == "sine_wave") {
                 vel.y = std::sin(pos.x * 0.02f) * 180.f;
             } else if (pattern.type == "gravity_well") {
-                // Le tir se courbe vers la ligne du trou noir
+                // The shot bends toward the line of the black hole
                 vel.y += (WorldHeight / 2.f - pos.y) * 1.5f * dt;
             }
         });

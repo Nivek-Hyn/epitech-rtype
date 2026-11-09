@@ -1,12 +1,13 @@
 #pragma once
 
+#include "LevelLoader.hpp"
 #include "Prefabs.hpp"
 #include "Weapons.hpp"
 #include "common/Constants.hpp"
 #include "common/Protocol.hpp"
+#include "engine/core/EventBus.hpp"
 #include "engine/ecs/Registry.hpp"
 #include "engine/physics/Aabb.hpp"
-#include "levelLoader.hpp"
 #include "net/INetworkServer.hpp"
 
 #include <array>
@@ -54,6 +55,8 @@ public:
                                                    "assets/levels/level3.json"};
         float intermissionDelay = 2.0f;
         int playerLives = 3;
+        int maxLives = 5;          // a life bonus never goes above this (nor above playerLives when higher)
+        float restartDelay = 10.f; // seconds the end screen stays before the game goes back to the waiting room
         float respawnDelay = 2.0f;
         float invulnerability = 2.0f;
         std::size_t levelsPerWorld = 3;
@@ -61,6 +64,9 @@ public:
     };
 
     Game();
+    // The event handlers keep a pointer to the game: it must stay where it was built.
+    Game(const Game &) = delete;
+    Game &operator=(const Game &) = delete;
 
     void onPlayerJoined(PlayerId player);
     void onPlayerLeft(PlayerId player);
@@ -79,6 +85,10 @@ public:
 
     void loadLevel(const std::string &filepath);
     void loadCampaign(const std::vector<std::string> &levelPaths);
+    // Reads every level of the campaign; throws std::runtime_error naming the first broken file.
+    void checkLevels() const;
+    // Starts the campaign at the given level (from 0), e.g. from the campaign map. Out of range: the first level.
+    void startAtLevel(std::size_t index);
     void loadRules(const std::string &filepath);
     // Adds the prefabs of an entities file (see assets/config/entities.json).
     void loadEntitiesConfig(const std::string &filepath);
@@ -106,6 +116,17 @@ public:
 private:
     struct CollisionFrame;
 
+    // Published on the event bus when a collision destroys an entity; each reaction subscribes on its own
+    // (lives, network event, bonus drop), so the collision code knows none of them.
+    struct EntityKilled {
+        engine::ecs::Entity entity = engine::ecs::NullEntity;
+        std::uint32_t netId = 0;
+        protocol::EntityType type = protocol::EntityType::Enemy;
+        float x = 0.f; // top-left corner of its hit area
+        float y = 0.f;
+    };
+    void subscribeToEvents();
+
     // GameConfigLoader.cpp
     void applyDefaultRules();
 
@@ -119,6 +140,7 @@ private:
     void goToNextLevel();
     void restartCampaign();
     void updateLobby(float dt);
+    void restartAfterEnd(float dt);
     void startIfLobbyOver();
 
     // GamePlayers.cpp
@@ -157,6 +179,7 @@ private:
     void updateWaves(float dt);
     void spawnWave(WaveConfig &wave);
     void spawnFromLevel(const EnemySpawnConfig &config);
+    void placeAtRandomHeight(engine::ecs::Entity entity);
     void applyLevelOverrides(engine::ecs::Entity entity, const EnemySpawnConfig &config);
     void applyDifficulty(engine::ecs::Entity entity);
 
@@ -164,7 +187,7 @@ private:
     void handleCollisions();
     // GameWeapons.cpp
     void fire(std::size_t player, float x, float y);
-    void dropBonuses(const std::vector<std::pair<float, float>> &positions);
+    void dropBonusAt(float x, float y);
     std::optional<std::size_t> playerTouching(const engine::physics::Aabb &box);
     void collectBonuses();
     void giveBonus(engine::ecs::Entity bonus, std::size_t player);
@@ -184,6 +207,7 @@ private:
     void loseLifeIfShip(engine::ecs::Entity entity);
 
     engine::ecs::Registry _registry;
+    engine::core::EventBus _bus;
     std::array<engine::ecs::Entity, MaxPlayers> _players;
     std::array<float, MaxPlayers> _shootCooldowns{};
     std::array<bool, MaxPlayers> _connected{};
@@ -194,8 +218,6 @@ private:
     std::vector<protocol::Message> _events;
     std::uint32_t _tick = 0;
     std::uint32_t _nextNetId = 1;
-    float _enemySpawnTimer = 0.f;
-    std::uint32_t _enemiesSpawned = 0;
     std::uint32_t _score = 0;
     Arsenal _arsenal;
     std::array<std::string, MaxPlayers> _weapons;
@@ -205,6 +227,7 @@ private:
     float _levelTimer = 0.f;
     float _transitionTimer = 0.f;
     float _lobbyTimer = 0.f;
+    float _endTimer = 0.f;
 
     Prefabs _prefabs;
     GameRules _rules;
@@ -216,7 +239,5 @@ private:
     std::uint32_t _infiniteLoopCount = 1;
     protocol::GameState _state = protocol::GameState::Waiting;
 };
-
-LevelConfig loadLevelFromJson(const std::string &filepath);
 
 } // namespace rtype::server

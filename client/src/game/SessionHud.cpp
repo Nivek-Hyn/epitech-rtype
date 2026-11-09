@@ -6,10 +6,13 @@
 
 #include <algorithm>
 #include <string>
+#include <vector>
 
 namespace rtype::client {
 
 namespace {
+
+const std::array<const char *, 3> WorldNames = {"WORLD 1 - ORBITAL BELT", "WORLD 2 - MARS", "WORLD 3 - SINGULARITY"};
 
 const std::array<sf::Color, 4> PlayerColors = {sf::Color(0, 230, 255), sf::Color(255, 170, 40), sf::Color(80, 255, 120),
                                                sf::Color(240, 110, 255)};
@@ -83,7 +86,7 @@ void Session::drawAutoFire(sf::RenderWindow &window) const
         return;
     sf::Text text(_resources.getFont("default"), "AUTO FIRE ON (F1)", 20);
     text.setFillColor(sf::Color(255, 204, 0));
-    text.setPosition({45.f, 122.f});
+    text.setPosition({44.f, 132.f});
     outline(text);
     window.draw(text);
 }
@@ -123,21 +126,31 @@ void Session::drawHud(sf::RenderWindow &window) const
     drawDamageFlash(window);
     drawWaveBanner(window);
     drawWaitingRoom(window);
+    drawPlayerLeft(window);
     drawEndScreen(window);
 }
 
 // Score and wave, top left.
+// Score, world, level and wave in a panel, top left.
 void Session::drawScore(sf::RenderWindow &window) const
 {
-    sf::Text score(_resources.getFont("default"), "SCORE: " + std::to_string(_score), 28);
+    drawPanel(window, {24.f, 18.f}, {420.f, 104.f});
+    sf::Text title(_resources.getFont("default"), WorldNames[static_cast<std::size_t>(_level / 3) % WorldNames.size()],
+                   16);
+    title.setFillColor(sf::Color(150, 170, 210));
+    title.setPosition({44.f, 28.f});
+    window.draw(title);
+
+    sf::Text score(_resources.getFont("default"), "SCORE  " + std::to_string(_score), 34);
     score.setFillColor(sf::Color(0, 230, 255));
-    score.setPosition({45.f, 25.f});
+    score.setPosition({44.f, 48.f});
     outline(score);
     window.draw(score);
 
-    sf::Text stage(_resources.getFont("default"), "STAGE 1 - WAVE " + std::to_string(_wave), 20);
+    sf::Text stage(_resources.getFont("default"),
+                   "LEVEL " + std::to_string(_level + 1) + "  -  WAVE " + std::to_string(std::max(_wave, 1)), 18);
     stage.setFillColor(sf::Color(255, 204, 0));
-    stage.setPosition({45.f, 62.f});
+    stage.setPosition({44.f, 96.f});
     outline(stage);
     window.draw(stage);
 
@@ -149,11 +162,43 @@ void Session::drawScore(sf::RenderWindow &window) const
     window.draw(weapon);
 }
 
-// A banner while the heavy cruiser boss (enemy variant 5) is on screen.
+void Session::drawPanel(sf::RenderWindow &window, sf::Vector2f position, sf::Vector2f size) const
+{
+    sf::RectangleShape panel(size);
+    panel.setPosition(position);
+    panel.setFillColor(sf::Color(6, 10, 26, _highContrast ? 240 : 170));
+    panel.setOutlineThickness(2.f);
+    panel.setOutlineColor(sf::Color(0, 200, 255, 120));
+    window.draw(panel);
+    sf::RectangleShape accent({size.x, 4.f}); // a colored edge on top, like the menus
+    accent.setPosition(position);
+    accent.setFillColor(sf::Color(0, 220, 255));
+    window.draw(accent);
+}
+
+// A small heart: two circles and a triangle.
+void Session::drawHeart(sf::RenderWindow &window, sf::Vector2f center, sf::Color color) const
+{
+    for (const float side : {-1.f, 1.f}) {
+        sf::CircleShape lobe(6.f);
+        lobe.setOrigin({6.f, 6.f});
+        lobe.setPosition(center + sf::Vector2f{side * 5.f, -3.f});
+        lobe.setFillColor(color);
+        window.draw(lobe);
+    }
+    sf::ConvexShape point(3);
+    point.setPoint(0, center + sf::Vector2f{-11.f, -1.f});
+    point.setPoint(1, center + sf::Vector2f{11.f, -1.f});
+    point.setPoint(2, center + sf::Vector2f{0.f, 12.f});
+    point.setFillColor(color);
+    window.draw(point);
+}
+
+// A banner while a boss (enemy variants 5 and 6, see entities.json) is on screen.
 void Session::drawBossAlert(sf::RenderWindow &window) const
 {
     const bool boss = std::any_of(_shown.begin(), _shown.end(), [](const protocol::EntityState &entity) {
-        return entity.type == protocol::EntityType::Enemy && entity.variant == 5;
+        return entity.type == protocol::EntityType::Enemy && entity.variant >= 5 && entity.variant <= 6;
     });
     if (!boss)
         return;
@@ -175,23 +220,42 @@ void Session::drawPlayers(sf::RenderWindow &window) const
         if (entity.type == protocol::EntityType::Player && entity.variant < 4)
             active[entity.variant] = true;
     }
-    float y = 25.f;
+    std::vector<std::uint8_t> shown;
     for (std::uint8_t player = 0; player < 4; ++player) {
-        const bool local = _localPlayer == player;
-        const int lives = _lives[player];
-        if (!active[player] && lives == 0 && !local)
-            continue;
-        const std::string label = "P" + std::to_string(player + 1) + (local ? " (YOU)" : "");
-        sf::Text text(_resources.getFont("default"),
-                      label + " : " + lifeStatus(lives, active[player], _playerWasSpawned), 20);
-        text.setFillColor(lives > 0 ? PlayerColors[player]
-                                    : (active[player] ? sf::Color(255, 200, 50) : sf::Color(140, 140, 140)));
-        text.setOrigin({text.getLocalBounds().size.x, 0.f});
-        text.setPosition({WorldWidth - 45.f, y});
-        outline(text);
-        window.draw(text);
-        y += 26.f;
+        if (active[player] || _lives[player] > 0 || _localPlayer == player)
+            shown.push_back(player);
     }
+    if (shown.empty())
+        return;
+    const float width = 380.f;
+    drawPanel(window, {WorldWidth - width - 24.f, 18.f}, {width, 20.f + 36.f * static_cast<float>(shown.size())});
+    float y = 34.f;
+    for (const std::uint8_t player : shown) {
+        drawPlayerLine(window, player, active[player], y);
+        y += 36.f;
+    }
+}
+
+// "P2 (YOU)" in the player's color, then one heart per life, or the status when there is none.
+void Session::drawPlayerLine(sf::RenderWindow &window, std::uint8_t player, bool active, float y) const
+{
+    const float left = WorldWidth - 380.f;
+    const int lives = _lives[player];
+    sf::Text name(_resources.getFont("default"),
+                  "P" + std::to_string(player + 1) + (_localPlayer == player ? " (YOU)" : ""), 20);
+    name.setFillColor(lives > 0 || active ? PlayerColors[player] : sf::Color(140, 140, 140));
+    name.setPosition({left, y});
+    outline(name);
+    window.draw(name);
+    if (lives <= 0 || (!active && _playerWasSpawned)) {
+        sf::Text status(_resources.getFont("default"), lifeStatus(lives, active, _playerWasSpawned), 16);
+        status.setFillColor(lives > 0 ? sf::Color(255, 204, 0) : sf::Color(150, 150, 160));
+        status.setPosition({left + 130.f, y + 3.f});
+        window.draw(status);
+        return;
+    }
+    for (int life = 0; life < lives; life++)
+        drawHeart(window, {left + 150.f + static_cast<float>(life) * 30.f, y + 12.f}, sf::Color(255, 70, 90));
 }
 
 // The screen turns red for a moment when a ship is hit.
@@ -251,19 +315,26 @@ void Session::drawWaitingRoom(sf::RenderWindow &window) const
         readyBox.setOutlineColor(sf::Color(0, 255, 120));
         readyBox.setOutlineThickness(2.f);
         window.draw(readyBox);
-        window.draw(centeredText("READY ! (WAITING FOR OTHERS)", 20, sf::Color(255, 255, 255),
-                                 {WorldWidth / 2.f, 420.f}));
+        window.draw(
+            centeredText("READY ! (WAITING FOR OTHERS)", 20, sf::Color(255, 255, 255), {WorldWidth / 2.f, 420.f}));
     } else {
         readyBox.setFillColor(sf::Color(140, 90, 0, 200));
         readyBox.setOutlineColor(sf::Color(255, 204, 0));
         readyBox.setOutlineThickness(2.f);
         window.draw(readyBox);
-        window.draw(centeredText("PRESS SPACE / ENTER TO READY", 20, sf::Color(255, 255, 255),
-                                 {WorldWidth / 2.f, 420.f}));
+        window.draw(
+            centeredText("PRESS SPACE / ENTER TO READY", 20, sf::Color(255, 255, 255), {WorldWidth / 2.f, 420.f}));
     }
 
     window.draw(centeredText("Move: arrows or your keys    Network stats: F3    Menu: ESC", 18,
                              sf::Color(200, 210, 230), {WorldWidth / 2.f, 475.f}));
+}
+
+void Session::drawPlayerLeft(sf::RenderWindow &window) const
+{
+    if (_leftTimer <= 0.f)
+        return;
+    window.draw(centeredText(_leftMessage, 28, sf::Color(255, 170, 40), {WorldWidth / 2.f, 140.f}));
 }
 
 // Victory or defeat, decided by the server, with the final score.

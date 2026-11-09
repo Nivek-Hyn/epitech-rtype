@@ -2,7 +2,6 @@
 build*/
 r-type_server
 r-type_client
-r-type_level_editor
 /brickrush
 *.exe
 .cache/
@@ -15,3 +14,8 @@ site/
 docs/html/
 .venv/
 config.json
+assets/levels/custom.json
+/SpaceBackground.exe
+/space_background_pack.zip
+/SpaceBackground.x86_64
+/SBS - Seamless Space Backgrounds - Large 1024x1024.rar

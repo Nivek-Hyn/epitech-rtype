@@ -10,7 +10,7 @@ public:
     explicit Starfield(std::size_t starCount = 150, float width = 1920.f, float height = 1080.f);
 
     void update(float dt);
-    void draw(sf::RenderWindow &window) const;
+    void draw(sf::RenderTarget &window) const;
 
 private:
     struct Star {

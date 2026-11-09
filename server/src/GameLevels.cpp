@@ -1,7 +1,7 @@
 // Levels: loading them, going to the next one, winning the campaign, starting again.
 
 #include "Game.hpp"
-#include "common/Components.hpp"
+#include "GameComponents.hpp"
 #include <algorithm>
 
 namespace rtype::server {
@@ -17,6 +17,19 @@ void Game::loadCampaign(const std::vector<std::string> &levelPaths)
 {
     _campaignLevels = levelPaths;
     _currentLevelIndex = 0;
+    if (!_campaignLevels.empty())
+        loadCurrentLevel();
+}
+
+void Game::checkLevels() const
+{
+    for (const std::string &path : _campaignLevels)
+        loadLevelFromJson(path);
+}
+
+void Game::startAtLevel(std::size_t index)
+{
+    _currentLevelIndex = index < _campaignLevels.size() ? index : 0;
     if (!_campaignLevels.empty())
         loadCurrentLevel();
 }
@@ -101,7 +114,26 @@ void Game::restartCampaign()
     _score = 0;
     _weapons.fill(_arsenal.defaultWeapon);
     _infiniteLoopCount = 1;
+    _endTimer = 0.f;
     loadFirstLevel();
+    // Players still connected play the next game: full lives, and a ship for those who lost theirs.
+    for (std::size_t player = 0; player < _players.size(); player++) {
+        if (!_connected[player])
+            continue;
+        _lives[player] = _rules.playerLives;
+        if (_players[player] == engine::ecs::NullEntity)
+            spawnPlayerShip(player);
+    }
+}
+
+// After a victory or a game over, the end screen stays restart_delay seconds, then a new game starts.
+void Game::restartAfterEnd(float dt)
+{
+    if (_state != protocol::GameState::GameOver && _state != protocol::GameState::Finished)
+        return;
+    _endTimer += dt;
+    if (_endTimer >= _rules.restartDelay)
+        restartCampaign();
 }
 
 bool Game::allConnectedPlayersReady() const

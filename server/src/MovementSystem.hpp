@@ -1,11 +1,11 @@
 #pragma once
 
-#include "common/Components.hpp"
+#include "GameComponents.hpp"
 #include "engine/ecs/Registry.hpp"
 
 namespace rtype::server {
 
-// Fonction principale appelée dans le système de mise à jour du jeu
+// Sets the velocity of every enemy from its MovementPattern, once per tick, before the movement system.
 void updateEnemyMovements(engine::ecs::Registry &registry, float dt);
 
 } // namespace rtype::server

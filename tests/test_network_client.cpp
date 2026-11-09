@@ -191,7 +191,7 @@ TEST(NetworkClient, CanConnectAgainAfterAFailure)
     EXPECT_TRUE(waitUntil([&] { return client.connected(); }));
 }
 
-TEST(NetworkClient, IgnoresDuplicatedAndStaleServerPackets)
+TEST(NetworkClient, IgnoresDuplicatesButKeepsLatePackets)
 {
     asio::io_context io;
     const std::uint16_t port = findAvailablePort();
@@ -216,7 +216,9 @@ TEST(NetworkClient, IgnoresDuplicatedAndStaleServerPackets)
     sendNumbered(0, rtype::protocol::ConnectAccepted{0});
     sendNumbered(3, snapshotOfTick(5));
     sendNumbered(3, snapshotOfTick(5)); // a copy of the previous packet
-    sendNumbered(2, snapshotOfTick(4)); // arrives after number 3: a snapshot from the past
+    // Arrives after number 3. It is still delivered: it may be another part of a split tick, and the
+    // SnapshotAssembler is the one that drops an older tick.
+    sendNumbered(2, snapshotOfTick(4));
     sendNumbered(1, rtype::protocol::EntityDestroyed{7, rtype::protocol::DestroyReason::Killed}); // late, still useful
     ASSERT_TRUE(waitUntil([&] { return client.stats().traffic.totals.packetsReceived >= 5; }));
 
@@ -225,17 +227,14 @@ TEST(NetworkClient, IgnoresDuplicatedAndStaleServerPackets)
     int destroyed = 0;
     while (const auto message = client.poll()) {
         accepted += std::holds_alternative<rtype::protocol::ConnectAccepted>(*message);
-        if (const auto *snapshot = std::get_if<rtype::protocol::Snapshot>(&*message)) {
-            ++snapshots;
-            EXPECT_EQ(snapshot->tick, 5u);
-        }
+        snapshots += std::holds_alternative<rtype::protocol::Snapshot>(*message);
         destroyed += std::holds_alternative<rtype::protocol::EntityDestroyed>(*message);
     }
     EXPECT_EQ(accepted, 1);
-    EXPECT_EQ(snapshots, 1);
+    EXPECT_EQ(snapshots, 2);
     EXPECT_EQ(destroyed, 1);
     EXPECT_EQ(client.stats().traffic.totals.duplicatesDropped, 1u);
-    EXPECT_EQ(client.stats().traffic.totals.outdatedDropped, 1u);
+    EXPECT_EQ(client.stats().traffic.totals.outdatedDropped, 0u);
 }
 
 namespace {

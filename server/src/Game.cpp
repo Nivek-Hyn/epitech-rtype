@@ -2,10 +2,11 @@
 
 #include "Game.hpp"
 #include "EnemyShootSystem.hpp"
+#include "GameComponents.hpp"
 #include "MovementSystem.hpp"
-#include "common/Components.hpp"
 #include "engine/systems/Movement.hpp"
 #include <algorithm>
+#include <iostream>
 #include <utility>
 #include <vector>
 
@@ -45,20 +46,36 @@ Game::Game()
     _arsenal = loadArsenal("assets/config/weapons.json");
     _weapons.fill(_arsenal.defaultWeapon);
 
+    subscribeToEvents();
     _campaignLevels = _rules.campaignLevels;
     _currentLevelIndex = 0;
     if (!_campaignLevels.empty()) {
         try {
             loadCurrentLevel();
-        } catch (...) {
-            // Level file might not be found in some test environments
+        } catch (const std::exception &error) {
+            // Not fatal here: tests load their own levels. A server checks every level before starting.
+            std::cerr << "Warning: " << error.what() << '\n';
         }
     }
+}
+
+// The reactions to a destroyed entity, independent of each other and of the collision code.
+void Game::subscribeToEvents()
+{
+    _bus.subscribe<EntityKilled>([this](const EntityKilled &event) {
+        _events.push_back(protocol::EntityDestroyed{event.netId, protocol::DestroyReason::Killed}); // to the clients
+    });
+    _bus.subscribe<EntityKilled>([this](const EntityKilled &event) { loseLifeIfShip(event.entity); });
+    _bus.subscribe<EntityKilled>([this](const EntityKilled &event) {
+        if (event.type == protocol::EntityType::Enemy)
+            dropBonusAt(event.x, event.y);
+    });
 }
 
 void Game::update(float dt)
 {
     updateLobby(dt);
+    restartAfterEnd(dt);
     updatePlayerLives(dt);
     updateWaves(dt);
     updateEnemyMovements(_registry, dt);
@@ -181,6 +198,9 @@ protocol::Snapshot Game::snapshot()
     snap.tick = _tick;
     snap.state = _state;
     snap.score = _score;
+    snap.level = static_cast<std::uint8_t>(std::min<std::size_t>(_currentLevelIndex, 255));
+    snap.wave = static_cast<std::uint8_t>(std::count_if(_currentLevel.waves.begin(), _currentLevel.waves.end(),
+                                                        [](const WaveConfig &wave) { return wave.isSpawned; }));
     for (std::size_t player = 0; player < _lives.size(); player++)
         snap.lives[player] = static_cast<std::uint8_t>(std::clamp(_lives[player], 0, 255));
 

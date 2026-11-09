@@ -44,6 +44,8 @@ public:
     // Why the server refused us, after a ConnectRejected.
     const std::string &rejectionReason() const { return _rejectionReason; }
     bool isWaiting() const { return _waiting; }
+    int level() const { return _level; } // index of the level being played, from the snapshots
+    bool won() const { return _gameOver && _gameWon; }
     bool isReady() const { return _isReady; }
     void setReady(bool ready = true) { _isReady = ready; }
 
@@ -62,6 +64,9 @@ private:
                      const std::vector<sf::Vector2f> &ships);
     void onShipHit(const protocol::EntityState &shot, const std::vector<sf::Vector2f> &ships);
     void onEnemyHit(const protocol::EntityState &missile, const protocol::Snapshot &snapshot);
+    std::optional<protocol::EntityState> lastSeen(std::uint32_t netId) const;
+    void onDestroyed(const protocol::EntityDestroyed &event);
+    void onPlayerLeft(const protocol::PlayerLeft &event);
     void addExplosion(const protocol::EntityState &entity, float duration);
     float tiltOf(const protocol::EntityState &entity, float dt);
 
@@ -71,10 +76,14 @@ private:
     void drawScore(sf::RenderWindow &window) const;
     void drawBossAlert(sf::RenderWindow &window) const;
     void drawPlayers(sf::RenderWindow &window) const;
+    void drawPlayerLine(sf::RenderWindow &window, std::uint8_t player, bool active, float y) const;
+    void drawPanel(sf::RenderWindow &window, sf::Vector2f position, sf::Vector2f size) const;
+    void drawHeart(sf::RenderWindow &window, sf::Vector2f center, sf::Color color) const;
     void drawDamageFlash(sf::RenderWindow &window) const;
     void drawWaveBanner(sf::RenderWindow &window) const;
     void drawWeaponBanner(sf::RenderWindow &window) const;
     void drawWaitingRoom(sf::RenderWindow &window) const;
+    void drawPlayerLeft(sf::RenderWindow &window) const;
     void drawAutoFire(sf::RenderWindow &window) const;
     void drawShotMarkers(sf::RenderWindow &window) const;
     void outline(sf::Text &text) const;
@@ -107,11 +116,12 @@ private:
     float _shakeIntensity = 0.f;
     float _shootSoundCooldown = 0.f;
 
-    int _wave = 1;
+    int _level = 0; // from the snapshots
+    int _wave = 0;
     float _waveBanner = 0.f;
-    float _waveCooldown = 0.f;
-    bool _waveStarted = false;
-    int _lastEnemyCount = 0;
+    std::vector<std::uint32_t> _destroyed; // destroyed by an event, hidden until the snapshots drop them
+    std::string _leftMessage;              // "P2 LEFT THE GAME"
+    float _leftTimer = 0.f;
 
     float _localTilt = 0.f;
     std::unordered_map<std::uint32_t, float> _lastY; // last height of each remote ship

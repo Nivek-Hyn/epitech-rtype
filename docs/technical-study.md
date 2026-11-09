@@ -24,7 +24,7 @@ loss and latency still need the network track to be merged; they are not claimed
 | Dependencies | **CPM** | vcpkg, Conan | Keeps version declarations in CMake ([ADR 0001](adr/0001-cpp20-cmake-cpm.md)). The first build downloads and compiles application libraries. Compilers, SDKs and documented platform libraries such as X11/OpenGL remain prerequisites; builds are not assumed identical on every machine. |
 | Unit tests | **GoogleTest** | Catch2, doctest | Widely used, integrated with CTest (`gtest_discover_tests`), good failure messages. Catch2 or doctest would also fit; the choice is mostly familiarity. |
 | Continuous integration | **GitHub Actions**, run on demand + `scripts/check.sh` locally | GitLab CI, Jenkins | The repository is on GitHub. The manual workflow builds and tests on Linux and Windows and checks formatting. Local checks additionally run clang-tidy; they do not use Actions credits. |
-| Level editing | **Graphical editor** (`tools/level-editor`, SFML) writing the level JSON | Editing JSON by hand, in-game editor | Placing enemies on a time × height timeline is faster and less error-prone than typing coordinates. A separate tool keeps editing code out of the client. Its preview reuses the engine (Registry, movement, fixed timestep) but replays straight-line timing only, not movement patterns or shots. |
+| Level editing | **Editor inside the client** (CREATE A LEVEL), writing the level JSON | Editing JSON by hand, a separate tool | The level is shown as it is played: world background, real sprites, time to the right. TEST saves the level and plays it for real on a local server, so what is designed is exactly what is played. Placed objects are entities of an engine Registry. An earlier separate tool with colored dots was replaced. |
 
 ## 2. Libraries
 
@@ -138,8 +138,10 @@ an event (for example a collision) without knowing who reacts to it (damage, sco
 We kept both modes. The queued mode avoids a real bug: if a damage handler kills an entity while the collision
 system is still iterating over components, references to that entity's components would become invalid.
 Priorities and answers are candidates only if a game needs them. Brick Rush sends `BrickHit` and `BallLost`
-through the queued mode. The R-Type collision code reaches the same safety differently: it collects the entities
-to destroy during iteration and destroys them afterwards, without the bus.
+through the queued mode. The R-Type server uses it the same way: the collision code enqueues an
+`EntityKilled` event for each destroyed entity, and three independent handlers react after the iteration (the lost
+life, the `EntityDestroyed` sent to the clients, the bonus drop). Adding a reaction, such as a sound, needs no change
+to the collision code.
 
 ### Fixed timestep game loop — Implemented
 
@@ -173,10 +175,9 @@ keeping the fraction. Without this limit a slow server could accumulate an endle
 
 ### Known limits
 
-- Entity ids are recycled without a *generation* counter: an old id kept by mistake may point to a new entity.
-  The game sends a separate `NetworkId` over the network. That separates the two id spaces, but does not
-  detect stale local ids: callers must manage their lifetime. This is a usage rule, not a check enforced by Registry.
-  A generation counter is a possible improvement, not part of the current implementation.
+- Entity ids carry an 8-bit generation besides their slot: a stale id kept by mistake no longer reaches the entity
+  that reuses its slot (`Registry::alive` checks the generation). It wraps after 256 reuses of a slot. The game still
+  sends a separate `NetworkId` over the network, because slots are local to each machine.
 - Growing a vector or removing a component can invalidate pointers and references to components.
   Callbacks of `each` must not keep them.
 - Removing a component leaves an empty slot. Storage follows the largest inserted id and retained vector capacity,
@@ -192,7 +193,7 @@ keeping the fraction. Without this limit a slow server could accumulate an endle
 | **Reliable messages** for `EntityDestroyed`, `PlayerLeft` and `Disconnect` ([ADR 0009](adr/0009-reliable-messages-over-udp.md)) | A TCP channel, everything reliable | Only what nothing replaces is acknowledged and repeated, with a delay that follows the measured round-trip time. Snapshots and inputs stay unreliable: a newer one replaces them. |
 | **Binary protocol** ([ADR 0008](adr/0008-binary-protocol.md), [specification](protocol.md)) | JSON, text | Compact and fast to parse. One entity takes 10 bytes in binary (two quantized 16-bit positions), about 50 to 60 bytes in JSON. |
 
-Bandwidth, worst case (a full snapshot packet: 10-byte header + 15 bytes + 117 entities × 10 bytes = 1,195 bytes):
+Bandwidth, worst case (a full snapshot packet: 10-byte header + 17 bytes + 117 entities × 10 bytes = 1,197 bytes):
 30 packets per second ≈ 36 KB/s ≈ 287 kbit/s per client, about 1.15 Mbit/s for 4 clients. This is a payload
 estimate: it excludes UDP/IP overhead. Measured on a campaign game with 27 to 28 entities per snapshot, one client
 receives 8.4 KB/s, against 24.3 KB/s with the first protocol (14-byte entities, 60 snapshots per second): the
@@ -281,12 +282,12 @@ the network maintainer; no checks were disabled. This is separate from the succe
 
 | Decision | What we gain | What we accept |
 |---|---|---|
-| Our own ECS with sparse arrays | Simplicity, testability, full understanding | Some memory on empty slots; no generation counter yet |
+| Our own ECS with sparse arrays | Simplicity, testability, full understanding | Some memory on empty slots; 8-bit generations wrap after 256 reuses |
 | Separate engine modules and installed package | Reuse with selected dependencies and a separate consumer | Additional CMake rules; compatible compiler/OS/configuration still required; no runtime plugins |
 | Fixed timestep with catch-up limit | Consistent step duration; bounded catch-up work | Game loses simulated time after a long stall; cross-machine determinism is not guaranteed |
 | Event bus with immediate and queued modes | Decoupled systems, safe deferred reactions | Events must be copyable; no priorities yet |
 | Full snapshots over UDP | Robust to packet loss, simple | Higher bandwidth than deltas |
 | No persistence | No corruption or disk security issues | Nothing survives a server restart |
 | Prefabs described by components | Content and new entities without recompiling, in any game | New behaviors still need C++; component names are strings checked at load time |
-| Separate graphical level editor | Fast, visual level design writing the server's format | Preview replays timing only, not patterns or shots |
+| Level editor inside the game | Levels designed with the real sprites and backgrounds, tested for real in one click | The timeline shows spawn positions, not movement patterns: TEST is the way to see them |
 | A brick breaker as second game | Shows the engine on a very different game | A small game: it proves reuse, not every engine feature |

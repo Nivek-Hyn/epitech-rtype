@@ -8,6 +8,7 @@
 
 #include <SFML/Graphics.hpp>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -19,7 +20,8 @@ namespace rtype::client::ui {
 
 enum class MenuScreen { Root, HostGame, JoinGame, Settings };
 
-enum class MenuAction { None, Play, Host, Connect, Exit };
+// What the menu asks the application to do.
+enum class MenuAction { None, Campaign, Infinite, Host, Connect, Editor, Exit };
 
 class MainMenu {
 public:
@@ -28,13 +30,15 @@ public:
 
     void handleEvent(const sf::Event &event, const sf::RenderWindow &window);
     void update(float dt);
-    void draw(sf::RenderWindow &window);
+    void draw(sf::RenderTarget &window);
 
     MenuAction getAndResetAction();
     const GameConfig &getConfig() const;
     void setStatusMessage(const std::string &message, sf::Color color = sf::Color::Yellow);
     // Changes the accessibility settings from the game (F1, F2) and keeps the settings screen in sync.
     void setAccessibility(bool autoFire, bool highContrast);
+    // Makes a campaign level playable on the map, and saves it.
+    void unlockLevel(int level);
 
 private:
     void initRootScreen();
@@ -43,13 +47,28 @@ private:
     void initSettingsScreen();
     void updateKeyButtonLabels();
 
+    void handleRootEvent(std::optional<sf::Vector2f> mouse, bool clicked, const sf::Event::KeyPressed *key);
+    void handleHostEvent(const sf::Event &event, std::optional<sf::Vector2f> mouse, bool clicked,
+                         const sf::Event::KeyPressed *key);
+    void handleJoinEvent(const sf::Event &event, std::optional<sf::Vector2f> mouse, bool clicked,
+                         const sf::Event::KeyPressed *key);
+    void handleSettingsEvent(std::optional<sf::Vector2f> mouse, bool clicked, const sf::Event::KeyPressed *key);
+    bool clickSettingSelectors(sf::Vector2f mouse);
+    bool startRebinding(sf::Vector2f mouse);
+    bool clickPreset(sf::Vector2f mouse);
+    void rebind(sf::Keyboard::Key key);
+    void confirmHost();
+    void confirmJoin();
+    void back();
+    void drawScreenTitle(sf::RenderTarget &window, const std::string &title, float y);
+    void drawSettings(sf::RenderTarget &window);
+
     void navigateMenu(int direction);
     void triggerCurrentSelection();
     void playUiSound(const std::string &id = "click");
 
     const sf::Font &_font;
     ResourceManager *_resources{nullptr};
-    Starfield _starfield;
     MenuScreen _currentScreen{MenuScreen::Root};
     MenuAction _pendingAction{MenuAction::None};
     GameConfig _config;

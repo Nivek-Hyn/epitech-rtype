@@ -25,21 +25,21 @@ public:
     explicit EntityRenderer(ResourceManager &resources) : _resources(resources) {}
 
     // tilt is only used for ships: from -2 (diving) to 2 (climbing).
-    void draw(sf::RenderWindow &window, const protocol::EntityState &entity, float time, float tilt,
+    void draw(sf::RenderTarget &window, const protocol::EntityState &entity, float time, float tilt,
               std::optional<std::uint8_t> localPlayer) const;
-    void drawExplosion(sf::RenderWindow &window, const Explosion &explosion) const;
+    void drawExplosion(sf::RenderTarget &window, const Explosion &explosion) const;
 
 private:
-    void drawPlayer(sf::RenderWindow &window, const protocol::EntityState &entity, float time, float tilt,
+    void drawPlayer(sf::RenderTarget &window, const protocol::EntityState &entity, float time, float tilt,
                     std::optional<std::uint8_t> localPlayer) const;
-    void drawPlayerTag(sf::RenderWindow &window, const protocol::EntityState &entity,
+    void drawPlayerTag(sf::RenderTarget &window, const protocol::EntityState &entity,
                        std::optional<std::uint8_t> localPlayer) const;
-    void drawPlayerMissile(sf::RenderWindow &window, const protocol::EntityState &entity, float time) const;
-    void drawEnemyMissile(sf::RenderWindow &window, const protocol::EntityState &entity, float time) const;
-    void drawBonus(sf::RenderWindow &window, const protocol::EntityState &entity, float time) const;
-    void drawObstacle(sf::RenderWindow &window, const protocol::EntityState &entity, float time) const;
-    void drawEnemy(sf::RenderWindow &window, const protocol::EntityState &entity, float time) const;
-    void drawScout(sf::RenderWindow &window, const protocol::EntityState &entity, float time) const;
+    void drawPlayerMissile(sf::RenderTarget &window, const protocol::EntityState &entity, float time) const;
+    void drawEnemyMissile(sf::RenderTarget &window, const protocol::EntityState &entity, float time) const;
+    void drawBonus(sf::RenderTarget &window, const protocol::EntityState &entity, float time) const;
+    void drawObstacle(sf::RenderTarget &window, const protocol::EntityState &entity, float time) const;
+    void drawEnemy(sf::RenderTarget &window, const protocol::EntityState &entity, float time) const;
+    void drawScout(sf::RenderTarget &window, const protocol::EntityState &entity, float time) const;
 
     // The first loaded texture among the names, or the generic enemy texture.
     const sf::Texture &texture(std::initializer_list<const char *> names) const;

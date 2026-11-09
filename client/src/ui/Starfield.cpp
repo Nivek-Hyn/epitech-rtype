@@ -45,7 +45,7 @@ void Starfield::update(float dt)
     }
 }
 
-void Starfield::draw(sf::RenderWindow &window) const
+void Starfield::draw(sf::RenderTarget &window) const
 {
     for (const auto &star : _stars) {
         sf::RectangleShape shape({star.size, star.size});

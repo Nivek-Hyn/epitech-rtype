@@ -61,7 +61,8 @@ TEST(Weapons, DestroyedEnemyDropsABonusThatChangesTheWeapon)
     game.loadLevel("tests/data/one_grunt.json");
     game.arsenal().dropChance = 1.f;
     game.arsenal().dropPrefabs = {"bonus_laser"};
-    game.onPlayerJoined(0); // ship at y = 300, level with the enemy
+    game.rules().restartDelay = 1000.f; // the one-level campaign is won long before the bonus arrives
+    game.onPlayerJoined(0);             // ship at y = 300, level with the enemy
     game.onInput(0, protocol::InputFlag::Shoot);
     game.onInput(0, 0);
 

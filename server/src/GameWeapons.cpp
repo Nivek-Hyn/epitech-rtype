@@ -1,7 +1,7 @@
 // Player weapons and bonuses: weapons.json says which prefabs to use, entities.json describes them.
 
 #include "Game.hpp"
-#include "common/Components.hpp"
+#include "GameComponents.hpp"
 #include <algorithm>
 #include <cmath>
 #include <numbers>
@@ -10,8 +10,6 @@
 namespace rtype::server {
 
 namespace {
-
-constexpr int MaxLives = 5;
 
 // Turns the velocity of the prefab by the given angle, keeping its speed.
 void aim(rtype::components::Velocity &velocity, float degrees)
@@ -34,17 +32,14 @@ void Game::fire(std::size_t player, float x, float y)
     _shootCooldowns[player] = weapon.cooldown;
 }
 
-// Called once the collisions are resolved: creating entities while iterating is not allowed.
-void Game::dropBonuses(const std::vector<std::pair<float, float>> &positions)
+// A destroyed enemy may leave a bonus. Called from an event handler, once the collisions are resolved.
+void Game::dropBonusAt(float x, float y)
 {
-    if (_arsenal.dropPrefabs.empty())
+    if (_arsenal.dropPrefabs.empty() ||
+        !std::bernoulli_distribution(std::clamp(_arsenal.dropChance, 0.f, 1.f))(_random))
         return;
-    std::bernoulli_distribution drops(std::clamp(_arsenal.dropChance, 0.f, 1.f));
     std::uniform_int_distribution<std::size_t> pick(0, _arsenal.dropPrefabs.size() - 1);
-    for (const auto &[x, y] : positions) {
-        if (drops(_random))
-            spawnPrefab(_arsenal.dropPrefabs[pick(_random)], x, y);
-    }
+    spawnPrefab(_arsenal.dropPrefabs[pick(_random)], x, y);
 }
 
 // The player whose ship touches the box, if any.
@@ -75,7 +70,7 @@ void Game::giveBonus(engine::ecs::Entity bonus, std::size_t player)
     const auto &effect = *_registry.get<rtype::components::BonusEffect>(bonus);
     if (!effect.weapon.empty())
         _weapons[player] = effect.weapon;
-    _lives[player] = std::min(MaxLives, _lives[player] + effect.lives);
+    _lives[player] = std::min(std::max(_rules.maxLives, _rules.playerLives), _lives[player] + effect.lives);
     if (const auto *networkId = _registry.get<rtype::components::NetworkId>(bonus))
         _events.push_back(protocol::EntityDestroyed{networkId->id, protocol::DestroyReason::Collected});
     _registry.kill(bonus);

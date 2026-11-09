@@ -91,11 +91,13 @@ std::vector<EnemyType> loadEnemyTypes(const std::string &path)
     for (const auto &[name, prefab] : prefabs.items()) {
         const std::string list = listOf(prefab);
         const float speed = -prefab.value("Velocity", nlohmann::json::object()).value("x", -100.f);
+        const nlohmann::json hitbox = prefab.value("Hitbox", nlohmann::json::object());
         if (!list.empty())
-            types.push_back({name, speed, list});
+            types.push_back({name, speed, list, prefab.value("Kind", nlohmann::json::object()).value("variant", 0),
+                             hitbox.value("width", 64.f), hitbox.value("height", 64.f), hitbox.value("offset_y", 0.f)});
     }
     if (types.empty())
-        types.push_back({"standard", 100.f, "enemies"});
+        types.push_back({"standard", 100.f, "enemies", 0, 64.f, 64.f, 0.f});
     return types;
 }
 

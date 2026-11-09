@@ -4,6 +4,7 @@
 
 #include <cstdint>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 namespace rtype::protocol {
@@ -16,20 +17,19 @@ public:
     // Returns false when the snapshot was ignored because it belongs to an older tick.
     bool add(const Snapshot &snapshot)
     {
-        if (_hasTick && snapshot.tick < _tick)
+        if (_hasTick && snapshot.tick < _world.tick)
             return false;
-        if (!_hasTick || snapshot.tick > _tick) {
+        if (!_hasTick || snapshot.tick > _world.tick) {
             _hasTick = true;
-            _tick = snapshot.tick;
-            _entities.clear();
+            _world.entities.clear();
             _knownIds.clear();
         }
-        _state = snapshot.state;
-        _score = snapshot.score;
-        _lives = snapshot.lives;
+        std::vector<EntityState> entities = std::move(_world.entities);
+        _world = snapshot; // every field of the header comes from the newest packet
+        _world.entities = std::move(entities);
         for (const EntityState &entity : snapshot.entities) {
             if (_knownIds.insert(entity.netId).second)
-                _entities.push_back(entity);
+                _world.entities.push_back(entity);
         }
         return true;
     }
@@ -38,27 +38,21 @@ public:
     void reset()
     {
         _hasTick = false;
-        _tick = 0;
-        _state = GameState::Waiting;
-        _score = 0;
-        _lives = {};
-        _entities.clear();
+        _world = Snapshot{};
         _knownIds.clear();
     }
 
-    const std::vector<EntityState> &entities() const { return _entities; }
-    GameState state() const { return _state; }
-    std::uint32_t score() const { return _score; }
-    const decltype(Snapshot::lives) &lives() const { return _lives; }
-    std::uint32_t tick() const { return _tick; }
+    // The whole world of the newest tick, with the entities of all its packets.
+    const Snapshot &snapshot() const { return _world; }
+    const std::vector<EntityState> &entities() const { return _world.entities; }
+    GameState state() const { return _world.state; }
+    std::uint32_t score() const { return _world.score; }
+    const decltype(Snapshot::lives) &lives() const { return _world.lives; }
+    std::uint32_t tick() const { return _world.tick; }
 
 private:
     bool _hasTick = false;
-    std::uint32_t _tick = 0;
-    GameState _state = GameState::Waiting;
-    std::uint32_t _score = 0;
-    decltype(Snapshot::lives) _lives{};
-    std::vector<EntityState> _entities;
+    Snapshot _world;
     std::unordered_set<std::uint32_t> _knownIds;
 };
 

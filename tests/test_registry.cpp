@@ -46,10 +46,12 @@ TEST(Registry, KillPreservesOtherEntitiesAndReusesOnlyTheFreedId)
     EXPECT_FALSE(registry.alive(first));
     EXPECT_TRUE(registry.alive(second));
     const Entity replacement = registry.spawn();
-    EXPECT_EQ(replacement, first);
+    EXPECT_EQ(engine::ecs::indexOf(replacement), engine::ecs::indexOf(first)); // same slot...
+    EXPECT_NE(replacement, first);                                             // ...new generation
     EXPECT_TRUE(registry.alive(replacement));
+    EXPECT_FALSE(registry.alive(first));
     const Entity next = registry.spawn();
-    EXPECT_NE(next, first);
+    EXPECT_NE(engine::ecs::indexOf(next), engine::ecs::indexOf(first));
     EXPECT_NE(next, second);
 }
 
@@ -61,8 +63,8 @@ TEST(Registry, KillingDeadOrUnknownEntitiesDoesNotDuplicateFreeIds)
     registry.kill(entity);
     registry.kill(100);
     registry.kill(engine::ecs::NullEntity);
-    EXPECT_EQ(registry.spawn(), entity);
-    EXPECT_NE(registry.spawn(), entity);
+    EXPECT_EQ(engine::ecs::indexOf(registry.spawn()), engine::ecs::indexOf(entity));
+    EXPECT_NE(engine::ecs::indexOf(registry.spawn()), engine::ecs::indexOf(entity));
 }
 
 TEST(Registry, KillRemovesComponentsAndReusesId)
@@ -73,7 +75,23 @@ TEST(Registry, KillRemovesComponentsAndReusesId)
     registry.kill(ship);
     EXPECT_FALSE(registry.alive(ship));
     EXPECT_FALSE(registry.has<Position>(ship));
-    EXPECT_EQ(registry.spawn(), ship);
+    EXPECT_EQ(engine::ecs::indexOf(registry.spawn()), engine::ecs::indexOf(ship));
+}
+
+TEST(Registry, AStaleHandleNeverReachesTheEntityThatReusesItsSlot)
+{
+    Registry registry;
+    const Entity old = registry.spawn();
+    registry.kill(old);
+    const Entity reused = registry.spawn();
+    registry.emplace<Position>(reused, 5.f, 6.f);
+
+    EXPECT_FALSE(registry.alive(old));
+    EXPECT_EQ(registry.get<Position>(old), nullptr);
+    EXPECT_THROW(registry.emplace<Velocity>(old), std::invalid_argument);
+    registry.kill(old); // does nothing to the new entity
+    EXPECT_TRUE(registry.alive(reused));
+    EXPECT_FLOAT_EQ(registry.get<Position>(reused)->x, 5.f);
 }
 
 TEST(Registry, GetReturnsTheComponent)
@@ -125,9 +143,10 @@ TEST(Registry, ReusedEntityDoesNotInheritAnyOldComponents)
     registry.kill(entity);
     EXPECT_FALSE(registry.components<Position>().has(entity));
     EXPECT_FALSE(registry.components<Velocity>().has(entity));
-    EXPECT_EQ(registry.spawn(), entity);
-    EXPECT_EQ(registry.get<Position>(entity), nullptr);
-    EXPECT_FALSE(registry.has<Velocity>(entity));
+    const Entity reused = registry.spawn();
+    EXPECT_EQ(engine::ecs::indexOf(reused), engine::ecs::indexOf(entity));
+    EXPECT_EQ(registry.get<Position>(reused), nullptr);
+    EXPECT_FALSE(registry.has<Velocity>(reused));
 }
 
 TEST(Registry, CannotAttachComponentsToDeadOrUnknownEntities)

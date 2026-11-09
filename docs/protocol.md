@@ -1,6 +1,6 @@
-# R-Type Network Protocol — version 7
+# R-Type Network Protocol — version 8
 
-**Status of this document.** Specification of the R-Type game protocol, version 7, as implemented by the
+**Status of this document.** Specification of the R-Type game protocol, version 8, as implemented by the
 delivered client and server. Its presentation follows the conventions of the Internet RFCs; it is not an IETF
 standard.
 
@@ -26,7 +26,7 @@ are written in hexadecimal (`0x52`). `u8`, `u16` and `u32` are unsigned integers
 | Offset | Size | Field | Description |
 |---|---|---|---|
 | 0 | u16 | magic | Always `0x5254` ("RT") |
-| 2 | u8 | version | Protocol version, currently `7` |
+| 2 | u8 | version | Protocol version, currently `8` |
 | 3 | u8 | type | Message type (see §4); bit `0x40` set means a reliable message (§3.2) |
 | 4 | u32 | sequence | Number of the packet for this peer, see §3.1 |
 | 8 | u16 | payload_size | Number of bytes after the header |
@@ -147,6 +147,8 @@ Input flags: `0x01` up, `0x02` down, `0x04` left, `0x08` right, `0x10` shoot, `0
 | u8 | state: `1` waiting for players, `2` playing, `3` finished (victory), `4` game over (defeat) |
 | u32 | score |
 | 4 × u8 | lives left of each player, by `player_id` (`0` if nobody has this id) |
+| u8 | level: index of the level being played, from `0` |
+| u8 | wave: waves of this level that have already come (`0` before the first one) |
 | u16 | count (max 117) |
 | count × 10 bytes | entities |
 
@@ -204,20 +206,21 @@ Both examples are produced byte for byte by the reference encoder (test `Protoco
 **Input** — packet number 7, the player holds *up* and *shoot* (`0x01 | 0x10`):
 
 ```text
-52 54  07  02  00 00 00 07  00 01  |  11
+52 54  08  02  00 00 00 07  00 01  |  11
 magic  ver type sequence    size   |  flags
 ```
 
-**Snapshot** — packet number 8, tick 120, playing, score 300, player 0 has 3 lives, one entity: the ship of
-player 0 (net id 5) at (100, 300). Quantized: x = (100 + 1024) × 16 = 17984 = `0x4640`, y = (300 + 1024) × 16 =
+**Snapshot** — packet number 8, tick 120, playing, score 300, player 0 has 3 lives, second level (index 1),
+second wave, one entity: the ship of player 0 (net id 5) at (100, 300). Quantized: x = (100 + 1024) × 16 = 17984 = `0x4640`, y = (300 + 1024) × 16 =
 21184 = `0x52C0`.
 
 ```text
-52 54 07 83 00 00 00 08 00 19     header: Snapshot, sequence 8, payload of 25 bytes
+52 54 08 83 00 00 00 08 00 1B     header: Snapshot, sequence 8, payload of 27 bytes
 00 00 00 78                       tick 120
 02                                state: playing
 00 00 01 2C                       score 300
 03 00 00 00                       lives of players 0 to 3
+01 02                             level index 1, wave 2
 00 01                             one entity
 00 00 00 05 01 00 46 40 52 C0     net id 5, player, variant 0, x, y
 ```

@@ -1,7 +1,7 @@
 #include "EnemyShootSystem.hpp"
 #include "Game.hpp"
+#include "GameComponents.hpp"
 #include "MovementSystem.hpp"
-#include "common/Components.hpp"
 
 #include <gtest/gtest.h>
 
@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <array>
 #include <fstream>
+#include <set>
 #include <string>
 
 using namespace rtype;
@@ -545,11 +546,17 @@ TEST(Game, InvulnerabilityProtectsAndGameIsOverWhenLivesRunOut)
     EXPECT_EQ(game.snapshot().state, protocol::GameState::GameOver);
     EXPECT_EQ(countOf(game, protocol::EntityType::Enemy), 0);
 
-    // It stays over: nothing comes back while the players look at the screen.
-    run(game, 10.f);
+    // It stays over while the players look at the end screen...
+    run(game, game.rules().restartDelay - 1.f);
     EXPECT_EQ(game.gameState(), protocol::GameState::GameOver);
     EXPECT_EQ(countOf(game, protocol::EntityType::Enemy), 0);
     EXPECT_EQ(countOf(game, protocol::EntityType::Player), 0);
+
+    // ...then a new game starts in the waiting room, with a ship and full lives for the players still here.
+    run(game, 1.5f);
+    EXPECT_NE(game.gameState(), protocol::GameState::GameOver);
+    EXPECT_EQ(countOf(game, protocol::EntityType::Player), 1);
+    EXPECT_EQ(game.playerLives(0), 3);
 }
 
 TEST(Game, DeathWithLivesLeftIsNotGameOver)
@@ -1070,4 +1077,29 @@ TEST(Movement, BossSpriteStaysOnScreenWhileBouncing)
         EXPECT_LE(position->y + box.offsetY + box.height, WorldHeight + 5.f);
         EXPECT_GE(position->y + box.offsetY, -5.f);
     }
+}
+
+TEST(Game, LaterInfiniteLoopsSpawnEnemiesAtRandomHeightsOnTheRight)
+{
+    std::set<int> heights;
+    for (int attempt = 0; attempt < 5; ++attempt) {
+        Game game;
+        game.rules().lobbyDelay = 0.f;
+        game.loadEntitiesConfig(TestEntities);
+        game.loadLevel(OneGrunt); // the grunt is placed at y = 300 by the level, after 1 second
+        game.setGameMode(Game::GameMode::Infinite);
+        game.setInfiniteLoopCount(2);
+        game.onPlayerJoined(0);
+        game.onInput(0, protocol::InputFlag::Down); // out of the enemy's way
+        run(game, 1.05f);
+        const auto snap = game.snapshot();
+        const auto enemy = std::find_if(snap.entities.begin(), snap.entities.end(),
+                                        [](const auto &entity) { return entity.type == protocol::EntityType::Enemy; });
+        ASSERT_NE(enemy, snap.entities.end());
+        EXPECT_GE(enemy->y, 0.f);
+        EXPECT_LE(enemy->y, WorldHeight - 72.f);
+        EXPECT_GT(enemy->x, WorldWidth - 100.f); // it appeared on the right edge
+        heights.insert(static_cast<int>(enemy->y));
+    }
+    EXPECT_GT(heights.size(), 1u); // not always the height written in the level
 }

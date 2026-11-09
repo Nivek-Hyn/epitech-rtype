@@ -230,12 +230,6 @@ void AsioNetworkClient::handlePacket(const protocol::Packet &packet, Clock::time
     } else if (std::holds_alternative<protocol::ConnectRejected>(packet.message)) {
         if (connecting)
             _state = ConnectionState::Rejected;
-    } else if (std::holds_alternative<protocol::Snapshot>(packet.message)) {
-        // A snapshot is the whole game at one tick: one that arrives after a newer one would only go back in time.
-        if (verdict == engine::net::SequenceVerdict::Late) {
-            _traffic.addOutdated();
-            return;
-        }
     } else if (const auto *pong = std::get_if<protocol::Pong>(&packet.message)) {
         const double sample = static_cast<double>(static_cast<std::uint32_t>(nowMs() - pong->timestampMs));
         const double previous = _rttMs;

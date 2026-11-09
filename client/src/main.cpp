@@ -1,53 +1,20 @@
-#include "Game.hpp"
+#include "App.hpp"
 #include "ResourceManager.hpp"
 #include "common/Constants.hpp"
-#include "common/Protocol.hpp"
-#include "engine/core/FixedTimestep.hpp"
-#include "game/Session.hpp"
-#include "net/AsioNetworkClient.hpp"
-#include "net/AsioNetworkServer.hpp"
-#include "ui/MainMenu.hpp"
-#include "ui/Starfield.hpp"
 
-#include <SFML/Graphics.hpp>
-
-#include <atomic>
-#include <chrono>
-#include <cmath>
-#include <cstdio>
 #include <cstdlib>
 #include <exception>
 #include <iostream>
 #include <optional>
 #include <string>
-#include <thread>
-#include <vector>
 
 namespace {
-
-using namespace rtype::client;
 
 struct Arguments {
     std::string host = "127.0.0.1";
     std::uint16_t port = rtype::DefaultPort;
     bool directConnect = false; // a host was given: skip the menu
 };
-
-// One line of network statistics: ping, bandwidth, loss, dropped and resent packets.
-std::string statsLine(const NetworkStats &stats)
-{
-    char rtt[24] = "-- ms";
-    if (stats.rttMs)
-        std::snprintf(rtt, sizeof rtt, "%.0f ms", *stats.rttMs);
-    char line[200];
-    const auto dropped = stats.traffic.totals.duplicatesDropped + stats.traffic.totals.outdatedDropped;
-    std::snprintf(line, sizeof line,
-                  "ping %s | down %.1f KB/s | up %.1f KB/s | loss %.1f%% | dropped %llu | resent %llu  [F3]", rtt,
-                  stats.traffic.rates.receivedBytesPerSecond / 1024.0, stats.traffic.rates.sentBytesPerSecond / 1024.0,
-                  stats.lossPercent, static_cast<unsigned long long>(dropped),
-                  static_cast<unsigned long long>(stats.traffic.totals.retransmissions));
-    return line;
-}
 
 std::optional<Arguments> parseArguments(int argc, char **argv)
 {
@@ -57,8 +24,12 @@ std::optional<Arguments> parseArguments(int argc, char **argv)
             arguments.host = argv[1];
             arguments.directConnect = true;
         }
-        if (argc > 2)
-            arguments.port = static_cast<std::uint16_t>(std::stoul(argv[2]));
+        if (argc > 2) {
+            const unsigned long port = std::stoul(argv[2]);
+            if (port == 0 || port > 65535)
+                return std::nullopt;
+            arguments.port = static_cast<std::uint16_t>(port);
+        }
     } catch (const std::exception &) {
         return std::nullopt;
     }
@@ -358,7 +329,7 @@ int main(int argc, char **argv)
         return 84;
     }
 
-    ResourceManager resources;
+    rtype::client::ResourceManager resources;
     const bool hasAssets = resources.loadDefaults();
     if (!hasAssets)
         std::cerr << "Warning: Could not load some assets. Make sure to run from repository root.\n";
@@ -367,7 +338,7 @@ int main(int argc, char **argv)
         return 84;
     }
 
-    App app(resources, hasAssets);
+    rtype::client::App app(resources, hasAssets);
     if (arguments->directConnect) {
         try {
             app.connect(arguments->host, arguments->port);

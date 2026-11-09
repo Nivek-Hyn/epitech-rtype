@@ -1,0 +1,246 @@
+#include "CampaignMap.hpp"
+
+#include <nlohmann/json.hpp>
+
+#include <algorithm>
+#include <array>
+#include <cmath>
+#include <fstream>
+
+namespace rtype::client::ui {
+
+namespace {
+
+constexpr float NodeRadius = 38.f;
+constexpr float BossRadius = 52.f;
+
+const std::array<sf::Color, 3> WorldColors = {sf::Color(80, 190, 255), sf::Color(240, 120, 60),
+                                              sf::Color(190, 100, 255)};
+const std::array<const char *, 3> WorldNames = {"WORLD 1 - ORBITAL BELT", "WORLD 2 - MARS", "WORLD 3 - SINGULARITY"};
+
+nlohmann::json readJson(const std::string &path)
+{
+    std::ifstream file(path);
+    if (!file)
+        return nlohmann::json::object();
+    return nlohmann::json::parse(file, nullptr, false); // an invalid file reads as "discarded", handled below
+}
+
+// The campaign files listed in game_rules.json, with the name written in each level.
+std::vector<std::string> campaignNames()
+{
+    const nlohmann::json rules = readJson("assets/config/game_rules.json");
+    std::vector<std::string> names;
+    if (!rules.is_object())
+        return names;
+    for (const auto &path :
+         rules.value("campaign", nlohmann::json::object()).value("levels", nlohmann::json::array())) {
+        const nlohmann::json level = readJson(path.get<std::string>());
+        names.push_back(level.is_object() ? level.value("level_name", "Level") : "Level");
+    }
+    return names;
+}
+
+bool isBoss(std::size_t index)
+{
+    return index % CampaignMap::LevelsPerWorld == CampaignMap::LevelsPerWorld - 1;
+}
+
+// "2-1": world, then level within the world.
+std::string levelLabel(std::size_t index)
+{
+    return std::to_string(index / CampaignMap::LevelsPerWorld + 1) + "-" +
+           std::to_string(index % CampaignMap::LevelsPerWorld + 1);
+}
+
+} // namespace
+
+CampaignMap::CampaignMap(const sf::Font &font) : _font(font)
+{
+    const std::vector<std::string> names = campaignNames();
+    for (std::size_t i = 0; i < names.size(); i++) {
+        const float t = static_cast<float>(i);
+        _levels.push_back({names[i], {230.f + t * 182.f, 430.f + std::sin(t * 1.3f) * 120.f}});
+    }
+    _difficulty = std::make_unique<OptionSelector>(
+        font, "DIFFICULTY", std::vector<std::string>{"EASY", "NORMAL", "HARD"}, sf::Vector2f(680.f, 820.f), 1);
+    _playButton = std::make_unique<Button>(font, "PLAY", sf::Vector2f(680.f, 920.f), sf::Vector2f(260.f, 58.f));
+    _backButton = std::make_unique<Button>(font, "BACK", sf::Vector2f(980.f, 920.f), sf::Vector2f(260.f, 58.f));
+}
+
+void CampaignMap::open(std::size_t unlocked)
+{
+    _unlocked = std::min(unlocked, _levels.empty() ? 0 : _levels.size() - 1);
+    select(_unlocked); // start on the newest level reached
+    _choice.reset();
+    _back = false;
+}
+
+void CampaignMap::select(std::size_t index)
+{
+    if (index <= _unlocked && index < _levels.size())
+        _selected = index;
+}
+
+void CampaignMap::play()
+{
+    if (!_levels.empty())
+        _choice = Choice{_selected, static_cast<int>(_difficulty->getSelectedIndex())};
+}
+
+void CampaignMap::handleEvent(const sf::Event &event, const sf::RenderWindow &window)
+{
+    if (const auto *moved = event.getIf<sf::Event::MouseMoved>()) {
+        const sf::Vector2f mouse = window.mapPixelToCoords(moved->position);
+        _hovered.reset();
+        for (std::size_t i = 0; i < _levels.size(); i++) {
+            const sf::Vector2f d = mouse - _levels[i].position;
+            if (d.x * d.x + d.y * d.y < BossRadius * BossRadius)
+                _hovered = i;
+        }
+        _difficulty->handleMouseMove(mouse);
+        _playButton->handleMouseMove(mouse);
+        _backButton->handleMouseMove(mouse);
+    } else if (const auto *click = event.getIf<sf::Event::MouseButtonPressed>()) {
+        const sf::Vector2f mouse = window.mapPixelToCoords(click->position);
+        if (_hovered)
+            select(*_hovered);
+        _difficulty->handleMouseClick(mouse);
+        if (_playButton->handleMouseClick(mouse))
+            play();
+        else if (_backButton->handleMouseClick(mouse))
+            _back = true;
+    } else if (const auto *key = event.getIf<sf::Event::KeyPressed>()) {
+        if (key->code == sf::Keyboard::Key::Right && _selected + 1 <= _unlocked)
+            select(_selected + 1);
+        else if (key->code == sf::Keyboard::Key::Left && _selected > 0)
+            select(_selected - 1);
+        else if (key->code == sf::Keyboard::Key::Enter || key->code == sf::Keyboard::Key::Space)
+            play();
+        else if (key->code == sf::Keyboard::Key::Escape)
+            _back = true;
+        else
+            _difficulty->handleKeyPress(key->code);
+    }
+}
+
+std::optional<CampaignMap::Choice> CampaignMap::takeChoice()
+{
+    return std::exchange(_choice, std::nullopt);
+}
+
+bool CampaignMap::takeBack()
+{
+    return std::exchange(_back, false);
+}
+
+sf::Text CampaignMap::text(const std::string &string, unsigned int size, sf::Color color, sf::Vector2f center) const
+{
+    sf::Text label(_font, string, size);
+    label.setFillColor(color);
+    label.setOutlineColor(sf::Color(0, 0, 0, 200));
+    label.setOutlineThickness(2.f);
+    const auto bounds = label.getLocalBounds();
+    label.setOrigin({bounds.position.x + bounds.size.x / 2.f, bounds.position.y + bounds.size.y / 2.f});
+    label.setPosition(center);
+    return label;
+}
+
+void CampaignMap::draw(sf::RenderTarget &window) const
+{
+    window.draw(text("CAMPAIGN", 56, sf::Color(255, 204, 0), {960.f, 110.f}));
+    drawWorldLabels(window);
+    drawPath(window);
+    for (std::size_t i = 0; i < _levels.size(); i++)
+        drawNode(window, i);
+    drawPanel(window);
+}
+
+void CampaignMap::drawWorldLabels(sf::RenderTarget &window) const
+{
+    for (std::size_t world = 0; world * LevelsPerWorld < _levels.size(); world++) {
+        const float x =
+            _levels[world * LevelsPerWorld + 1 < _levels.size() ? world * LevelsPerWorld + 1 : world * LevelsPerWorld]
+                .position.x;
+        window.draw(
+            text(WorldNames[world % WorldNames.size()], 24, WorldColors[world % WorldColors.size()], {x, 210.f}));
+    }
+}
+
+// Dots between the nodes; the part already travelled is bright.
+void CampaignMap::drawPath(sf::RenderTarget &window) const
+{
+    for (std::size_t i = 0; i + 1 < _levels.size(); i++) {
+        const sf::Vector2f from = _levels[i].position;
+        const sf::Vector2f step = (_levels[i + 1].position - from) / 10.f;
+        const sf::Color color = i < _unlocked ? sf::Color(255, 220, 120) : sf::Color(120, 120, 140, 160);
+        for (int dot = 1; dot < 10; dot++) {
+            sf::CircleShape point(5.f);
+            point.setOrigin({5.f, 5.f});
+            point.setPosition(from + step * static_cast<float>(dot));
+            point.setFillColor(color);
+            window.draw(point);
+        }
+    }
+}
+
+// A locked level is grey with a padlock; the selected one pulses; a boss level is bigger.
+void CampaignMap::drawNode(sf::RenderTarget &window, std::size_t index) const
+{
+    const Level &level = _levels[index];
+    const bool locked = index > _unlocked;
+    const bool selected = index == _selected;
+    const float pulse = selected ? 1.f + 0.06f * std::sin(_time * 5.f) : 1.f;
+    const float radius = (isBoss(index) ? BossRadius : NodeRadius) * pulse;
+    const sf::Color color = locked ? sf::Color(70, 70, 85) : WorldColors[(index / LevelsPerWorld) % WorldColors.size()];
+
+    sf::CircleShape node(radius, 48);
+    node.setOrigin({radius, radius});
+    node.setPosition(level.position);
+    node.setFillColor(color);
+    node.setOutlineThickness(selected ? 6.f : 3.f);
+    node.setOutlineColor(selected ? sf::Color::White : sf::Color(20, 20, 30));
+    window.draw(node);
+
+    if (locked)
+        drawLock(window, level.position);
+    else
+        window.draw(text(isBoss(index) ? "BOSS" : levelLabel(index), isBoss(index) ? 22 : 26, sf::Color::White,
+                         level.position));
+    if (index < _unlocked) // already passed
+        window.draw(text("*", 34, sf::Color(255, 220, 80), level.position + sf::Vector2f{0.f, -radius - 18.f}));
+}
+
+void CampaignMap::drawLock(sf::RenderTarget &window, sf::Vector2f center) const
+{
+    sf::CircleShape shackle(10.f);
+    shackle.setOrigin({10.f, 10.f});
+    shackle.setPosition(center + sf::Vector2f{0.f, -8.f});
+    shackle.setFillColor(sf::Color::Transparent);
+    shackle.setOutlineThickness(4.f);
+    shackle.setOutlineColor(sf::Color(200, 200, 210));
+    window.draw(shackle);
+    sf::RectangleShape body({26.f, 20.f});
+    body.setOrigin({13.f, 0.f});
+    body.setPosition(center + sf::Vector2f{0.f, -2.f});
+    body.setFillColor(sf::Color(200, 200, 210));
+    window.draw(body);
+}
+
+// The selected level, the difficulty and the buttons.
+void CampaignMap::drawPanel(sf::RenderTarget &window) const
+{
+    sf::RectangleShape panel({1000.f, 300.f});
+    panel.setPosition({460.f, 700.f});
+    panel.setFillColor(sf::Color(8, 12, 28, 210));
+    panel.setOutlineThickness(2.f);
+    panel.setOutlineColor(WorldColors[world() % WorldColors.size()]);
+    window.draw(panel);
+    if (!_levels.empty())
+        window.draw(text(_levels[_selected].name, 32, sf::Color::White, {960.f, 750.f}));
+    _difficulty->draw(window);
+    _playButton->draw(window);
+    _backButton->draw(window);
+}
+
+} // namespace rtype::client::ui

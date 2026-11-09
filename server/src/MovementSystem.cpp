@@ -1,5 +1,5 @@
 #include "MovementSystem.hpp"
-#include "common/Components.hpp"
+#include "GameComponents.hpp"
 #include "common/Constants.hpp"
 #include <algorithm>
 #include <cmath>

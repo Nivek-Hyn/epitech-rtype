@@ -13,7 +13,7 @@ this page does not reassign another member's work.
 | Data-driven content: prefabs, levels, weapons, rules | `assets/config/*.json`, `assets/levels/*.json` ([how-to guides](how-to.md)) |
 | Campaign of 9 levels in 3 worlds, infinite mode, difficulties, bosses, tiles, weapons and bonuses | [Campaign game design](GameDesign/game-design-campaign.md) |
 | Waiting room, then playing, victory or game over, decided by the server | `lobby_delay` in `game_rules.json`; snapshot `state` ([protocol](protocol.md)) |
-| Level editor with an engine preview | `./r-type_level_editor assets/levels/level1.json` |
+| Level editor in the game, with the real sprites and a Test button | Menu: CREATE A LEVEL ([how-to](how-to.md#edit-a-level-with-the-level-editor)) |
 | Reliable UDP protocol: acknowledgements, duplicates, split snapshots, quantization, 30 Hz with interpolation, rate limits | [Protocol](protocol.md), [networking](networking.md), [network guide](network-guide.md) |
 | Accessibility: remappable keys, auto fire, high contrast, letters and tags besides colors | Settings screen, F1/F2 in game ([accessibility](accessibility.md)) |
 
@@ -27,17 +27,19 @@ Run every command from the repository root (or the installed game directory) aft
 1. **The engine is reusable.** Start `./brickrush`: a brick breaker built from the same Registry, prefabs,
    movement system, AABB and event bus, without `common/`. Show `games/brickrush/assets/bricks.json`: its entities
    are described by components, like R-Type's.
-2. **Four players and the waiting room.** `./r-type_server 4242 --stats`, then up to four `./r-type_client <host> 4242`
-   on Linux and Windows. The waiting room shows the players for 5 seconds, then the first wave comes.
-   A fifth client is refused ("the server is full").
-3. **Content without recompiling.** Change the `Health` or `Velocity` of a prefab in `assets/config/entities.json`,
-   or place enemies with the level editor, then restart the server.
-4. **A bad network.** `python3 scripts/netsim.py --listen 5000 --server 127.0.0.1:4242 --loss 10 --delay 80 --jitter 30 --dup 2`,
+2. **The campaign.** `./r-type_client`, CAMPAIGN: the map shows the three worlds, the locked levels and the
+   difficulty. Play a level: the background and the HUD show its world; reaching a level unlocks it on the map.
+3. **Four players and the waiting room.** `./r-type_server 4242 --stats`, then up to four
+   `./r-type_client <host> 4242` on Linux and Windows. Each player presses Space when ready; a fifth client is
+   refused ("the server is full"). When a player leaves, the others see "P2 LEFT THE GAME".
+4. **Content without recompiling.** Change the `Health` or `Velocity` of a prefab in `assets/config/entities.json`,
+   or place enemies in the level editor (CREATE A LEVEL) and press TEST to play the level at once.
+5. **A bad network.** `python3 scripts/netsim.py --listen 5000 --server 127.0.0.1:4242 --loss 10 --delay 80 --jitter 30 --dup 2`,
    connect a client to port 5000 and press F3: the game stays smooth, losses and resent packets are counted.
-5. **The protocol by hand.** Decode the two datagrams of [protocol §7](protocol.md#7-example-datagrams): header,
+6. **The protocol by hand.** Decode the two datagrams of [protocol §7](protocol.md#7-example-datagrams): header,
    big-endian fields, quantized positions. Explain why UDP, why the server keeps the authority, and how losses,
    duplicates and split snapshots are handled.
-6. **Accessibility.** In Settings, remap a key and enable auto fire and high contrast; in game, F1 and F2 toggle
+7. **Accessibility.** In Settings, remap a key and enable auto fire and high contrast; in game, F1 and F2 toggle
    them. Restart the client: the settings are kept.
 
 ## Before the demonstration

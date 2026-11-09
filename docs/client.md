@@ -7,7 +7,11 @@ is the authority, and the client draws what the snapshots contain.
 
 | File | Role |
 |---|---|
-| `client/src/main.cpp` | Arguments, then the `App` class: menu or game session, volumes, F1/F2/F3 keys, return to the menu |
+| `client/src/main.cpp` | Command-line arguments, then the application |
+| `client/src/App.cpp` | One state per screen (menu, campaign map, editor, game); hosts the local server; F1/F2/F3; where Escape leads |
+| `client/src/ui/CampaignMap.cpp` | Campaign map: one node per level, locked levels, difficulty, progress saved in `config.json` |
+| `client/src/editor/LevelEditor.cpp`, `LevelEditorDraw.cpp` | Level editor inside the game, on an engine `Registry` |
+| `client/src/render/WorldBackground.cpp` | Background of each world: image layers listed in `assets/config/backgrounds.json`, each scrolling at its own speed |
 | `client/src/ui/MainMenu.cpp` | Menu screens: join a server, settings (volumes, auto fire, high contrast, key remapping) |
 | `client/src/ui/GameConfig.cpp` | Settings saved in `config.json`; an invalid file falls back to the defaults |
 | `client/src/game/Session.cpp` | One game: inputs sent, snapshots received and smoothed, effects of destroyed entities |
@@ -34,9 +38,11 @@ snapshots whose time has come (sounds, explosions, HUD) and draws the entities b
    Without the window focus, an empty input is sent, so another window's keys never move the ship.
 2. `Session::receive` merges the packets of a tick (`SnapshotAssembler`) and queues the complete snapshot in the
    `SnapshotInterpolator`, which shows the world about two snapshots in the past.
-3. A snapshot whose time has come updates the score, lives and game state. An entity of the previous snapshot that
-   is missing was destroyed: the session plays its explosion, sound, flash or screen shake.
-4. `Session::draw` draws the blended entities, then the HUD.
+3. A snapshot whose time has come updates the score, lives, level, wave and game state.
+4. An `EntityDestroyed` from the server says why an entity disappeared. Only a killed one explodes (with its sound,
+   flash or screen shake); a bonus that was picked up or an entity that left the screen does not. The entity is hidden
+   at once, until the snapshots drop it too. A `PlayerLeft` shows "P2 LEFT THE GAME" for a few seconds.
+5. `Session::draw` draws the blended entities, then the HUD.
 
 ## Drawing an entity
 

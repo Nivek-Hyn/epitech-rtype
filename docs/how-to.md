@@ -246,14 +246,24 @@ of the prefab for this enemy only; 0 or nothing keeps them.
 
 ### Edit a level with the level editor
 
-```sh
-./r-type_level_editor assets/levels/level1.json
-```
+In the client menu, choose **CREATE A LEVEL**. The level is shown as it is played: the world background, the real
+sprites, time running to the right (one line per second) and the height of the screen from top to bottom.
 
-The editor shows the level as a timeline: time to the right, height downward. Left click adds the selected
-prefab, right click removes the one under the mouse, the wheel or Tab changes the prefab, +/- changes its
-speed, and Ctrl+S saves. P plays a preview with the engine's Registry, movement system and fixed timestep:
-it checks timing and heights, not movement patterns or shots. Placements in the same half-second share a wave.
+| Action | Control |
+|---|---|
+| Choose the enemy or tile to place | Click it in the palette, or Tab / Shift+Tab |
+| Place it | Left click on the timeline |
+| Move it | Drag it |
+| Delete it | Right click on it, or Delete while the mouse is over it |
+| Move in time | Mouse wheel, or Left / Right arrows |
+| Save | SAVE or Ctrl+S |
+| Play it for real | TEST: saves, starts a local server on this level and joins it; Escape comes back to the editor |
+| Open another level | OPEN goes through `assets/levels/custom.json` (the default) and the campaign levels |
+| Change the background | WORLD |
+
+The file keeps every key the editor does not show (amplitude, health...). Placements in the same quarter of a
+second share a wave. The editor's objects are entities of an engine `Registry` (`client/src/editor/`); reading and
+writing the files is in `tools/level-editor/`.
 
 ## Change the network protocol
 

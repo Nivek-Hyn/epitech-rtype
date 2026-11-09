@@ -1,6 +1,6 @@
 #include "Prefabs.hpp"
 
-#include "common/Components.hpp"
+#include "GameComponents.hpp"
 
 #include <array>
 #include <fstream>
