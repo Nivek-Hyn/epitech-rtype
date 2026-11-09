@@ -6,7 +6,7 @@
     "laser": { "missile": "laser_missile", "cooldown": 0.45, "angles": [0.0] }
   },
   "bonus_drops": {
-    "chance": 0.15,
+    "chance": 1.0,
     "prefabs": ["bonus_spread", "bonus_laser", "bonus_life"]
   }
 }

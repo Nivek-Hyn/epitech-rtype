@@ -123,7 +123,7 @@ bool ResourceManager::hasSound(const std::string &id) const
     return _soundBuffers.find(id) != _soundBuffers.end();
 }
 
-void ResourceManager::playSound(const std::string &id, float volume)
+void ResourceManager::playSound(const std::string &id, float volume, float pitch)
 {
     if (_sfxVolume <= 0.01f)
         return;
@@ -140,6 +140,7 @@ void ResourceManager::playSound(const std::string &id, float volume)
 
     auto sound = std::make_unique<sf::Sound>(it->second);
     sound->setVolume(_sfxVolume * (volume / 100.f));
+    sound->setPitch(pitch);
     sound->play();
     _activeSounds.push_back(std::move(sound));
 }

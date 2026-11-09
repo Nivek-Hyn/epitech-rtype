@@ -57,6 +57,13 @@ private:
     void handle(const protocol::Message &message, bool &gotSnapshot);
     void onSnapshot(const protocol::Snapshot &snapshot);
     void updateGameState(const protocol::Snapshot &snapshot);
+    void updateWaveCounter(const protocol::Snapshot &snapshot);
+    void playDestroyEffects(const protocol::Snapshot &snapshot);
+    void playSpawnEffects(const protocol::Snapshot &snapshot);
+    void onDestroyed(const protocol::EntityState &entity, const protocol::Snapshot &snapshot,
+                     const std::vector<sf::Vector2f> &ships);
+    void onShipHit(const protocol::EntityState &shot, const std::vector<sf::Vector2f> &ships);
+    void onEnemyHit(const protocol::EntityState &missile, const protocol::Snapshot &snapshot);
     std::optional<protocol::EntityState> lastSeen(std::uint32_t netId) const;
     void onDestroyed(const protocol::EntityDestroyed &event);
     void onPlayerLeft(const protocol::PlayerLeft &event);
@@ -74,6 +81,7 @@ private:
     void drawHeart(sf::RenderWindow &window, sf::Vector2f center, sf::Color color) const;
     void drawDamageFlash(sf::RenderWindow &window) const;
     void drawWaveBanner(sf::RenderWindow &window) const;
+    void drawWeaponBanner(sf::RenderWindow &window) const;
     void drawWaitingRoom(sf::RenderWindow &window) const;
     void drawPlayerLeft(sf::RenderWindow &window) const;
     void drawAutoFire(sf::RenderWindow &window) const;
@@ -118,6 +126,10 @@ private:
     float _localTilt = 0.f;
     std::unordered_map<std::uint32_t, float> _lastY; // last height of each remote ship
     std::unordered_map<std::uint32_t, float> _tilts; // displayed tilt of each remote ship
+
+    std::string _currentWeapon = "BLASTER";
+    std::string _weaponBannerText;
+    float _weaponBannerTimer = 0.f;
 };
 
 } // namespace rtype::client

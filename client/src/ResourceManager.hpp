@@ -36,7 +36,7 @@ public:
     bool loadSound(const std::string &id, const std::string &path);
     const sf::SoundBuffer &getSound(const std::string &id) const;
     bool hasSound(const std::string &id) const;
-    void playSound(const std::string &id, float volume = 100.f);
+    void playSound(const std::string &id, float volume = 100.f, float pitch = 1.0f);
     void updateAudio();
 
     // Audio - Music
