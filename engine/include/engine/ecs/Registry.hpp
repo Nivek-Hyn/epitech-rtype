@@ -3,9 +3,11 @@
 #include "engine/ecs/Entity.hpp"
 #include "engine/ecs/SparseArray.hpp"
 
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <stdexcept>
+#include <tuple>
 #include <typeindex>
 #include <typeinfo>
 #include <unordered_map>
@@ -92,13 +94,19 @@ public:
     /// types or killing entities: collect entities first, or use EventBus::enqueue.
     ///
     /// @tparam Components Component types an entity must have to be visited.
+    /// Each storage is looked up once per call, not once per entity; a missing type means nothing to visit.
     template <typename... Components, typename Function> void each(Function &&func)
     {
-        const std::size_t entityCount = _alive.size();
-        for (std::size_t i = 0; i < entityCount; i++) {
-            const Entity entity = static_cast<Entity>(i);
-            if (alive(entity) && (has<Components>(entity) && ...))
-                func(entity, *get<Components>(entity)...);
+        const std::tuple<SparseArray<Components> *...> storages{findComponents<Components>()...};
+        if ((!std::get<SparseArray<Components> *>(storages) || ...))
+            return;
+        const std::size_t slotCount = _alive.size(); // entities created by the callback are not visited
+        for (std::size_t slot = 0; slot < slotCount; slot++) {
+            if (!_alive[slot])
+                continue;
+            const Entity entity = makeEntity(static_cast<std::uint32_t>(slot), _generations[slot]);
+            if ((std::get<SparseArray<Components> *>(storages)->has(entity) && ...))
+                func(entity, *std::get<SparseArray<Components> *>(storages)->get(entity)...);
         }
     }
 
@@ -124,8 +132,9 @@ private:
 
     // Suggested storage, free to change: only the public functions above are the contract.
     std::unordered_map<std::type_index, std::unique_ptr<ISparseArray>> _componentArrays;
-    std::vector<bool> _alive;
-    std::vector<Entity> _freeIds;
+    std::vector<bool> _alive;                // by slot
+    std::vector<std::uint32_t> _generations; // by slot: increased each time the slot is freed
+    std::vector<std::uint32_t> _freeIds;     // free slots, reused last freed first
     std::vector<System> _systems;
 };
 

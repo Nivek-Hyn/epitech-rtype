@@ -1,0 +1,40 @@
+Third-party components
+======================
+
+The runtime uses Asio for UDP transport and nlohmann/json for server level configuration.
+Client-enabled builds also link SFML,
+which uses FreeType, HarfBuzz, SheenBidi, Ogg, Vorbis and FLAC in this build.
+Copies of their main upstream notice files are installed under notices/.
+GoogleTest is used only by tests and is not part of the runtime installation.
+
+Asio: https://think-async.com/Asio/
+nlohmann/json: https://github.com/nlohmann/json
+SFML: https://www.sfml-dev.org/
+FreeType: https://freetype.org/
+HarfBuzz: https://harfbuzz.github.io/
+SheenBidi: https://github.com/Tehreer/SheenBidi
+Ogg, Vorbis and FLAC: https://xiph.org/
+
+Portions of this software are copyright (c) 2026 The FreeType Project
+(www.freetype.org). All rights reserved.
+
+These main notices are not an exhaustive inventory of embedded third-party
+code in SFML, including its image decoders and platform loaders. Preserve and
+review the corresponding upstream header notices when preparing a public release.
+
+Assets and project code
+=======================
+
+The assets/r-typesheet*.gif files were supplied by Epitech for this student
+R-Type project, as confirmed by the team. Original creator credits and any terms
+covering public redistribution have not been recorded in this repository.
+This document records the educational source; it does not assign an asset license
+or establish permission for public redistribution.
+
+The assets/backgrounds images come from "Seamless Space Backgrounds" by Screaming
+Brain Studios, released under Creative Commons Zero (CC0 1.0, public domain):
+free to use, modify and redistribute, without attribution. mars.png is a recolored
+nebula of the pack, and stars.png a starfield of the pack made transparent.
+
+The repository currently declares no project-wide source-code license.
+The upstream notices do not assign a license to the project's own code or assets.

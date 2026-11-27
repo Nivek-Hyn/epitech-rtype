@@ -23,18 +23,27 @@ flowchart BT
     server --> engine
     client --> common
     client --> engine
+    client -. "hosts a local game" .-> server
 ```
 
 *Text description: `engine` is at the bottom and depends on nothing but the standard library.
 `common` depends on `engine` (the protocol uses its serialization). `server` and `client` each depend directly on
-both `common` (the protocol they share) and `engine` (ECS, game loop), but never on each other.*
+both `common` (the protocol they share) and `engine` (ECS, game loop). The server never depends on the client. The
+client links the server library for one purpose: hosting a solo or local game (a "listen server"). It runs the same
+`ServerLoop` as `r-type_server` on its own thread and talks to it through UDP like any remote server, so the game
+logic still runs only on the server side.*
 
 | Module | Responsibility | Third-party libraries | CMake target |
 |---|---|---|---|
-| `engine/` | Generic game engine: knows nothing about R-Type | none | `rtype_engine` (static library) |
+| `engine/` | Generic game engine: knows nothing about R-Type | none | `rtype_engine` / `RTypeEngine::Engine` (interface target grouping enabled modules) |
 | `common/` | What the server and the client must agree on: protocol, components, constants | none | `rtype_common` (static library) |
 | `server/` | Authoritative game simulation and server networking | Asio | `rtype_server_lib` (game logic, tested) + `r-type_server` |
-| `client/` | Display, keyboard input, sound and client networking | SFML, Asio | `r-type_client` |
+| `client/` | Display, menus, sound, keyboard input and client networking; hosts a local server for solo games | SFML, Asio, server library | `r-type_client` |
+
+The engine is also a separate CMake project. ECS and Core are static libraries; Physics, Net and Systems
+are header-only targets. Systems depends on ECS, and Core provides the platform thread dependency.
+Modules are selected at build time and exported for `find_package` consumers; no dynamic plugin loader exists.
+See the [engine guide](engine.md) and [technical study](technical-study.md#standalone-engine-and-module-choices-implemented).
 
 Rules every contributor follows ([CONTRIBUTING](https://github.com/EpitechPGE3-2026/G-ING-500-MAR-5-1-rtype-5/blob/main/CONTRIBUTING.md)):
 - `engine/` never includes anything from `common/`, `server/` or `client/`.
@@ -71,7 +80,6 @@ flowchart LR
     ServerMain --> ServerNet
     Game --> ECS
     Game --> Physics
-    Game --> Events
     Game --> Components
     ServerNet --> Protocol
     ServerNet --> Queue
@@ -79,11 +87,12 @@ flowchart LR
     ClientNet --> Queue
 ```
 
-*Text description: the engine offers six independent building blocks. The protocol uses the engine's
+*Text description: the engine offers six reusable building blocks. The protocol uses the engine's
 serialization. On the server, the main loop uses the fixed timestep clock, drives the game logic and talks to
-the network layer. The current game logic uses the ECS, movement system and shared components; collision and
-event-bus integration are not yet part of the server loop. Both network layers use the protocol and a thread-safe
-queue. The client renders entities directly from the latest snapshot rather than keeping a local ECS.*
+the network layer. The current game logic uses the ECS, movement system, AABB collisions and shared components.
+When a collision destroys an entity, Game publishes it on the event bus; the loss of a life, the network event and
+the bonus drop each react on their own. Both network layers use the protocol and a thread-safe queue. The client
+draws the entities of the latest snapshots, smoothed by interpolation.*
 
 | Subsystem | Main files | Status |
 |---|---|---|
@@ -95,15 +104,17 @@ queue. The client renders entities directly from the latest snapshot rather than
 | Threading | `engine/include/engine/core/ThreadSafeQueue.hpp` | Implemented; mutex-protected FIFO queue |
 | Protocol | `common/include/common/Protocol.hpp`, `common/src/Protocol.cpp`, [protocol.md](protocol.md) | Implemented; validates datagrams and message payloads |
 | Shared components | `common/include/common/Components.hpp`, `common/include/common/Constants.hpp` | Implemented |
-| Game logic | `server/src/Game.hpp`, `server/src/Game.cpp` | Basic player movement, shooting and snapshots; enemy gameplay is not implemented |
+| Game logic | `server/src/Game.hpp`, `server/src/Game.cpp` and `server/src/Game*.cpp` (one file per part of the game) | Player movement, shooting, enemy spawning, missile/enemy collisions, score and snapshots |
 | Server network | `server/src/net/INetworkServer.hpp`, `server/src/net/AsioNetworkServer.cpp` | Implemented; UDP handshake, inputs, snapshots, ping/pong and timeout handling |
 | Client network | `client/src/net/INetworkClient.hpp`, `client/src/net/AsioNetworkClient.cpp` | Implemented; UDP connection retry, input sending and server timeout detection |
-| Rendering | `client/src/main.cpp` | Basic snapshot rendering with colored rectangles; no sprites, starfield or audio yet |
+| Client application | `client/src/main.cpp`, `client/src/ui/` | Menu, settings saved in `config.json`, then a game session; Escape returns to the menu |
+| Game session | `client/src/game/Session.cpp`, `client/src/game/SessionHud.cpp` | Last snapshot, inputs sent, effects of destroyed entities (explosions, sounds, flash, shake), HUD and end screen |
+| Rendering | `client/src/render/EntityRenderer.cpp`, `client/src/ResourceManager.cpp` | One drawing function per entity type and variant; starfield, music and sound effects |
 
 ## 3. Client–server model
 
 The server is the only authority on the game. Clients send what the player presses; the server sends back
-the whole state of the game, 60 times per second.
+the whole state of the game, 30 times per second (the simulation runs at 60 steps per second).
 
 ```mermaid
 sequenceDiagram
@@ -123,7 +134,7 @@ sequenceDiagram
     end
 ```
 
-*Text description: the client network thread retries `Connect` every 500 ms until the server accepts or rejects it.
+*Text description: the client network thread retries `Connect` every 500 ms while it is not connected.
 The server assigns one of four player ids. The client sends its held input flags while connected. The server
 converts received datagrams into game-thread events and broadcasts a snapshot after each simulation tick. The
 client's rendering thread drains decoded messages and displays the latest snapshot. A disconnect or timeout
@@ -163,7 +174,7 @@ A **thread** is a second flow of execution running another function at the same 
 with the same memory (`std::thread`). Each program has two:
 
 - the **network thread**, which runs Asio's asynchronous receive, timer and send handlers;
-- the **game thread** (on the client, the rendering thread), the one running `main`, which must never wait.
+- the **game thread** (on the client, the rendering thread), the one running `main` and processing queued messages.
 
 Asio receives datagrams asynchronously on its own I/O thread. The game and rendering loops therefore do not
 wait for network packets.
@@ -180,18 +191,18 @@ flowchart LR
     Clients(["Clients"])
     Clients -- "datagrams (Input...)" --> Receive
     Receive -- "push" --> Queue
-    Queue -- "tryPop, never waits" --> Simulation
+    Queue -- "tryPop, empty gives nullopt" --> Simulation
     Simulation -- "send / broadcast: encode + send_to" --> Clients
 ```
 
 *Text description: clients send datagrams to the server's UDP port. Asio's I/O thread decodes each valid packet
 and pushes the resulting event (player joined, left, input) into a thread-safe queue. At each step, the game
-thread drains the queue without waiting, runs the simulation and posts snapshots and game events to the network
+thread drains the available messages, runs the simulation and posts snapshots and game events to the network
 thread for delivery.*
 
 **The queue between the two threads.** Both threads use the same queue. A mutex protects its internal FIFO
 storage from concurrent access. `tryPop` never waits for a message: when the queue is empty it returns
-`std::nullopt`.
+`std::nullopt` after acquiring its mutex. It can wait for that mutex; it is not a lock-free queue.
 
 ```cpp
 // Network thread, after decoding an Input datagram:
@@ -212,7 +223,7 @@ sender address of each datagram it receives.
 
 The client follows the same idea: its network thread fills a queue that the main (rendering) thread empties every
 frame before drawing. The client sends held input flags while connected; the server remains authoritative for
-player positions. The current client draws the snapshot entities directly as simple shapes rather than storing
+player positions. The current client draws the snapshot entities directly as sprites rather than storing
 them in a local ECS.
 
 ## 6. Inside the engine: the ECS

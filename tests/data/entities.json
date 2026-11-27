@@ -1,0 +1,49 @@
+{
+  "prefabs": {
+    "test_shooter": {
+      "Kind": {"type": "enemy", "variant": 0},
+      "Hitbox": {"width": 66, "height": 72},
+      "Health": {"hp": 100},
+      "Velocity": {"x": -1.0},
+      "MovementPattern": {"type": "straight"},
+      "EnemyAttack": [{"fire_rate": 0.5, "bullet_speed": 300.0, "bullet_pattern": "straight"}],
+      "EnemyTraits": {"score": 100}
+    },
+    "test_grunt": {
+      "Kind": {"type": "enemy", "variant": 0},
+      "Hitbox": {"width": 66, "height": 72},
+      "Health": {"hp": 1},
+      "Velocity": {"x": -120.0},
+      "MovementPattern": {"type": "straight"},
+      "EnemyTraits": {"score": 100}
+    },
+    "test_sprite": {
+      "Kind": {"type": "enemy", "variant": 3},
+      "Hitbox": {"width": 56, "height": 46},
+      "Health": {"hp": 1},
+      "Velocity": {"x": -120.0},
+      "MovementPattern": {"type": "straight"},
+      "EnemyTraits": {"score": 100}
+    },
+    "test_boss": {
+      "Kind": {"type": "enemy", "variant": 0},
+      "Hitbox": {"width": 66, "height": 72},
+      "Health": {"hp": 2},
+      "Velocity": {"x": -400.0},
+      "MovementPattern": {"type": "straight", "hold_x": 300.0},
+      "EnemyTraits": {"score": 1000, "is_boss": true}
+    },
+    "test_tile": {
+      "Kind": {"type": "obstacle", "variant": 1},
+      "Hitbox": {"width": 72, "height": 72},
+      "Health": {"hp": 2},
+      "Velocity": {"x": -120.0}
+    },
+    "test_shield": {
+      "Kind": {"type": "obstacle", "variant": 0},
+      "Hitbox": {"width": 72, "height": 72},
+      "Health": {"hp": 1},
+      "Velocity": {"x": -120.0}
+    }
+  }
+}

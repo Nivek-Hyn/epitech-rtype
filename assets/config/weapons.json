@@ -1,0 +1,12 @@
+{
+  "default_weapon": "blaster",
+  "weapons": {
+    "blaster": { "missile": "player_missile", "cooldown": 0.25, "angles": [0.0] },
+    "spread": { "missile": "player_missile", "cooldown": 0.35, "angles": [-12.0, 0.0, 12.0] },
+    "laser": { "missile": "laser_missile", "cooldown": 0.45, "angles": [0.0] }
+  },
+  "bonus_drops": {
+    "chance": 1.0,
+    "prefabs": ["bonus_spread", "bonus_laser", "bonus_life"]
+  }
+}

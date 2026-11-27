@@ -1,0 +1,232 @@
+{
+  "prefabs": {
+    "player_ship": {
+      "Kind": {"type": "player"},
+      "Hitbox": {"width": 33, "height": 36},
+      "PlayerControl": {"speed": 200.0}
+    },
+    "player_missile": {
+      "Kind": {"type": "player_missile"},
+      "Hitbox": {"width": 36, "height": 24},
+      "Velocity": {"x": 400.0},
+      "MissileDamage": {"damage": 1}
+    },
+    "enemy_missile": {
+      "Kind": {"type": "enemy_missile"},
+      "Hitbox": {"width": 36, "height": 24}
+    },
+    "laser_missile": {
+      "Kind": {"type": "player_missile", "variant": 1},
+      "Hitbox": {"width": 56, "height": 18},
+      "Velocity": {"x": 900.0},
+      "MissileDamage": {"damage": 3}
+    },
+    "bonus_spread": {
+      "Kind": {"type": "bonus", "variant": 0},
+      "Hitbox": {"width": 32, "height": 32},
+      "Velocity": {"x": -120.0},
+      "BonusEffect": {"weapon": "spread"}
+    },
+    "bonus_laser": {
+      "Kind": {"type": "bonus", "variant": 1},
+      "Hitbox": {"width": 32, "height": 32},
+      "Velocity": {"x": -120.0},
+      "BonusEffect": {"weapon": "laser"}
+    },
+    "bonus_life": {
+      "Kind": {"type": "bonus", "variant": 2},
+      "Hitbox": {"width": 32, "height": 32},
+      "Velocity": {"x": -120.0},
+      "BonusEffect": {"lives": 1}
+    },
+    "standard_red": {
+      "Kind": {"type": "enemy", "variant": 0},
+      "Hitbox": {"width": 66, "height": 72},
+      "Health": {"hp": 1},
+      "Velocity": {"x": -100.0},
+      "MovementPattern": {"type": "straight"},
+      "EnemyAttack": [{"fire_rate": 2.0, "bullet_speed": 350.0, "bullet_variant": 0, "bullet_pattern": "straight"}],
+      "EnemyTraits": {"score": 100}
+    },
+    "patrol": {
+      "Kind": {"type": "enemy", "variant": 1},
+      "Hitbox": {"width": 64, "height": 56},
+      "Health": {"hp": 3},
+      "Velocity": {"x": -130.0},
+      "MovementPattern": {"type": "back_and_forth"},
+      "EnemyAttack": [{"fire_rate": 1.8, "bullet_speed": 320.0, "bullet_variant": 1, "bullet_pattern": "straight"}],
+      "EnemyTraits": {"score": 100}
+    },
+    "sine_wave": {
+      "Kind": {"type": "enemy", "variant": 2},
+      "Hitbox": {"width": 64, "height": 56},
+      "Health": {"hp": 4},
+      "Velocity": {"x": -120.0},
+      "MovementPattern": {"type": "sine_wave"},
+      "EnemyAttack": [{"fire_rate": 1.8, "bullet_speed": 340.0, "bullet_variant": 2, "bullet_pattern": "zigzag"}],
+      "EnemyTraits": {"score": 100}
+    },
+    "diver": {
+      "Kind": {"type": "enemy", "variant": 3},
+      "Hitbox": {"width": 56, "height": 46},
+      "Health": {"hp": 2},
+      "Velocity": {"x": -160.0},
+      "MovementPattern": {"type": "dive"},
+      "EnemyAttack": [{"fire_rate": 2.2, "bullet_speed": 380.0, "bullet_variant": 1, "bullet_pattern": "straight"}],
+      "EnemyTraits": {"score": 100}
+    },
+    "tentacle_creature": {
+      "Kind": {"type": "enemy", "variant": 4},
+      "Hitbox": {"width": 72, "height": 83},
+      "Health": {"hp": 8},
+      "Velocity": {"x": -60.0},
+      "MovementPattern": {"type": "zigzag"},
+      "EnemyAttack": [{"fire_rate": 1.5, "bullet_speed": 300.0, "bullet_variant": 3, "bullet_pattern": "zigzag"}],
+      "EnemyTraits": {"score": 100}
+    },
+    "boss_heavy": {
+      "Kind": {"type": "enemy", "variant": 5},
+      "Hitbox": {"width": 200, "height": 200, "offset_y": -15},
+      "Health": {"hp": 50},
+      "Velocity": {"x": -40.0},
+      "MovementPattern": {"type": "straight", "hold_x": 1500.0},
+      "EnemyAttack": [{"fire_rate": 0.8, "bullet_speed": 480.0, "bullet_variant": 1, "bullet_pattern": "straight", "offset_y": 0.0}, {"fire_rate": 2.0, "bullet_speed": 280.0, "bullet_variant": 0, "bullet_pattern": "zigzag", "offset_y": -30.0}, {"fire_rate": 2.0, "bullet_speed": 280.0, "bullet_variant": 0, "bullet_pattern": "zigzag", "offset_y": 30.0}],
+      "EnemyTraits": {"score": 1000, "is_boss": true}
+    },
+    "boss": {
+      "Kind": {"type": "enemy", "variant": 6},
+      "Hitbox": {"width": 280, "height": 222, "offset_y": -60},
+      "Health": {"hp": 50},
+      "Velocity": {"x": -25.0},
+      "MovementPattern": {"type": "straight"},
+      "EnemyAttack": [{"fire_rate": 0.7, "bullet_speed": 480.0, "bullet_variant": 4, "bullet_pattern": "zigzag"}],
+      "EnemyTraits": {"score": 100}
+    },
+    "satellite_scout": {
+      "Kind": {"type": "enemy", "variant": 1},
+      "Hitbox": {"width": 64, "height": 56},
+      "Health": {"hp": 2},
+      "Velocity": {"x": -110.0},
+      "MovementPattern": {"type": "orbital"},
+      "EnemyAttack": [{"fire_rate": 2.2, "bullet_speed": 320.0, "bullet_variant": 0, "bullet_pattern": "straight"}],
+      "EnemyTraits": {"score": 100}
+    },
+    "orbital_probe": {
+      "Kind": {"type": "enemy", "variant": 2},
+      "Hitbox": {"width": 64, "height": 56},
+      "Health": {"hp": 4},
+      "Velocity": {"x": -90.0},
+      "MovementPattern": {"type": "sine_wave"},
+      "EnemyAttack": [{"fire_rate": 1.8, "bullet_speed": 360.0, "bullet_variant": 0, "bullet_pattern": "straight"}],
+      "EnemyTraits": {"score": 100}
+    },
+    "solar_relay": {
+      "Kind": {"type": "enemy", "variant": 3},
+      "Hitbox": {"width": 56, "height": 46},
+      "Health": {"hp": 8},
+      "Velocity": {"x": -60.0},
+      "MovementPattern": {"type": "back_and_forth"},
+      "EnemyAttack": [{"fire_rate": 1.6, "bullet_speed": 380.0, "bullet_variant": 0, "bullet_pattern": "straight", "offset_y": -20.0}, {"fire_rate": 1.6, "bullet_speed": 380.0, "bullet_variant": 0, "bullet_pattern": "straight", "offset_y": 20.0}],
+      "EnemyTraits": {"score": 100}
+    },
+    "boss_orbital_carrier": {
+      "Kind": {"type": "enemy", "variant": 6},
+      "Hitbox": {"width": 280, "height": 222, "offset_y": -60},
+      "Health": {"hp": 60},
+      "Velocity": {"x": -30.0},
+      "MovementPattern": {"type": "orbital", "hold_x": 1500.0},
+      "EnemyAttack": [{"fire_rate": 0.9, "bullet_speed": 450.0, "bullet_variant": 1, "bullet_pattern": "straight", "offset_y": 0.0}, {"fire_rate": 1.8, "bullet_speed": 300.0, "bullet_variant": 0, "bullet_pattern": "zigzag", "offset_y": -35.0}, {"fire_rate": 1.8, "bullet_speed": 300.0, "bullet_variant": 0, "bullet_pattern": "zigzag", "offset_y": 35.0}],
+      "EnemyTraits": {"score": 1000, "is_boss": true}
+    },
+    "martian_hopper": {
+      "Kind": {"type": "enemy", "variant": 7},
+      "Hitbox": {"width": 90, "height": 100},
+      "Health": {"hp": 3},
+      "Velocity": {"x": -120.0},
+      "MovementPattern": {"type": "martian_bounce"},
+      "EnemyAttack": [{"fire_rate": 2.0, "bullet_speed": 340.0, "bullet_variant": 0, "bullet_pattern": "straight"}],
+      "EnemyTraits": {"score": 100}
+    },
+    "gravity_diver": {
+      "Kind": {"type": "enemy", "variant": 3},
+      "Hitbox": {"width": 56, "height": 46},
+      "Health": {"hp": 2},
+      "Velocity": {"x": -150.0},
+      "MovementPattern": {"type": "gravity_dive"},
+      "EnemyAttack": [{"fire_rate": 1.4, "bullet_speed": 380.0, "bullet_variant": 0, "bullet_pattern": "straight"}],
+      "EnemyTraits": {"score": 100}
+    },
+    "dust_striker": {
+      "Kind": {"type": "enemy", "variant": 0},
+      "Hitbox": {"width": 66, "height": 72},
+      "Health": {"hp": 5},
+      "Velocity": {"x": -130.0},
+      "MovementPattern": {"type": "straight"},
+      "EnemyAttack": [{"fire_rate": 1.2, "bullet_speed": 420.0, "bullet_variant": 0, "bullet_pattern": "zigzag"}],
+      "EnemyTraits": {"score": 100}
+    },
+    "boss_mars_excavator": {
+      "Kind": {"type": "enemy", "variant": 6},
+      "Hitbox": {"width": 280, "height": 222, "offset_y": -60},
+      "Health": {"hp": 50},
+      "Velocity": {"x": -35.0},
+      "MovementPattern": {"type": "martian_bounce", "amplitude": 60.0, "hold_x": 1200.0},
+      "EnemyAttack": [{"fire_rate": 0.7, "bullet_speed": 500.0, "bullet_variant": 1, "bullet_pattern": "straight", "offset_y": 0.0}, {"fire_rate": 1.6, "bullet_speed": 320.0, "bullet_variant": 0, "bullet_pattern": "zigzag", "offset_y": -40.0}, {"fire_rate": 1.6, "bullet_speed": 320.0, "bullet_variant": 0, "bullet_pattern": "zigzag", "offset_y": 40.0}],
+      "EnemyTraits": {"score": 1500, "is_boss": true}
+    },
+    "quantum_shifter": {
+      "Kind": {"type": "enemy", "variant": 2},
+      "Hitbox": {"width": 64, "height": 56},
+      "Health": {"hp": 4},
+      "Velocity": {"x": -140.0},
+      "MovementPattern": {"type": "gravity_pull"},
+      "EnemyAttack": [{"fire_rate": 1.5, "bullet_speed": 360.0, "bullet_variant": 0, "bullet_pattern": "gravity_well"}],
+      "EnemyTraits": {"score": 100}
+    },
+    "vortex_drone": {
+      "Kind": {"type": "enemy", "variant": 4},
+      "Hitbox": {"width": 72, "height": 83},
+      "Health": {"hp": 6},
+      "Velocity": {"x": -100.0},
+      "MovementPattern": {"type": "black_hole_orbit"},
+      "EnemyAttack": [{"fire_rate": 1.4, "bullet_speed": 320.0, "bullet_variant": 0, "bullet_pattern": "gravity_well"}],
+      "EnemyTraits": {"score": 100}
+    },
+    "singularity_fragment": {
+      "Kind": {"type": "enemy", "variant": 4},
+      "Hitbox": {"width": 72, "height": 83},
+      "Health": {"hp": 12},
+      "Velocity": {"x": -50.0},
+      "MovementPattern": {"type": "back_and_forth"},
+      "EnemyAttack": [{"fire_rate": 1.0, "bullet_speed": 400.0, "bullet_variant": 1, "bullet_pattern": "straight", "offset_y": -15.0}, {"fire_rate": 1.0, "bullet_speed": 400.0, "bullet_variant": 1, "bullet_pattern": "straight", "offset_y": 15.0}],
+      "EnemyTraits": {"score": 100}
+    },
+    "boss_singularity_core": {
+      "Kind": {"type": "enemy", "variant": 6},
+      "Hitbox": {"width": 280, "height": 222, "offset_y": -60},
+      "Health": {"hp": 100},
+      "Velocity": {"x": -25.0},
+      "MovementPattern": {"type": "vortex_spiral", "hold_x": 960.0},
+      "EnemyAttack": [{"fire_rate": 0.6, "bullet_speed": 520.0, "bullet_variant": 1, "bullet_pattern": "straight", "offset_y": 0.0}, {"fire_rate": 1.4, "bullet_speed": 350.0, "bullet_variant": 0, "bullet_pattern": "gravity_well", "offset_y": -45.0}, {"fire_rate": 1.4, "bullet_speed": 350.0, "bullet_variant": 0, "bullet_pattern": "gravity_well", "offset_y": 45.0}],
+      "EnemyTraits": {"score": 2500, "is_boss": true}
+    },
+    "satellite_debris": {
+      "Kind": {"type": "obstacle", "variant": 0},
+      "Hitbox": {"width": 72, "height": 72},
+      "Health": {"hp": 2},
+      "Velocity": {"x": -110.0}
+    },
+    "mars_rock": {
+      "Kind": {"type": "obstacle", "variant": 1},
+      "Hitbox": {"width": 72, "height": 72},
+      "Health": {"hp": 4},
+      "Velocity": {"x": -90.0}
+    },
+    "singularity_shard": {
+      "Kind": {"type": "obstacle", "variant": 2},
+      "Hitbox": {"width": 72, "height": 72},
+      "Health": {"hp": 3},
+      "Velocity": {"x": -140.0}
+    }
+  }
+}

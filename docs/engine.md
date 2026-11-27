@@ -7,15 +7,69 @@ For step-by-step guides, see the [how-to guides](how-to.md).
 | Part | Header | Namespace | Status |
 |---|---|---|---|
 | Entities and components | `engine/ecs/Entity.hpp`, `engine/ecs/SparseArray.hpp`, `engine/ecs/Registry.hpp` | `engine::ecs` | Implemented |
+| Prefabs (entities described by data) | `engine/ecs/Prefabs.hpp` | `engine::ecs` | Implemented |
 | Fixed timestep clock | `engine/core/FixedTimestep.hpp` | `engine::core` | Implemented |
 | Event bus | `engine/core/EventBus.hpp` | `engine::core` | Implemented |
 | Collision shapes | `engine/physics/Aabb.hpp` | `engine::physics` | Implemented |
 | Movement system | `engine/systems/Movement.hpp` | `engine::systems` | Implemented |
-| Byte serialization | `engine/net/ByteBuffer.hpp` | `engine::net` | Designed (network team) |
-| Thread-safe queue | `engine/core/ThreadSafeQueue.hpp` | `engine::core` | Designed (network team) |
+| Byte serialization | `engine/net/ByteBuffer.hpp` | `engine::net` | Implemented; bounded big-endian reads and writes |
+| Thread-safe queue | `engine/core/ThreadSafeQueue.hpp` | `engine::core` | Implemented; mutex-protected FIFO |
 
-All headers are under `engine/include/`. Link with the `rtype_engine` CMake target.
+All headers are under `engine/include/`. The repository uses the `rtype_engine` umbrella CMake target.
+An external project can use the installed `RTypeEngine::Engine` target or select individual modules.
+See the [standalone build and installation walkthrough](how-to.md#run-the-component-and-system-example).
+Additional module-selection recipes are in `engine/README.md` in the source repository.
 The expected behavior of every part is specified by the unit tests in `tests/test_*.cpp`.
+
+## Build boundaries and module selection
+
+The engine requires C++20 and the standard library. It does not include `common/`, SFML or Asio.
+The game supplies its own components, networking transport, rendering and rules.
+
+| Installed target | Provides | Links to |
+|---|---|---|
+| `RTypeEngine::ECS` | Registry and component storage | Standard library |
+| `RTypeEngine::Core` | Timing, event bus, thread-safe queue | `Threads::Threads` |
+| `RTypeEngine::Physics` | AABB overlap functions | Standard library |
+| `RTypeEngine::Net` | Binary buffers, without socket transport | Standard library |
+| `RTypeEngine::Systems` | Generic movement | `RTypeEngine::ECS` |
+| `RTypeEngine::Engine` | All enabled modules | Each enabled target above |
+
+ECS and Core are static libraries. Physics, Net and Systems are header-only interface targets.
+Every target propagates its include directory and C++20 requirement to consumers.
+Modules are selected at CMake configuration time, not enabled or unloaded while the game runs.
+This is not a dynamic plugin API. Disabling ECS also requires disabling Systems.
+
+For example, a game using only collisions can request the Physics component:
+
+```cmake
+find_package(RTypeEngine 0.1 CONFIG REQUIRED COMPONENTS Physics)
+target_link_libraries(my_game PRIVATE RTypeEngine::Physics)
+```
+
+The basic consumer in `engine/examples/basic/main.cpp` defines its own Position and Velocity types,
+registers the generic movement system and checks the result. Its separate CMake project uses the
+installed package rather than the engine's source tree. Run the complete check from the repository root:
+
+```sh
+cmake -P engine/cmake/CheckPackage.cmake
+```
+
+## A second game: Brick Rush
+
+`games/brickrush/` (a brick breaker) proves that the engine is not tied to R-Type. It links only the engine modules, nlohmann/json
+and SFML for its window; it never includes `common/`.
+
+| Engine part | How Brick Rush uses it |
+|---|---|
+| Registry | Paddle, ball and bricks are entities with Brick Rush's own components (`Box`, `Ball`, `Brick`...). |
+| Prefabs | `assets/bricks.json` describes every entity by its components; a level is a grid of prefab names. |
+| Movement system | `movement<Position, Velocity>` moves the paddle and the ball. |
+| AABB | The ball bounces on the walls, the paddle and the bricks (`src/Collisions.cpp`). |
+| Event bus | Collisions enqueue `BrickHit` and `BallLost`; bricks break and lives drop at `dispatch`. |
+| Fixed timestep | The window loop simulates 60 steps per second, like the R-Type server. |
+
+The rules (`brickrush_core`) have no window, so `tests/test_brickrush.cpp` tests them directly.
 
 ## 1. Entity-Component-System
 
@@ -78,10 +132,50 @@ The Registry finds the storage of a type with a `std::unordered_map<std::type_in
 | Rule | Why |
 |---|---|
 | Do not keep a pointer or reference to a component after the current system | Adding a component can grow a vector and move every component of that type. |
-| Do not keep an entity id across ticks | Killed ids are reused: an old id may now point to a different, alive entity, and `alive` cannot tell (there is no generation counter yet). |
+| A kept entity id may become stale | Each id carries a generation (high 8 bits) besides its slot (low 24 bits). Killing an entity increases the generation of its slot, so an old id no longer matches the entity that reuses the slot: `alive` returns false and `get` returns nullptr. The generation wraps after 256 reuses of a slot. |
 | Never send an `Entity` over the network | Ids are local to each machine. Send a `NetworkId` component instead. |
 | Do not add a system from inside a running system | `update` is iterating over the list of systems. |
 | Inside `each`, do not kill entities or add components of the visited types | It can invalidate the references passed to the callback. Use `EventBus::enqueue` and react after the systems have run. |
+
+`get<C>` returns a borrowed pointer: it transfers no ownership. Removing or replacing that component,
+killing its entity, destroying the Registry, or growing that component's vector can invalidate it,
+even within the same system. Read the pointer again after a storage-changing operation.
+
+### Prefabs: entities described by data
+
+A prefab is an entity template: a name and a list of (component name, component data). The game registers
+each component type under a name, with a function reading it from its own data format. The engine never
+reads files and does not know JSON: `Prefabs<Data>` works with any copyable `Data` type.
+
+```cpp
+engine::ecs::Prefabs<nlohmann::json> prefabs;
+prefabs.registerComponent<Health>("Health", [](const nlohmann::json &data) { return Health{data.value("hp", 1)}; });
+prefabs.add("grunt", {{"Health", {{"hp", 3}}}});           // data read now, errors reported here
+engine::ecs::Entity grunt = prefabs.spawn(registry, "grunt"); // new entity with a Health of 3
+prefabs.applyTo(registry, other, "grunt");                  // same components on an existing entity
+```
+
+| Operation | Result |
+|---|---|
+| `add` with an unregistered component name | Throws `std::invalid_argument`; the prefab is not added. |
+| `add` with data the reading function rejects | Throws what that function throws; the prefab is not added. |
+| `spawn` or `applyTo` with an unknown prefab | Throws `std::out_of_range`; `spawn` creates no entity. |
+
+R-Type reads its prefabs from `assets/config/entities.json` (see the [how-to guides](how-to.md#add-an-enemy-a-tile-or-a-bonus)).
+Components are read once, when the prefab is added, so spawning copies ready values.
+
+### Failure behavior
+
+| Operation | Result |
+|---|---|
+| `spawn` when no usable id remains | Throws `std::overflow_error`. |
+| `emplace<C>` on a dead or unknown entity | Throws `std::invalid_argument`. |
+| `get<C>` on a dead entity or an absent component | Returns `nullptr`; no storage is created. |
+| `kill` on a dead entity, or `remove<C>` on an absent component | Does nothing. |
+| `addSystem` with an empty function | Throws `std::invalid_argument`. |
+
+Allocation failures and exceptions thrown by component constructors or systems are not caught by the
+Registry. If a system throws during `update`, later systems are not called by that invocation.
 
 ## 2. Fixed timestep clock
 
@@ -159,30 +253,35 @@ registry.addSystem(engine::systems::movement<rtype::components::Position, rtype:
 
 Velocity is in world units per second, so movement speed does not depend on the tick rate.
 
-## 5. Networking utilities (designed)
+## 5. Networking utilities
 
-These two parts are specified by their headers and implemented by the network team.
+These header-only utilities are generic engine building blocks used by the networking code.
 
 - `ByteWriter` / `ByteReader` write and read integers and floats in big-endian, field by field. Reading past the
   end never overflows: the reader returns 0 and `ok()` becomes false.
-- `ThreadSafeQueue<T>` passes values from the network thread to the game thread. `tryPop` never blocks.
+- `ThreadSafeQueue<T>` passes values from the network thread to the game thread. `tryPop` returns
+  `std::nullopt` immediately when the queue is empty after acquiring its mutex. It can wait for that mutex;
+  this is not a lock-free queue and it does not wait for a new value to arrive. The queue has no capacity limit.
 
 ## 6. Tests
 
 ```sh
-ctest --test-dir build --output-on-failure -R '^(Registry|FixedTimestep|EventBus|Aabb|Movement)\.'
+ctest --test-dir build --output-on-failure -R '^(Registry|Prefabs|FixedTimestep|EventBus|Aabb|Movement)\.'
 ```
 
 | Test file | What it checks |
 |---|---|
 | `tests/test_registry.cpp` | Id reuse, components, `each`, systems |
+| `tests/test_prefabs.cpp` | Spawning from a prefab, replacing components, rejected names |
 | `tests/test_fixed_timestep.cpp` | Step duration, catch-up limit, waiting time, invalid settings |
 | `tests/test_event_bus.cpp` | Immediate and queued delivery, order, chained events |
 | `tests/test_aabb.cpp` | Overlap, separation, touching edges |
 | `tests/test_movement.cpp` | Movement scaled by the time step, use as a system |
+| `tests/test_thread_safe_queue.cpp` | FIFO order and empty queue behavior |
 
 ## 7. Known limits and next steps
 
-- Entity ids are reused without a generation counter (see the rules above).
-- `each` checks every id; with many more entities, iterating over the smallest storage first would be faster.
+- A generation wraps after 256 reuses of the same slot: an id kept that long could match again.
+- `each` looks each storage up once per call, then visits every slot; with many more entities, iterating over the
+  smallest storage first would be faster.
 - The event bus has no priorities and no unsubscription; they are not needed by the game yet.

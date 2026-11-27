@@ -1,0 +1,13 @@
+{
+  "stage": 99,
+  "level_name": "Test: boss with several attacks",
+  "waves": [
+    {
+      "wave_id": 1,
+      "delay_before_start": 1.0,
+      "enemies": [
+        { "type": "boss_heavy", "spawn_y": 350.0, "speed": 30.0 }
+      ]
+    }
+  ]
+}

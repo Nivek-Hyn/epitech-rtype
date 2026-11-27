@@ -2,6 +2,45 @@
 
 Short recipes for the most common changes. They assume you know the concepts from the
 [engine documentation](engine.md): entities, components, systems and the event bus.
+Before changing data shared across domains, read the [shared data reference](shared-data.md).
+
+## Run the component and system example
+
+`engine/examples/basic/` is a complete consumer project. It defines its own components and adds a system
+without changing the engine. It requires a C++20 compiler, CMake 3.24+ and a build tool, with no SFML,
+Asio, game assets or GoogleTest. From the repository root:
+
+```sh
+cmake -S engine -B build/engine-tutorial -DCMAKE_BUILD_TYPE=Debug
+cmake --build build/engine-tutorial --config Debug --parallel 4
+cmake --install build/engine-tutorial --config Debug --prefix "$PWD/build/engine-tutorial-install"
+cmake -S engine/examples/basic -B build/engine-tutorial-consumer -DCMAKE_BUILD_TYPE=Debug -DCMAKE_PREFIX_PATH="$PWD/build/engine-tutorial-install"
+cmake --build build/engine-tutorial-consumer --config Debug --parallel 4
+ctest --test-dir build/engine-tutorial-consumer -C Debug --output-on-failure --verbose
+```
+
+These commands also work in PowerShell; use a Developer PowerShell for MSVC and keep `--config Debug`
+and `-C Debug` for Visual Studio generators. Use matching engine/consumer compilers and configurations.
+The test prints `Custom component and system: movement, lifetime and deferred destruction passed`.
+Alternatively, `cmake -P engine/cmake/CheckPackage.cmake` builds, installs and tests the example in one command.
+
+Read `engine/examples/basic/main.cpp` in this order:
+
+1. `Lifetime` holds the remaining lifetime in seconds. The struct belongs to the consumer; the Registry
+   needs no new registration or code change to store it.
+2. `lifetimeSystem` receives the Registry and the duration of one simulated step. Its `each<Lifetime>`
+   callback visits only live entities with that component and subtracts the step duration.
+3. Expired ids are collected in a vector. The following loop kills those entities after `each` has finished,
+   so none of its component references is accessed after destruction.
+4. `main` registers movement first, then lifetime. Each `update(0.5f)` runs both systems in that order.
+   The temporary entity starts with one second of lifetime; the other entity has no Lifetime component.
+5. After the first update, both entities have moved and the temporary entity has half a second left.
+   After the second, the temporary entity and all its components are removed; the permanent one survives.
+   Fresh pointers are obtained after the systems run.
+
+The two updates represent simulated time; this console example does not sleep for a real second.
+To experiment, change the initial lifetime to `1.5f` and adjust the checks to expect half a second remaining
+after the two updates. Keep the engine unchanged: the new behavior belongs to the consumer.
 
 ## Add a component
 
@@ -118,33 +157,113 @@ Use the event bus when a system must trigger something it should not know about 
    bus.dispatch();
    ```
 
-## Add an enemy type
+## Add an enemy, a tile or a bonus
 
-An enemy is an entity, not a class: a new enemy type is a new combination of components and a new value of
-`Kind::variant`. This guide lists the steps; the gameplay and rendering systems they rely on are being written.
+Game entities are **prefabs**: `assets/config/entities.json` lists each entity with its components.
+The server creates the entity from that list; its systems produce the game. No C++ is needed when the new
+entity only combines existing components.
 
-1. **Pick a variant number.** `Kind{EntityType::Enemy, variant}` identifies the enemy type for the client.
-   Keep the list of variants in one place (a comment or an enum in `common/`), so the server and the client
-   agree on it.
+```json
+"armored_scout": {
+  "Kind": {"type": "enemy", "variant": 1},
+  "Hitbox": {"width": 64, "height": 56},
+  "Health": {"hp": 4},
+  "Velocity": {"x": -90.0},
+  "MovementPattern": {"type": "sine_wave", "amplitude": 120},
+  "EnemyAttack": [{"fire_rate": 1.5, "bullet_speed": 380.0, "bullet_pattern": "zigzag"}],
+  "EnemyTraits": {"score": 150}
+}
+```
 
-2. **Spawn it on the server** with the components every networked entity needs, plus its own behavior:
+| Component | Fields | Used by |
+|---|---|---|
+| `Kind` | `type` (`player`, `enemy`, `player_missile`, `enemy_missile`, `obstacle`, `bonus`), `variant` | Snapshot: the client chooses the sprite from both |
+| `Hitbox` | `width`, `height`, `offset_y` | Collisions and screen limits; no Hitbox means no collision |
+| `Health` | `hp` | Damage from missiles |
+| `Velocity` | `x`, `y` (world units per second; negative x goes left) | Movement |
+| `MovementPattern` | `type`, `amplitude`, `frequency`, `hold_x` | Enemy movement patterns (`server/src/MovementSystem.cpp`) |
+| `EnemyAttack` | list of `fire_rate`, `bullet_speed`, `bullet_variant`, `bullet_pattern`, `offset_y` | Enemy shooting |
+| `EnemyTraits` | `score`, `is_boss` | Score in infinite mode; a boss survives contact with a ship |
+| `MissileDamage` | `damage` | Health a player missile removes |
+| `BonusEffect` | `weapon`, `lives` | What a player gets by touching the bonus |
+| `PlayerControl` | `speed` | Speed of a ship moved by inputs |
+
+Then use the name in a level (`"type": "armored_scout"`) and restart the server.
+A prefab with an unknown component or invalid data is skipped with a warning at startup.
+A new `variant` also needs its sprite in the client; reusing an existing variant needs nothing.
+
+### Add a component usable in prefabs
+
+1. Define the struct (see [Add a component](#add-a-component)).
+2. Register it under a name in `registerGameComponents` (`server/src/Prefabs.cpp`), with a function reading it
+   from JSON:
 
    ```cpp
-   engine::ecs::Entity enemy = spawnNetworked(protocol::EntityType::Enemy, variant, x, y);
-   _registry.emplace<rtype::components::Velocity>(enemy, -200.f, 0.f);
-   // + server-only components: health, hitbox, movement pattern, shooting...
+   prefabs.registerComponent<Shield>("Shield", [](const Json &json) { return Shield{json.value("hits", 1)}; });
    ```
 
-   `spawnNetworked` (declared in `server/src/Game.hpp`, written by the gameplay team) is meant to give the entity a
-   `NetworkId`, a `Kind` and a `Position`, which is what the snapshot sends.
+3. Write or extend the system that uses it. The engine's `Prefabs` class does not know JSON: the same
+   mechanism works with any data format.
 
-3. **Give it a behavior.** Reuse existing systems when possible (movement, shooting). For a new movement pattern,
-   add a component holding its parameters and a system that updates the `Velocity` from it.
+## Add a weapon
 
-4. **Display it on the client.** Map the new variant to a sprite in the client's rendering code. The protocol
-   does not change: the snapshot already carries `type` and `variant`.
+Weapons are in `assets/config/weapons.json`. A weapon names the prefab of its missile, its cooldown, and one
+angle per missile fired at once:
 
-5. **Test the server side** like any system: spawn the enemy, run a few ticks, check its position or state.
+```json
+"twin": { "missile": "player_missile", "cooldown": 0.3, "angles": [-4.0, 4.0] }
+```
+
+The missile prefab gives its sprite variant, hitbox, speed and `MissileDamage`. To give the weapon to players,
+add a bonus prefab with `"BonusEffect": {"weapon": "twin"}` and list it in `bonus_drops.prefabs`.
+`bonus_drops.chance` is the probability that a destroyed enemy drops a bonus. A destroyed ship goes back to
+`default_weapon`.
+
+## Add a configured wave
+
+The campaign plays the levels listed in `assets/config/game_rules.json`, under `campaign.levels`.
+Start the server from the repository root or the installed game directory. Restart it after editing a file.
+
+Append an entry to the `waves` array of a level, keeping valid JSON commas:
+
+```json
+{
+  "wave_id": 3,
+  "delay_before_start": 10.0,
+  "enemies": [
+    { "type": "patrol", "spawn_y": 500, "speed": 120 }
+  ],
+  "obstacles": [
+    { "type": "satellite_debris", "spawn_y": 200 }
+  ]
+}
+```
+
+`type` is a prefab name. The wave fires once, when the level has been played for ten seconds: the delay is
+measured from the beginning of the level, not from the previous wave. `spawn_y` is a world coordinate
+(a negative value picks a random height). `speed`, `health`, `amplitude` and `frequency` replace the values
+of the prefab for this enemy only; 0 or nothing keeps them.
+
+### Edit a level with the level editor
+
+In the client menu, choose **CREATE A LEVEL**. The level is shown as it is played: the world background, the real
+sprites, time running to the right (one line per second) and the height of the screen from top to bottom.
+
+| Action | Control |
+|---|---|
+| Choose the enemy or tile to place | Click it in the palette, or Tab / Shift+Tab |
+| Place it | Left click on the timeline |
+| Move it | Drag it |
+| Delete it | Right click on it, or Delete while the mouse is over it |
+| Move in time | Mouse wheel, or Left / Right arrows |
+| Save | SAVE or Ctrl+S |
+| Play it for real | TEST: saves, starts a local server on this level and joins it; Escape comes back to the editor |
+| Open another level | OPEN goes through `assets/levels/custom.json` (the default) and the campaign levels |
+| Change the background | WORLD |
+
+The file keeps every key the editor does not show (amplitude, health...). Placements in the same quarter of a
+second share a wave. The editor's objects are entities of an engine `Registry` (`client/src/editor/`); reading and
+writing the files is in `tools/level-editor/`.
 
 ## Change the network protocol
 

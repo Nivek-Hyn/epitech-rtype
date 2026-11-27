@@ -48,7 +48,10 @@ nav:
   - Home: index.md
   - Architecture:
       - Overview: architecture.md
+      - Cross-platform support: cross-platform.md
       - Engine: engine.md
+      - Client: client.md
+      - Shared data: shared-data.md
       - Technical study: technical-study.md
       - Decision records:
           - Index: adr/README.md
@@ -60,9 +63,20 @@ nav:
           - 0006 ECS with sparse arrays: adr/0006-ecs-sparse-arrays.md
           - 0007 Authoritative snapshots: adr/0007-authoritative-snapshots.md
           - 0008 Binary protocol: adr/0008-binary-protocol.md
+          - 0009 Reliable messages: adr/0009-reliable-messages-over-udp.md
+          - 0010 Snapshot rate and interpolation: adr/0010-snapshot-rate-and-interpolation.md
+          - 0011 Delta snapshots not adopted: adr/0011-delta-snapshots-not-adopted.md
+  - Network guide (A to Z): network-guide.md
   - Network protocol: protocol.md
+  - API reference: html/index.html
+  - Networking implementation: networking.md
   - Guides:
+      - Build and run: build-and-run.md
+      - Campaign game design: GameDesign/game-design-campaign.md
       - How-to guides: how-to.md
+      - Validation record: validation.md
+      - Delivery and defense: delivery.md
+      - Static analysis: static-analysis.md
   - Accessibility:
       - Accessibility study: accessibility.md
       - Documentation guidelines: documentation-guidelines.md

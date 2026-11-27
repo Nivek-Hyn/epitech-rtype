@@ -1,0 +1,32 @@
+{
+  "worlds": [
+    {
+      "name": "Orbital belt",
+      "layers": [
+        { "image": "assets/backgrounds/orbital-belt.png", "fill": true, "speed": 10 },
+        { "image": "assets/backgrounds/stars.png", "fill": true, "speed": 35 },
+        { "image": "assets/backgrounds/space-ceiling.png", "repeat_x": true, "y": 0.0, "speed": 70 },
+        { "image": "assets/backgrounds/space-ground.png", "repeat_x": true, "y": 920.0, "speed": 70 }
+      ]
+    },
+    {
+      "name": "Mars",
+      "layers": [
+        { "image": "assets/backgrounds/mars.png", "fill": true, "speed": 10 },
+        { "image": "assets/backgrounds/mars-phobos.png", "fill": false, "repeat_x": false, "x": 1400.0, "y": 120.0, "scale": 0.8, "speed": 4 },
+        { "image": "assets/backgrounds/mars-mountains.png", "repeat_x": true, "y": 560.0, "speed": 28 },
+        { "image": "assets/backgrounds/mars-ceiling.png", "repeat_x": true, "y": 0.0, "speed": 75 },
+        { "image": "assets/backgrounds/mars-ground.png", "repeat_x": true, "y": 900.0, "speed": 75 }
+      ]
+    },
+    {
+      "name": "Singularity",
+      "layers": [
+        { "image": "assets/backgrounds/singularity.png", "fill": true, "speed": 8 },
+        { "image": "assets/backgrounds/stars.png", "fill": true, "speed": 30 },
+        { "image": "assets/backgrounds/singularity-ceiling.png", "repeat_x": true, "y": 0.0, "speed": 75 },
+        { "image": "assets/backgrounds/singularity-ground.png", "repeat_x": true, "y": 920.0, "speed": 75 }
+      ]
+    }
+  ]
+}
