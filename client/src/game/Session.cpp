@@ -173,8 +173,8 @@ void Session::onSnapshot(const protocol::Snapshot &snapshot)
 {
     _score = snapshot.score;
     _lives = snapshot.lives;
-    if (snapshot.level != _level || snapshot.wave != _wave)
-        _waveBanner = WaveBannerDuration; // a new wave has come
+    if ((snapshot.level != _level || snapshot.wave != _wave) && snapshot.wave > 0)
+        _waveBanner = WaveBannerDuration; // a new wave has come (a new level starts at wave 0)
     _wave = snapshot.wave;
     _level = snapshot.level;
     updateGameState(snapshot);
