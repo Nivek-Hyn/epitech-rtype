@@ -86,7 +86,7 @@ void Session::drawAutoFire(sf::RenderWindow &window) const
         return;
     sf::Text text(_resources.getFont("default"), "AUTO FIRE ON (F1)", 20);
     text.setFillColor(sf::Color(255, 204, 0));
-    text.setPosition({44.f, 132.f});
+    text.setPosition({44.f, 160.f});
     outline(text);
     window.draw(text);
 }
@@ -130,11 +130,10 @@ void Session::drawHud(sf::RenderWindow &window) const
     drawEndScreen(window);
 }
 
-// Score and wave, top left.
 // Score, world, level and wave in a panel, top left.
 void Session::drawScore(sf::RenderWindow &window) const
 {
-    drawPanel(window, {24.f, 18.f}, {420.f, 104.f});
+    drawPanel(window, {24.f, 18.f}, {420.f, 130.f});
     sf::Text title(_resources.getFont("default"), WorldNames[static_cast<std::size_t>(_level / 3) % WorldNames.size()],
                    16);
     title.setFillColor(sf::Color(150, 170, 210));
@@ -150,14 +149,14 @@ void Session::drawScore(sf::RenderWindow &window) const
     sf::Text stage(_resources.getFont("default"),
                    "LEVEL " + std::to_string(_level + 1) + "  -  WAVE " + std::to_string(std::max(_wave, 1)), 18);
     stage.setFillColor(sf::Color(255, 204, 0));
-    stage.setPosition({44.f, 96.f});
+    stage.setPosition({44.f, 92.f});
     outline(stage);
     window.draw(stage);
 
     sf::Text weapon(_resources.getFont("default"), "WEAPON: " + _currentWeapon, 20);
     weapon.setFillColor(_currentWeapon == "LASER" ? sf::Color(255, 90, 220)
                        : (_currentWeapon == "SPREAD" ? sf::Color(80, 200, 255) : sf::Color(200, 220, 240)));
-    weapon.setPosition({45.f, 92.f});
+    weapon.setPosition({44.f, 116.f});
     outline(weapon);
     window.draw(weapon);
 }

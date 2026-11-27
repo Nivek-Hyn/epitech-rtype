@@ -308,7 +308,7 @@ float Session::tiltOf(const EntityState &entity, float dt)
 void Session::draw(sf::RenderWindow &window, float time, float dt, bool hasAssets)
 {
     _shown = _interpolator.sample(protocol::SnapshotInterpolator::Clock::now());
-    if (!_connected || _shown.empty())
+    if (!_gameOver && (!_connected || _shown.empty()))
         drawConnecting(window);
     if (hasAssets) {
         for (const auto &entity : _shown) {
