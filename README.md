@@ -1,74 +1,133 @@
 # R-Type
 
-A networked multiplayer remake of the arcade shoot'em up R-Type, built on our own C++ game engine.
-Up to 4 players connect to an authoritative UDP server and fight waves of enemies together.
+A multiplayer shoot'em up in C++20, built on our own reusable game engine. Up to four players join an
+authoritative UDP server, alone or together, on Linux and Windows.
 
-**C++20 · custom ECS engine · UDP with Asio · SFML 3 · CMake + CPM · GoogleTest · GitHub Actions (Linux and Windows)**
+**C++20 · custom ECS engine · UDP with Asio · SFML 3 · JSON content · CMake + CPM · GoogleTest · CI on Linux and Windows**
 
-Epitech project, team of 4.
+Epitech project (third year), team of 4, delivered on 9 November 2026.
 
-## Highlights
+![Four players fight the boss of the Mars world, then the game moves on to the third world](docs/media/rtype-mars-boss.webp)
 
-- **Engine and game kept apart.** `engine/` is a generic ECS engine (entity registry on sparse arrays, systems, fixed timestep, AABB collisions, event bus, byte serialization) and contains no R-Type code.
-- **Authoritative server.** Clients only send their inputs; the server runs the game and sends snapshots back over a small binary protocol ([docs/protocol.md](docs/protocol.md)).
-- **Checked before merging.** A GitHub Actions workflow builds and tests on Linux and Windows and checks formatting; `scripts/check.sh` runs the same checks locally.
-- **Documented.** Architecture, engine, protocol, how-to guides, decision records and an accessibility study in [docs/](docs/index.md).
+![The final boss falls and the campaign ends with "Mission accomplished"](docs/media/rtype-final-boss.webp)
+
+*Four clients connected to one server on the same machine. Each ship is steered by a small autopilot written only
+for this recording (not part of the repository) that reads the client's snapshots instead of the keyboard.*
+
+## What it does
+
+- **Game**: a campaign of 9 levels in 3 worlds (Orbital Belt, Mars, Singularity), each world ending with a boss; an
+  infinite mode with random spawns; three difficulties; weapons and bonuses; a waiting room; lives and respawns.
+- **Content as data**: every entity is a prefab described by its components in
+  [`assets/config/entities.json`](assets/config/entities.json), and every level is a JSON file. A level editor is built
+  into the game (CREATE A LEVEL): place enemies on a timeline with the real sprites, save, and test the level at once.
+- **Network**: binary protocol over UDP ([specification](docs/protocol.md)), reliable messages with acknowledgements,
+  split snapshots, 16-bit positions, 30 snapshots per second with client interpolation, rate limits, live statistics
+  (F3). The server is authoritative: clients only send their inputs.
+- **Engine**: ECS with prefabs and entity generations, fixed timestep, event bus, AABB physics, network building
+  blocks. It builds and installs on its own, and a second game (`brickrush`, a brick breaker) uses it without any
+  R-Type code.
+- **Accessibility**: remappable keys, auto fire (F1), high contrast (F2), shapes and letters besides colors.
+
+| Campaign map | Level editor |
+|---|---|
+| ![Campaign map with the three worlds and the levels reached](docs/media/rtype-campaign.png) | ![Level editor with the enemies of level 1-1 on a timeline](docs/media/rtype-level-editor.png) |
 
 ## Requirements
 
-- A C++20 compiler: GCC 12+, Clang 16+ or MSVC 2022
-- CMake 3.24+
-- Git (dependencies are downloaded automatically by [CPM](https://github.com/cpm-cmake/CPM.cmake))
-- **Linux only**, system packages needed by SFML:
+- A C++20 compiler (tested: GCC 13 and 15 on Linux, MSVC 2022 on Windows), CMake 3.28+ (3.24+ for a server-only build).
+- Git and Internet access for the first build: [CPM](https://github.com/cpm-cmake/CPM.cmake) downloads Asio,
+  SFML, nlohmann/json and GoogleTest.
+- On Linux, the system libraries SFML needs:
   - Fedora: `sudo dnf install libX11-devel libXrandr-devel libXcursor-devel libXi-devel mesa-libGL-devel systemd-devel`
   - Ubuntu/Debian: `sudo apt install libx11-dev libxrandr-dev libxcursor-dev libxi-dev libgl1-mesa-dev libudev-dev`
 
-## Build
+## Build and play
+
+Linux:
 
 ```sh
-export CPM_SOURCE_CACHE=$HOME/.cache/CPM   # optional: share downloaded dependencies between builds
-cmake -S . -B build
-cmake --build build -j
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --parallel 4
+./r-type_client            # menu: campaign, infinite mode, host or join a game, level editor
 ```
 
-The binaries `r-type_server` and `r-type_client` are created at the repository root.
+Windows (Developer PowerShell for Visual Studio 2022):
 
-Options: `-DRTYPE_BUILD_CLIENT=OFF` (server only), `-DRTYPE_BUILD_TESTS=OFF`.
+```powershell
+cmake -S . -B build/windows -G "Visual Studio 17 2022" -A x64
+cmake --build build/windows --config Release --parallel 4
+.\Release\r-type_client.exe
+```
 
-## Run
+For a LAN game, start a dedicated server with `./r-type_server 4242`, then run `./r-type_client <server address> 4242`
+on each player's computer (allow the UDP port in the firewall). `./r-type_server --help` lists its options (mode,
+difficulty, first level, statistics). Run the programs from the repository or installed directory, where `assets/` is.
+
+Controls: arrows or ZQSD move, Space shoots, F1 auto fire, F2 high contrast, F3 network statistics, Escape returns to
+the menu.
+
+Options: `-DRTYPE_BUILD_CLIENT=OFF` for a server-only build, `-DRTYPE_BUILD_TESTS=OFF` to omit the tests. More in the
+[build guide](docs/build-and-run.md) and the [cross-platform guide](docs/cross-platform.md).
+
+## Checks
 
 ```sh
-./r-type_server [port]          # default port: 4242
-./r-type_client [host] [port]   # default: 127.0.0.1 4242
+ctest --test-dir build --output-on-failure --no-tests=error   # 230 tests
+scripts/check.sh   # formatting, build, clang-tidy and tests, as the CI does
 ```
 
-Run the client from the repository root so it finds `assets/`.
-Controls: arrow keys or `Z` `Q` `S` `D` to move, `Space` to shoot.
-
-## Tests
-
-```sh
-ctest --test-dir build --output-on-failure
-scripts/check.sh                 # formatting + build without warnings + tests, as the CI does
-```
+The engine can also be built and installed on its own (`cmake -P engine/cmake/CheckPackage.cmake`); see
+[engine/README.md](engine/README.md) and the [extension guide](docs/how-to.md).
 
 ## Project layout
 
-| Folder | Content |
+| Directory | Responsibility |
 |---|---|
-| `engine/` | Generic game engine (ECS, game loop, events, collisions, serialization). Knows nothing about R-Type. |
-| `common/` | Code shared by server and client: network protocol, components, constants. |
-| `server/` | Authoritative game server. |
-| `client/` | Graphical client (SFML). |
-| `tests/` | Unit tests (GoogleTest). |
-| `docs/` | Documentation, starting at [docs/index.md](docs/index.md) (also buildable as a website, see that page). |
+| `engine/` | Generic ECS and prefabs, timing, events, physics, binary buffers, reliable delivery helpers; standard library only. |
+| `common/` | R-Type protocol, components and constants shared between client and server. |
+| `server/` | Authoritative simulation and Asio transport. |
+| `client/` | SFML rendering, menus, campaign map, level editor, input and Asio transport; hosts a local server for solo games. |
+| `games/brickrush/` | Second game made with the engine only. |
+| `tools/level-editor/` | Reading and writing of level files, used by the editor in the client. |
+| `tests/` | GoogleTest tests. |
+| `docs/` | [Documentation index](docs/index.md): [architecture](docs/architecture.md), [protocol](docs/protocol.md), [technical study](docs/technical-study.md), decision records. |
 
-## Contributing
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the workflow and [THIRD_PARTY_NOTICES.txt](THIRD_PARTY_NOTICES.txt) for
+dependency notices and asset provenance.
 
-See [CONTRIBUTING.md](CONTRIBUTING.md).
+## License
+
+No license has been chosen: the source code is all rights reserved by its authors. The sprites were supplied by
+Epitech for this student project and must not be redistributed.
+
+## After the project
+
+This repository is the final version from the school repository (up to 9 November 2026). Since then, three display
+fixes: the HUD lines no longer overlap, the end screen no longer shows the connection message, and a new level no
+longer announces "wave 0".
 
 ## Team and contributions
 
-Kevin Huynh ([@Nivek-Hyn](https://github.com/Nivek-Hyn)), Katia Pontre, Nael Gamba and Julien Leiner.
+Kevin Huynh ([@Nivek-Hyn](https://github.com/Nivek-Hyn)), Katia Pontre ([@katiaP18](https://github.com/katiaP18)),
+Nael Gamba ([@nael481](https://github.com/nael481)) and Julien Leiner ([@Julien-Lnr](https://github.com/Julien-Lnr)).
 
-- Kevin Huynh: the project setup (CMake with CPM, CI on Linux and Windows, formatting checks), the engine core (entity registry, sparse arrays, fixed timestep, movement, AABB collisions, event bus), the first version of the binary protocol, server-side gameplay (enemy spawns, missile hits, score), unit tests and most of the technical documentation.
+- **Kevin Huynh: engine and project tooling.**
+  - Project setup: CMake with CPM, CI on Linux and Windows, formatting and clang-tidy checks, installation and
+    release archives with library licenses and Windows DLLs.
+  - Engine: entity registry on sparse arrays, fixed timestep, movement, AABB collisions, event bus, then prefabs,
+    entity generations, and a standalone build that other projects can install.
+  - Content as data: entities described by their components in JSON, configurable weapons and bonuses.
+  - Tools and features on top of the engine: the level editor inside the game, the second game Brick Rush, the
+    campaign map that remembers the levels reached, the waiting room (with Julien), auto fire and high contrast.
+  - Presentation: world backgrounds drawn from image layers with a fade between worlds, HUD panels with hearts.
+  - The first version of the binary protocol and its specification, server-side gameplay of the first part (spawns,
+    hits, score), unit tests and most of the technical documentation.
+- **Nael Gamba: networking.** Reliable messages with acknowledgements, sequence numbers and duplicate filtering,
+  split snapshots, 16-bit positions, 30 Hz snapshots with client interpolation, rate limits, network metrics and a
+  lossy-link test proxy.
+- **Julien Leiner: client and rendering.** The SFML client and its main menu, enemy sprites and explosions, music
+  and sounds, saved settings, the local server embedded in the client for solo and hosted games, the ready status of
+  the waiting room, world decors with ground and ceiling.
+- **Katia Pontre: gameplay and level content.** The 9 levels in 3 worlds, new enemies and boss attacks, the infinite
+  and campaign modes, lives.
