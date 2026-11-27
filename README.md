@@ -3,8 +3,6 @@
 A networked multiplayer remake of the arcade shoot'em up R-Type, built on our own C++ game engine.
 Up to 4 players connect to an authoritative UDP server and fight waves of enemies together.
 
-![Gameplay: the player's ship fires at incoming enemies](docs/media/rtype-demo.gif)
-
 **C++20 · custom ECS engine · UDP with Asio · SFML 3 · CMake + CPM · GoogleTest · GitHub Actions (Linux and Windows)**
 
 Epitech project, team of 4.
@@ -69,8 +67,8 @@ scripts/check.sh                 # formatting + build without warnings + tests, 
 
 See [CONTRIBUTING.md](CONTRIBUTING.md).
 
-## Team
+## Team and contributions
 
-Kevin Huynh ([@Nivek-Hyn](https://github.com/Nivek-Hyn)), Katia Pontre, Nael Gamba, Julien Leiner.
+Kevin Huynh ([@Nivek-Hyn](https://github.com/Nivek-Hyn)), Katia Pontre, Nael Gamba and Julien Leiner.
 
-My part: the project setup (CMake with CPM, CI on Linux and Windows, formatting checks), the engine core (entity registry, sparse arrays, fixed timestep, movement, AABB collisions, event bus), the first version of the binary protocol, server-side gameplay (enemy spawns, missile hits, score), unit tests and most of the technical documentation.
+- Kevin Huynh: the project setup (CMake with CPM, CI on Linux and Windows, formatting checks), the engine core (entity registry, sparse arrays, fixed timestep, movement, AABB collisions, event bus), the first version of the binary protocol, server-side gameplay (enemy spawns, missile hits, score), unit tests and most of the technical documentation.
