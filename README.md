@@ -1,7 +1,20 @@
 # R-Type
 
-A networked multiplayer remake of the classic shoot'em up R-Type, built on our own C++ game engine.
-Up to 4 players connect to an authoritative server and fight waves of Bydos together.
+A networked multiplayer remake of the arcade shoot'em up R-Type, built on our own C++ game engine.
+Up to 4 players connect to an authoritative UDP server and fight waves of enemies together.
+
+![Gameplay: the player's ship fires at incoming enemies](docs/media/rtype-demo.gif)
+
+**C++20 · custom ECS engine · UDP with Asio · SFML 3 · CMake + CPM · GoogleTest · GitHub Actions (Linux and Windows)**
+
+Epitech project, team of 4.
+
+## Highlights
+
+- **Engine and game kept apart.** `engine/` is a generic ECS engine (entity registry on sparse arrays, systems, fixed timestep, AABB collisions, event bus, byte serialization) and contains no R-Type code.
+- **Authoritative server.** Clients only send their inputs; the server runs the game and sends snapshots back over a small binary protocol ([docs/protocol.md](docs/protocol.md)).
+- **Checked before merging.** A GitHub Actions workflow builds and tests on Linux and Windows and checks formatting; `scripts/check.sh` runs the same checks locally.
+- **Documented.** Architecture, engine, protocol, how-to guides, decision records and an accessibility study in [docs/](docs/index.md).
 
 ## Requirements
 
@@ -32,6 +45,7 @@ Options: `-DRTYPE_BUILD_CLIENT=OFF` (server only), `-DRTYPE_BUILD_TESTS=OFF`.
 ```
 
 Run the client from the repository root so it finds `assets/`.
+Controls: arrow keys or `Z` `Q` `S` `D` to move, `Space` to shoot.
 
 ## Tests
 
@@ -55,6 +69,8 @@ scripts/check.sh                 # formatting + build without warnings + tests, 
 
 See [CONTRIBUTING.md](CONTRIBUTING.md).
 
-## Authors
+## Team
 
-<!-- TODO: team members -->
+Kevin Huynh ([@Nivek-Hyn](https://github.com/Nivek-Hyn)), Katia Pontre, Nael Gamba, Julien Leiner.
+
+My part: the project setup (CMake with CPM, CI on Linux and Windows, formatting checks), the engine core (entity registry, sparse arrays, fixed timestep, movement, AABB collisions, event bus), the first version of the binary protocol, server-side gameplay (enemy spawns, missile hits, score), unit tests and most of the technical documentation.
