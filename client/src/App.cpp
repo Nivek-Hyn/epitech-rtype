@@ -302,10 +302,10 @@ void App::draw(float dt)
     _window.setView(view); // also used to turn mouse positions into world coordinates
     sf::RenderTarget &target = _post.begin(_window);
     target.setView(view);
-    target.clear(sf::Color(10, 10, 25));
+    target.clear(sf::Color::Black);
     if (_screen == Screen::Playing) {
         if (!_menu.getConfig().highContrast) // plain dark background in high contrast
-            _background.draw(target);
+            _background.draw(target, _post.glow());
         _session.setGlowTarget(_post.glow());
         _session.draw(target, _time, dt, _hasAssets);
         if (_showStats)
@@ -317,7 +317,7 @@ void App::draw(float dt)
         } else {
             _background.setWorld(_screen == Screen::Campaign ? _campaign.world()
                                                              : static_cast<std::size_t>(_time / 12.f));
-            _background.draw(target);
+            _background.draw(target, _post.glow());
             if (_screen == Screen::Campaign)
                 _campaign.draw(target);
             else

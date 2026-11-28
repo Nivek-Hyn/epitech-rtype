@@ -67,6 +67,7 @@ void writePayload(engine::net::ByteWriter &writer, const Message &message)
                     writer.u8(lives);
                 writer.u8(value.level);
                 writer.u8(value.wave);
+                writer.u8(value.bossHealth);
                 writer.u16(static_cast<std::uint16_t>(value.entities.size()));
                 for (const EntityState &entity : value.entities) {
                     writer.u32(entity.netId);
@@ -133,7 +134,7 @@ std::vector<Snapshot> splitSnapshot(const Snapshot &snapshot)
         const auto first = snapshot.entities.begin() + static_cast<std::ptrdiff_t>(offset);
         parts.push_back({snapshot.tick, snapshot.state, snapshot.score,
                          std::vector<EntityState>(first, first + static_cast<std::ptrdiff_t>(count)), snapshot.lives,
-                         snapshot.level, snapshot.wave});
+                         snapshot.level, snapshot.wave, snapshot.bossHealth});
         offset += count;
     } while (offset < snapshot.entities.size());
     return parts;
@@ -245,6 +246,7 @@ std::optional<Packet> decode(std::span<const std::uint8_t> datagram)
                 lives = reader.u8();
             snapshot.level = reader.u8();
             snapshot.wave = reader.u8();
+            snapshot.bossHealth = reader.u8();
             const auto count = reader.u16();
             if (count > MaxEntitiesPerSnapshot || bodySize != SnapshotFixedSize + count * EntityStateSize)
                 return std::nullopt;

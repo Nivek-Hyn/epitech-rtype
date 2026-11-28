@@ -14,6 +14,7 @@ namespace rtype::components {
 // Hits left before the entity is destroyed.
 struct Health {
     int hp = 3;
+    int maxHp = 0; // health when it came into play, after the difficulty (0: not known yet)
 };
 
 // Movement of an enemy, applied by MovementSystem.cpp; type is one of the names of its pattern table.

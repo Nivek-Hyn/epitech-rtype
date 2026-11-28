@@ -116,6 +116,7 @@ private:
     bool _autoFire = false; // shown in the HUD
 
     float _damageFlash = 0.f;
+    float _hudTime = 0.f; // the time of the frame, for what blinks in the HUD
     float _shakeTimer = 0.f;
     float _shakeIntensity = 0.f;
     float _shootSoundCooldown = 0.f;
@@ -123,6 +124,10 @@ private:
     int _level = 0; // from the snapshots
     int _wave = 0;
     float _waveBanner = 0.f;
+    float _bossHealth = 0.f; // health left of the boss on screen, from 0 to 1 (from the snapshots)
+    float _bossBar = 0.f;    // what the boss bar shows: follows _bossHealth smoothly, so it fills as the boss arrives
+    float _bossTime = 0.f;   // time since the boss appeared
+    float _bossTrail = 0.f;  // the health just lost, shown a moment longer behind the bar
     std::vector<std::uint32_t> _destroyed; // destroyed by an event, hidden until the snapshots drop them
     std::string _leftMessage;              // "P2 LEFT THE GAME"
     float _leftTimer = 0.f;

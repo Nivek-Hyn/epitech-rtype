@@ -15,7 +15,7 @@
 namespace rtype::protocol {
 
 inline constexpr std::uint16_t Magic = 0x5254; // "RT"
-inline constexpr std::uint8_t Version = 8;
+inline constexpr std::uint8_t Version = 9;
 inline constexpr std::size_t HeaderSize = 10;
 // Stay under the usual Internet MTU so datagrams are never fragmented.
 inline constexpr std::size_t MaxPacketSize = 1200;
@@ -102,7 +102,7 @@ std::uint16_t quantizePosition(float value);
 float dequantizePosition(std::uint16_t quantized);
 
 inline constexpr std::size_t EntityStateSize = 10;
-inline constexpr std::size_t SnapshotFixedSize = 17;
+inline constexpr std::size_t SnapshotFixedSize = 18;
 inline constexpr std::size_t MaxEntitiesPerSnapshot =
     (MaxPacketSize - HeaderSize - SnapshotFixedSize) / EntityStateSize;
 
@@ -118,6 +118,7 @@ struct Snapshot {
     std::array<std::uint8_t, MaxPlayers> lives{}; // lives left of each player, by player id
     std::uint8_t level = 0;                       // index of the level being played, from 0
     std::uint8_t wave = 0;                        // waves of this level that have already come
+    std::uint8_t bossHealth = 0;                  // health left of the boss on screen, 1 to 255; 0: no boss
 };
 struct EntityDestroyed {
     std::uint32_t netId = 0;

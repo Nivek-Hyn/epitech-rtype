@@ -1,5 +1,6 @@
 #include "MainMenu.hpp"
 #include "ResourceManager.hpp"
+#include "render/Neon.hpp"
 
 #include <algorithm>
 #include <array>
@@ -12,20 +13,21 @@ namespace rtype::client::ui {
 MainMenu::MainMenu(const sf::Font &font, ResourceManager *resources)
     : _font(font), _resources(resources), _config(GameConfig::loadFromFile("config.json")),
       _titleText(font, "R - T Y P E", 80), _subtitleText(font, "A SPACE SHOOTER", 22), _screenTitleText(font, "", 36),
-      _statusText(font, "", 22), _controlsTitleText(font, "--- CONTROLS RECONFIGURATION ---", 22)
+      _statusText(font, "", 22), _controlsTitleText(font, "CONTROLS", 22)
 {
-    _titleText.setFillColor(sf::Color(255, 204, 0));
+    _titleText.setFillColor(sf::Color(255, 255, 255));
     _titleText.setLetterSpacing(1.5f);
     const auto titleBounds = _titleText.getLocalBounds();
     _titleText.setPosition({960.f - (titleBounds.size.x / 2.f), 100.f});
 
-    _subtitleText.setFillColor(sf::Color(0, 220, 255));
-    _subtitleText.setLetterSpacing(2.0f);
+    _subtitleText.setFillColor(sf::Color(150, 158, 172));
+    _subtitleText.setLetterSpacing(4.0f);
     const auto subBounds = _subtitleText.getLocalBounds();
     _subtitleText.setPosition({960.f - (subBounds.size.x / 2.f), 195.f});
 
     _screenTitleText.setFillColor(sf::Color(255, 255, 255));
-    _statusText.setFillColor(sf::Color::Yellow);
+    _screenTitleText.setLetterSpacing(2.5f);
+    _statusText.setFillColor(sf::Color(238, 244, 255));
 
     initRootScreen();
     initHostScreen();
@@ -141,9 +143,10 @@ void MainMenu::initSettingsScreen()
         style == styles.end() ? 1 : static_cast<std::size_t>(style - styles.begin()));
     startY += 80.f;
 
-    _controlsTitleText.setString("--- CONTROLS RECONFIGURATION ---");
+    _controlsTitleText.setString("CONTROLS");
     _controlsTitleText.setCharacterSize(22);
-    _controlsTitleText.setFillColor(sf::Color(0, 220, 255));
+    _controlsTitleText.setFillColor(sf::Color(150, 158, 172));
+    _controlsTitleText.setLetterSpacing(2.f);
     const auto b = _controlsTitleText.getLocalBounds();
     _controlsTitleText.setPosition({960.f - (b.size.x / 2.f), startY});
 
@@ -413,7 +416,8 @@ void MainMenu::handleSettingsEvent(std::optional<sf::Vector2f> mouse, bool click
     if (!mouse)
         return;
     if (!clicked) {
-        for (auto *selector : {&_sfxVolumeSelector, &_musicVolumeSelector, &_autoFireSelector, &_contrastSelector, &_styleSelector})
+        for (auto *selector :
+             {&_sfxVolumeSelector, &_musicVolumeSelector, &_autoFireSelector, &_contrastSelector, &_styleSelector})
             (*selector)->handleMouseMove(*mouse);
         for (auto *buttons : {&_keyButtons, &_presetButtons, &_settingsButtons}) {
             for (auto &button : *buttons)
@@ -475,7 +479,7 @@ bool MainMenu::startRebinding(sf::Vector2f mouse)
             playUiSound("click");
             _rebindingAction = static_cast<int>(i);
             updateKeyButtonLabels();
-            setStatusMessage("Press a key for this action, or Escape to cancel", sf::Color::Yellow);
+            setStatusMessage("Press a key for this action, or Escape to cancel", sf::Color(238, 244, 255));
             return true;
         }
     }
@@ -499,7 +503,7 @@ bool MainMenu::clickPreset(sf::Vector2f mouse)
             (_config.*presets[i].apply)();
             _config.saveToFile("config.json");
             updateKeyButtonLabels();
-            setStatusMessage(presets[i].message, sf::Color::Green);
+            setStatusMessage(presets[i].message, sf::Color(90, 235, 120));
             return true;
         }
     }
@@ -528,7 +532,8 @@ void MainMenu::rebind(sf::Keyboard::Key key)
         *keys.at(static_cast<std::size_t>(_rebindingAction)) = key;
         playUiSound("click");
         _config.saveToFile("config.json");
-        setStatusMessage("Action " + action + " bound to [" + GameConfig::keyToString(key) + "]", sf::Color::Green);
+        setStatusMessage("Action " + action + " bound to [" + GameConfig::keyToString(key) + "]",
+                         sf::Color(90, 235, 120));
     }
     _rebindingAction = -1;
     updateKeyButtonLabels();
@@ -567,6 +572,19 @@ void MainMenu::drawScreenTitle(sf::RenderTarget &window, const std::string &titl
 void MainMenu::draw(sf::RenderTarget &window)
 {
     if (_currentScreen != MenuScreen::Settings) { // the settings need the whole height
+        {
+            // A soft shadow behind the title, so the lines of the background fade out behind it.
+            neon::Canvas canvas(window, nullptr);
+            sf::Transform shadow;
+            shadow.translate({960.f, 160.f});
+            shadow.scale({520.f, 130.f});
+            canvas.setTransform(shadow);
+            canvas.halo({0.f, 0.f}, 1.f, sf::Color(0, 0, 0, 235));
+            canvas.setTransform(sf::Transform::Identity);
+            const float half = _subtitleText.getLocalBounds().size.x / 2.f + 24.f;
+            canvas.line({960.f - half - 90.f, 209.f}, {960.f - half, 209.f}, 1.5f, sf::Color(255, 255, 255, 90));
+            canvas.line({960.f + half, 209.f}, {960.f + half + 90.f, 209.f}, 1.5f, sf::Color(255, 255, 255, 90));
+        }
         window.draw(_titleText);
         window.draw(_subtitleText);
     }

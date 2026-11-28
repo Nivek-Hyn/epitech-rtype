@@ -102,6 +102,11 @@ bool Game::missileHitsEnemy(CollisionFrame &frame, engine::ecs::Entity missile, 
 void Game::damageEnemy(CollisionFrame &frame, const std::pair<engine::ecs::Entity, engine::physics::Aabb> &enemy,
                        engine::ecs::Entity missile)
 {
+    // A boss cannot be hurt before it has reached its place on screen.
+    const auto *pattern = _registry.get<rtype::components::MovementPattern>(enemy.first);
+    const auto *position = _registry.get<rtype::components::Position>(enemy.first);
+    if (pattern && position && pattern->holdX > 0.f && position->x > pattern->holdX)
+        return;
     const auto *damage = _registry.get<rtype::components::MissileDamage>(missile);
     if (auto *health = _registry.get<rtype::components::Health>(enemy.first)) {
         health->hp -= damage ? damage->damage : 1;

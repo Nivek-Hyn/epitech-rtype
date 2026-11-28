@@ -11,7 +11,9 @@ is the authority, and the client draws what the snapshots contain.
 | `client/src/App.cpp` | One state per screen (menu, campaign map, editor, game); hosts the local server; F1/F2/F3; where Escape leads |
 | `client/src/ui/CampaignMap.cpp` | Campaign map: one node per level, locked levels, difficulty, progress saved in `config.json` |
 | `client/src/editor/LevelEditor.cpp`, `LevelEditorDraw.cpp` | Level editor inside the game, on an engine `Registry` |
-| `client/src/render/WorldBackground.cpp` | Background of each world: image layers listed in `assets/config/backgrounds.json`, each scrolling at its own speed |
+| `client/src/render/WorldBackground.cpp` | Background of each world, drawn in code: stars at three depths, the landmark of the world, walls scrolling at the speed of the game |
+| `client/src/render/Neon.cpp` | Drawing toolkit used by every picture of the game: black shapes and lines of light, copied to the glow layer of the Neon styles |
+| `client/src/render/Looks.hpp` | Enemy variants, the colour of each world, the colours of the players and of danger |
 | `client/src/ui/MainMenu.cpp` | Menu screens: join a server, settings (volumes, auto fire, high contrast, key remapping) |
 | `client/src/ui/GameConfig.cpp` | Settings saved in `config.json`; an invalid file falls back to the defaults |
 | `client/src/game/Session.cpp` | One game: inputs sent, snapshots received and smoothed, effects of destroyed entities |
@@ -51,15 +53,17 @@ variant comes from the `Kind` of the entity's prefab in `assets/config/entities.
 
 | Type | Function | Variants |
 |---|---|---|
-| Player | `drawPlayer` | Player index: ship color, "P1"..."P4" tag; tilt follows vertical movement |
-| Player missile | `drawPlayerMissile` | `0` blaster, `1` laser (longer, magenta) |
-| Enemy missile | `drawEnemyMissile` | `0` to `4`: shape, color and animation of each enemy shot |
-| Enemy | `drawEnemy`, `drawScout` | Sprite table `enemyLook`: texture, frame, scale and vertical offset of each variant |
-| Obstacle | `drawObstacle` | `0` debris, `1` Martian rock, `2` singularity shard; colored squares without the texture |
-| Bonus | `drawBonus` | Orb with a letter: `S` spread, `L` laser, `+` life |
+| Player | `drawShip` | Player index: colour of the cockpit, wings and engine, "P1"..."P4" tag; tilt follows vertical movement |
+| Player missile | `drawPlayerShot` | `0` blaster, `1` laser (longer, pink) |
+| Enemy missile | `drawEnemyShot` | `0` to `4`: always red with a white-hot centre; the shape tells the pattern |
+| Enemy | `drawEnemy` | Named in `render/Looks.hpp`: `10` to `12` Orbital belt, `13` to `15` Mars, `16` to `18` Singularity, `30` to `32` the three bosses; `0` to `7` the first enemies of the project |
+| Obstacle | `drawObstacle` | `0` torn solar panel, `1` Martian rock, `2` singularity crystal |
+| Bonus | `drawBonus` | Turning diamond with an icon: three lines spread, one beam laser, a cross extra life |
 
-To show a new enemy variant, add its entry to `enemyLook` (`client/src/render/EntityRenderer.cpp`) and use the
-variant in the prefab. An unknown variant is drawn with the default boss sprite.
+Everything is drawn with `neon::Canvas` (`client/src/render/Neon.hpp`): black shapes that hide what is behind them
+and lines of light, also drawn on the glow layer so that the Neon and Arcade styles make them shine. Enemies are drawn
+in the colour of their world with a red eye; red is kept for what hurts. To show a new enemy variant, give it a name in
+`render/Looks.hpp`, a drawing function in `render/EntityRenderer.cpp`, and use the variant in the prefab.
 
 ## Settings and accessibility
 

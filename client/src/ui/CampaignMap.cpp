@@ -14,8 +14,8 @@ namespace {
 constexpr float NodeRadius = 38.f;
 constexpr float BossRadius = 52.f;
 
-const std::array<sf::Color, 3> WorldColors = {sf::Color(80, 190, 255), sf::Color(240, 120, 60),
-                                              sf::Color(190, 100, 255)};
+const std::array<sf::Color, 3> WorldColors = {sf::Color(70, 150, 255), sf::Color(255, 112, 46),
+                                              sf::Color(176, 92, 255)}; // as in render/Looks.hpp
 const std::array<const char *, 3> WorldNames = {"WORLD 1 - ORBITAL BELT", "WORLD 2 - MARS", "WORLD 3 - SINGULARITY"};
 
 nlohmann::json readJson(const std::string &path)
@@ -138,6 +138,7 @@ sf::Text CampaignMap::text(const std::string &string, unsigned int size, sf::Col
 {
     sf::Text label(_font, string, size);
     label.setFillColor(color);
+    label.setLetterSpacing(1.8f);
     label.setOutlineColor(sf::Color(0, 0, 0, 200));
     label.setOutlineThickness(2.f);
     const auto bounds = label.getLocalBounds();
@@ -148,7 +149,7 @@ sf::Text CampaignMap::text(const std::string &string, unsigned int size, sf::Col
 
 void CampaignMap::draw(sf::RenderTarget &window) const
 {
-    window.draw(text("CAMPAIGN", 56, sf::Color(255, 204, 0), {960.f, 205.f}));
+    window.draw(text("CAMPAIGN", 56, sf::Color::White, {960.f, 205.f}));
     drawWorldLabels(window);
     drawPath(window);
     for (std::size_t i = 0; i < _levels.size(); i++)
@@ -173,10 +174,10 @@ void CampaignMap::drawPath(sf::RenderTarget &window) const
     for (std::size_t i = 0; i + 1 < _levels.size(); i++) {
         const sf::Vector2f from = _levels[i].position;
         const sf::Vector2f step = (_levels[i + 1].position - from) / 10.f;
-        const sf::Color color = i < _unlocked ? sf::Color(255, 220, 120) : sf::Color(120, 120, 140, 160);
+        const sf::Color color = i < _unlocked ? sf::Color(238, 244, 255) : sf::Color(255, 255, 255, 50);
         for (int dot = 1; dot < 10; dot++) {
-            sf::CircleShape point(5.f);
-            point.setOrigin({5.f, 5.f});
+            sf::CircleShape point(3.f);
+            point.setOrigin({3.f, 3.f});
             point.setPosition(from + step * static_cast<float>(dot));
             point.setFillColor(color);
             window.draw(point);
@@ -184,7 +185,8 @@ void CampaignMap::drawPath(sf::RenderTarget &window) const
     }
 }
 
-// A locked level is grey with a padlock; the selected one pulses; a boss level is bigger.
+// A ring of light in the colour of its world; a locked level is dim with a padlock; the selected one pulses and
+// turns white; a boss level is bigger.
 void CampaignMap::drawNode(sf::RenderTarget &window, std::size_t index) const
 {
     const Level &level = _levels[index];
@@ -192,14 +194,24 @@ void CampaignMap::drawNode(sf::RenderTarget &window, std::size_t index) const
     const bool selected = index == _selected;
     const float pulse = selected ? 1.f + 0.06f * std::sin(_time * 5.f) : 1.f;
     const float radius = (isBoss(index) ? BossRadius : NodeRadius) * pulse;
-    const sf::Color color = locked ? sf::Color(70, 70, 85) : WorldColors[(index / LevelsPerWorld) % WorldColors.size()];
+    const sf::Color color =
+        locked ? sf::Color(255, 255, 255, 60) : WorldColors[(index / LevelsPerWorld) % WorldColors.size()];
 
+    if (selected) {
+        sf::CircleShape outer(radius + 12.f, 48);
+        outer.setOrigin({radius + 12.f, radius + 12.f});
+        outer.setPosition(level.position);
+        outer.setFillColor(sf::Color::Transparent);
+        outer.setOutlineThickness(1.f);
+        outer.setOutlineColor(sf::Color(255, 255, 255, 120));
+        window.draw(outer);
+    }
     sf::CircleShape node(radius, 48);
     node.setOrigin({radius, radius});
     node.setPosition(level.position);
-    node.setFillColor(color);
-    node.setOutlineThickness(selected ? 6.f : 3.f);
-    node.setOutlineColor(selected ? sf::Color::White : sf::Color(20, 20, 30));
+    node.setFillColor(sf::Color(0, 0, 0, 235));
+    node.setOutlineThickness(selected ? 4.f : 3.f);
+    node.setOutlineColor(selected ? sf::Color::White : color);
     window.draw(node);
 
     if (locked)
@@ -208,7 +220,7 @@ void CampaignMap::drawNode(sf::RenderTarget &window, std::size_t index) const
         window.draw(text(isBoss(index) ? "BOSS" : levelLabel(index), isBoss(index) ? 22 : 26, sf::Color::White,
                          level.position));
     if (index < _unlocked) // already passed
-        window.draw(text("*", 34, sf::Color(255, 220, 80), level.position + sf::Vector2f{0.f, -radius - 18.f}));
+        window.draw(text("CLEAR", 13, color, level.position + sf::Vector2f{0.f, -radius - 16.f}));
 }
 
 void CampaignMap::drawLock(sf::RenderTarget &window, sf::Vector2f center) const
@@ -217,13 +229,15 @@ void CampaignMap::drawLock(sf::RenderTarget &window, sf::Vector2f center) const
     shackle.setOrigin({10.f, 10.f});
     shackle.setPosition(center + sf::Vector2f{0.f, -8.f});
     shackle.setFillColor(sf::Color::Transparent);
-    shackle.setOutlineThickness(4.f);
-    shackle.setOutlineColor(sf::Color(200, 200, 210));
+    shackle.setOutlineThickness(2.f);
+    shackle.setOutlineColor(sf::Color(255, 255, 255, 140));
     window.draw(shackle);
     sf::RectangleShape body({26.f, 20.f});
     body.setOrigin({13.f, 0.f});
     body.setPosition(center + sf::Vector2f{0.f, -2.f});
-    body.setFillColor(sf::Color(200, 200, 210));
+    body.setFillColor(sf::Color::Black); // hides the lower half of the shackle
+    body.setOutlineThickness(2.f);
+    body.setOutlineColor(sf::Color(255, 255, 255, 140));
     window.draw(body);
 }
 
@@ -232,8 +246,8 @@ void CampaignMap::drawPanel(sf::RenderTarget &window) const
 {
     sf::RectangleShape panel({1000.f, 285.f});
     panel.setPosition({460.f, 608.f}); // between the map and the ground of the world
-    panel.setFillColor(sf::Color(8, 12, 28, 210));
-    panel.setOutlineThickness(2.f);
+    panel.setFillColor(sf::Color(0, 0, 0, 242));
+    panel.setOutlineThickness(1.f);
     panel.setOutlineColor(WorldColors[world() % WorldColors.size()]);
     window.draw(panel);
     if (!_levels.empty())

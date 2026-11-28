@@ -88,8 +88,16 @@ void Game::applyLevelOverrides(engine::ecs::Entity entity, const EnemySpawnConfi
 // Health, speeds and attacks scaled by the difficulty and the infinite mode loops.
 void Game::applyDifficulty(engine::ecs::Entity entity)
 {
-    if (auto *health = _registry.get<rtype::components::Health>(entity))
+    if (auto *health = _registry.get<rtype::components::Health>(entity)) {
         health->hp = scaledHealth(health->hp);
+        // A boss is as strong for four players as for one: its health grows with the players in the game.
+        const auto *traits = _registry.get<rtype::components::EnemyTraits>(entity);
+        if (traits && traits->isBoss) {
+            const auto players = std::count(_connected.begin(), _connected.end(), true);
+            health->hp *= static_cast<int>(std::max<std::ptrdiff_t>(1, players));
+        }
+        health->maxHp = health->hp;
+    }
     auto *velocity = _registry.get<rtype::components::Velocity>(entity);
     if (velocity)
         velocity->x = -scaledSpeed(-velocity->x);

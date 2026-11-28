@@ -203,6 +203,15 @@ protocol::Snapshot Game::snapshot()
                                                         [](const WaveConfig &wave) { return wave.isSpawned; }));
     for (std::size_t player = 0; player < _lives.size(); player++)
         snap.lives[player] = static_cast<std::uint8_t>(std::clamp(_lives[player], 0, 255));
+    _registry.each<rtype::components::Health, rtype::components::EnemyTraits>(
+        [&snap](engine::ecs::Entity /*entity*/, const rtype::components::Health &health,
+                const rtype::components::EnemyTraits &traits) {
+            if (!traits.isBoss || health.maxHp <= 0 || health.hp <= 0)
+                return;
+            const float left = static_cast<float>(health.hp) / static_cast<float>(health.maxHp);
+            snap.bossHealth =
+                std::max(snap.bossHealth, static_cast<std::uint8_t>(std::clamp(std::lround(left * 255.f), 1L, 255L)));
+        });
 
     _registry.each<rtype::components::Position, rtype::components::Kind, rtype::components::NetworkId>(
         [&snap](engine::ecs::Entity /*entity*/, const rtype::components::Position &position,

@@ -13,6 +13,7 @@ namespace {
 using rtype::components::MovementPattern;
 
 constexpr float MinBounceHeight = 50.f;
+constexpr float BossEntrySpeed = 260.f; // world units per second, until the boss reaches its place
 
 // Singularity: the black hole is at the center of the screen. The screen being wider than
 // high, orbits are flattened into ellipses so that they stay visible.
@@ -170,6 +171,8 @@ void holdBoss(Motion &m, bool holding, float topY)
         return;
     if (holding)
         m.velocity.x = 0.f;
+    else // a boss comes on screen quickly, then holds its place
+        m.velocity.x = std::min(m.velocity.x, -BossEntrySpeed);
     if ((m.position.y <= topY && m.velocity.y < 0.f) || (m.position.y >= m.bottomY && m.velocity.y > 0.f))
         m.velocity.y = 0.f;
 }

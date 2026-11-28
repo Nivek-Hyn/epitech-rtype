@@ -1,6 +1,7 @@
 #include "game/Session.hpp"
 
 #include "common/Constants.hpp"
+#include "render/Looks.hpp"
 
 #include <SFML/Window/Keyboard.hpp>
 
@@ -59,6 +60,7 @@ void Session::reset()
     _score = 0;
     _connected = _gameOver = _gameWon = _playerWasSpawned = _waiting = _isReady = false; // settings are kept
     _damageFlash = _shakeTimer = _waveBanner = _leftTimer = _localTilt = 0.f;
+    _bossHealth = _bossBar = _bossTime = _bossTrail = 0.f;
     _level = _wave = 0;
     _destroyed.clear();
     _leftMessage.clear();
@@ -76,6 +78,9 @@ void Session::update(float dt, bool connected)
     countDown(_waveBanner, dt);
     countDown(_weaponBannerTimer, dt);
     countDown(_leftTimer, dt);
+    _bossTime = _bossHealth > 0.f ? _bossTime + dt : 0.f;
+    _bossBar += (_bossHealth - _bossBar) * std::min(1.f, dt * (_bossTime < 2.f ? 2.5f : 10.f));
+    _bossTrail = _bossTrail < _bossBar ? _bossBar : std::max(_bossBar, _bossTrail - dt * 0.35f);
     _effects.update(dt);
     if (_dyingBoss && (_dyingTimer -= dt) <= 0.f)
         _dyingBoss.reset();
@@ -169,8 +174,8 @@ void Session::handle(const protocol::Message &message, bool &gotSnapshot)
     } else if (const auto *snapshot = std::get_if<protocol::Snapshot>(&message)) {
         gotSnapshot = _world.add(*snapshot);
     } else if (const auto *rejected = std::get_if<protocol::ConnectRejected>(&message)) {
-        _rejectionReason = rejected->reason == protocol::RejectReason::ServerFull ? "server is full"
-                                                                                  : "version mismatch";
+        _rejectionReason =
+            rejected->reason == protocol::RejectReason::ServerFull ? "server is full" : "version mismatch";
     } else if (const auto *destroyed = std::get_if<protocol::EntityDestroyed>(&message)) {
         onDestroyed(*destroyed);
     } else if (const auto *playerLeft = std::get_if<protocol::PlayerLeft>(&message)) {
@@ -187,6 +192,7 @@ void Session::onSnapshot(const protocol::Snapshot &snapshot)
         _waveBanner = WaveBannerDuration; // a new wave has come (a new level starts at wave 0)
     _wave = snapshot.wave;
     _level = snapshot.level;
+    _bossHealth = static_cast<float>(snapshot.bossHealth) / 255.f;
     updateGameState(snapshot);
     _entities = snapshot.entities;
     // A destroyed entity stays hidden until it is gone from the snapshots too.
@@ -235,15 +241,17 @@ void Session::onDestroyed(const protocol::EntityDestroyed &event)
     case EntityType::Enemy:
     case EntityType::Obstacle:
         _resources.playSound("explosion", 90.f);
-        if (entity->type == EntityType::Enemy && entity->variant >= 5) { // bosses: a chain of blasts
-            _effects.bossExplosion({entity->x + 140.f, entity->y + 60.f});
+        if (entity->type == EntityType::Enemy && looks::isBoss(entity->variant)) { // bosses: a chain of blasts
+            _effects.bossExplosion({entity->x + looks::BossCenterX, entity->y + looks::BossCenterY});
             _dyingBoss = *entity;
             _dyingTimer = 1.5f;
             _shakeTimer = ShakeDuration * 5.f;
             _shakeIntensity = 14.f;
         } else {
             addExplosion(*entity, 0.35f);
-            _effects.explosion({entity->x + 32.f, entity->y + 30.f}, sf::Color(255, 160, 50), 1.f);
+            const std::size_t world = entity->type == EntityType::Enemy ? looks::worldOfEnemy(entity->variant)
+                                                                        : std::min<std::size_t>(entity->variant, 2);
+            _effects.explosion({entity->x + 32.f, entity->y + 30.f}, looks::worldPalette(world).accent, 1.f);
         }
         break;
     case EntityType::Player:
@@ -251,7 +259,7 @@ void Session::onDestroyed(const protocol::EntityDestroyed &event)
         _resources.playSound("hit", 100.f);
         _resources.playSound("explosion", 100.f);
         addExplosion(*entity, 0.45f);
-        _effects.explosion({entity->x + 33.f, entity->y + 17.f}, sf::Color(0, 220, 255), 1.4f);
+        _effects.explosion({entity->x + 30.f, entity->y + 15.f}, looks::playerColor(entity->variant), 1.4f);
         _damageFlash = DamageFlashDuration;
         _shakeTimer = ShakeDuration;
         _shakeIntensity = 15.f;
@@ -265,7 +273,7 @@ void Session::onDestroyed(const protocol::EntityDestroyed &event)
             _effects.hit(tip, sf::Color(90, 220, 255));
             flashEnemyNear(tip);
         } else {
-            _effects.hit({entity->x + 16.f, entity->y + 12.f}, sf::Color(255, 90, 70));
+            _effects.hit({entity->x + 16.f, entity->y + 12.f}, looks::Danger);
         }
         break;
     case EntityType::Bonus:
@@ -273,7 +281,8 @@ void Session::onDestroyed(const protocol::EntityDestroyed &event)
             _resources.playSound("hit", 90.f, 1.5f);
             static const std::array<sf::Color, 3> bonusColors{sf::Color(80, 200, 255), sf::Color(255, 90, 220),
                                                               sf::Color(120, 255, 140)};
-            _effects.pickup({entity->x + 16.f, entity->y + 16.f}, bonusColors[std::min<std::size_t>(entity->variant, 2)]);
+            _effects.pickup({entity->x + 16.f, entity->y + 16.f},
+                            bonusColors[std::min<std::size_t>(entity->variant, 2)]);
             if (entity->variant == 0) {
                 _currentWeapon = "SPREAD";
                 _weaponBannerText = "+ SPREAD SHOT (3-WAY) !";
@@ -299,23 +308,14 @@ void Session::onPlayerLeft(const protocol::PlayerLeft &event)
     _leftTimer = 3.f;
 }
 
-// Shots, bonuses and enemies just hit are drawn again on the glow layer; ships leave an exhaust trail.
+// Ships leave an exhaust trail in their player's colour.
 void Session::drawGlowOf(const EntityState &entity, float time, float tilt, float dt)
 {
-    if (_highContrast)
+    (void)time;
+    (void)tilt;
+    if (_highContrast || entity.type != EntityType::Player)
         return;
-    if (entity.type == EntityType::Player) {
-        static const std::array<sf::Color, 4> exhaust{sf::Color(60, 200, 255), sf::Color(255, 170, 60),
-                                                      sf::Color(90, 255, 130), sf::Color(240, 120, 255)};
-        _effects.engine({entity.x - 2.f, entity.y + 17.f}, exhaust[entity.variant % 4], dt);
-        return;
-    }
-    if (!_glow)
-        return;
-    const bool shot = entity.type == EntityType::PlayerMissile || entity.type == EntityType::EnemyMissile;
-    const bool hitEnemy = entity.type == EntityType::Enemy && _hitFlash.contains(entity.netId);
-    if (shot || entity.type == EntityType::Bonus || hitEnemy)
-        _renderer.draw(*_glow, entity, time, tilt, _localPlayer);
+    _effects.engine(EntityRenderer::enginePosition(entity), looks::playerColor(entity.variant), dt);
 }
 
 // The enemy nearest to where a shot ended, if close enough, glows for a moment.
@@ -326,7 +326,7 @@ void Session::flashEnemyNear(sf::Vector2f point)
     for (const auto &entity : _shown) {
         if (entity.type != EntityType::Enemy)
             continue;
-        const float size = entity.variant >= 5 ? 140.f : 34.f;
+        const float size = looks::isBoss(entity.variant) ? 140.f : 34.f;
         const sf::Vector2f center(entity.x + size, entity.y + size * 0.8f);
         const sf::Vector2f d = center - point;
         const float distance = d.x * d.x + d.y * d.y;
@@ -377,6 +377,7 @@ float Session::tiltOf(const EntityState &entity, float dt)
 
 void Session::draw(sf::RenderTarget &window, float time, float dt, bool hasAssets)
 {
+    _hudTime = time;
     _shown = _interpolator.sample(protocol::SnapshotInterpolator::Clock::now());
     if (!_gameOver && (!_connected || _shown.empty()))
         drawConnecting(window);
@@ -385,7 +386,12 @@ void Session::draw(sf::RenderTarget &window, float time, float dt, bool hasAsset
             if (std::find(_destroyed.begin(), _destroyed.end(), entity.netId) != _destroyed.end())
                 continue;
             const float tilt = entity.type == EntityType::Player ? tiltOf(entity, dt) : 0.f;
-            _renderer.draw(window, entity, time, tilt, _localPlayer);
+            const auto flash = _hitFlash.find(entity.netId);
+            const bool boss = entity.type == EntityType::Enemy && looks::isBoss(entity.variant);
+            // A boss is hit all the time: a lighter flash keeps it readable, and it wears as it loses health.
+            _renderer.draw(window, entity, time, tilt, _localPlayer, _highContrast ? nullptr : _glow,
+                           flash != _hitFlash.end() ? (boss ? 0.35f : 0.85f) : 0.f,
+                           boss && _bossHealth > 0.f ? 1.f - _bossHealth : 0.f);
             drawGlowOf(entity, time, tilt, dt);
         }
     }
@@ -394,14 +400,14 @@ void Session::draw(sf::RenderTarget &window, float time, float dt, bool hasAsset
         const float strength = 4.f + (1.5f - _dyingTimer) * 6.f;
         shaking.x += std::sin(time * 83.f) * strength;
         shaking.y += std::cos(time * 67.f) * strength;
-        _renderer.draw(window, shaking, time, 0.f, _localPlayer);
-        if (_glow && static_cast<int>(time * 20.f) % 2 == 0)
-            _renderer.draw(*_glow, shaking, time, 0.f, _localPlayer);
+        const bool white = static_cast<int>(time * 20.f) % 2 == 0;
+        _renderer.draw(window, shaking, time, 0.f, _localPlayer, _highContrast ? nullptr : _glow, white ? 0.9f : 0.f,
+                       1.f);
     }
     if (_highContrast)
         drawShotMarkers(window);
     for (const auto &explosion : _explosions)
-        _renderer.drawExplosion(window, explosion);
+        _renderer.drawExplosion(window, explosion, _highContrast ? nullptr : _glow);
     if (!_highContrast)
         _effects.draw(window, _glow);
     if (const float flash = _effects.flash(); flash > 0.f && !_highContrast) {

@@ -1,3 +1,5 @@
+> Historical document from the project. After the project, the sprite sheets below were replaced by graphics drawn in code (see [client.md](../client.md)).
+
 1. Introduction
 
 Ce document répertorie le mapping officiel entre les entités logiques du jeu (définies dans protocol.hpp et Components.hpp) et les assets graphiques du dossier assets/ pour le projet R-Type.

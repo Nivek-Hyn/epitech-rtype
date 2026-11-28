@@ -20,15 +20,15 @@ Starfield::Starfield(std::size_t starCount, float width, float height) : _width(
         if (layer == 0) {
             speed = 30.f;
             size = 1.5f;
-            color = sf::Color(100, 110, 150, 180);
+            color = sf::Color(255, 255, 255, 90);
         } else if (layer == 1) {
             speed = 70.f;
             size = 2.5f;
-            color = sf::Color(180, 190, 230, 220);
+            color = sf::Color(255, 255, 255, 160);
         } else {
             speed = 130.f;
             size = 3.5f;
-            color = (i % 2 == 0) ? sf::Color(255, 235, 150) : sf::Color(140, 220, 255);
+            color = sf::Color(255, 255, 255, 230);
         }
 
         _stars.push_back({distX(rng), distY(rng), speed, size, color});

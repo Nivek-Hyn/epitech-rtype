@@ -25,16 +25,13 @@ review the corresponding upstream header notices when preparing a public release
 Assets and project code
 =======================
 
-The assets/r-typesheet*.gif files were supplied by Epitech for this student
-R-Type project, as confirmed by the team. Original creator credits and any terms
-covering public redistribution have not been recorded in this repository.
-This document records the educational source; it does not assign an asset license
-or establish permission for public redistribution.
+Every picture of the game (ships, enemies, shots, worlds and interface) is drawn
+by the client's own code (client/src/render), from shapes and lines: no image file
+is used.
 
-The assets/backgrounds images come from "Seamless Space Backgrounds" by Screaming
-Brain Studios, released under Creative Commons Zero (CC0 1.0, public domain):
-free to use, modify and redistribute, without attribution. mars.png is a recolored
-nebula of the pack, and stars.png a starfield of the pack made transparent.
+The font is Chakra Petch (assets/fonts/ChakraPetch-SemiBold.ttf), copyright 2018
+The Chakra Petch Project Authors, released under the SIL Open Font License 1.1
+(assets/fonts/OFL.txt).
 
 The repository currently declares no project-wide source-code license.
 The upstream notices do not assign a license to the project's own code or assets.

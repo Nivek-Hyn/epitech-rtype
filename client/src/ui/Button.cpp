@@ -3,11 +3,12 @@
 namespace rtype::client::ui {
 
 Button::Button(const sf::Font &font, const std::string &label, sf::Vector2f position, sf::Vector2f size)
-    : _text(font, label, 24), _label(label)
+    : _text(font, label, 22), _label(label)
 {
+    _text.setLetterSpacing(1.8f);
     _box.setSize(size);
     _box.setPosition(position);
-    _box.setOutlineThickness(2.f);
+    _box.setOutlineThickness(1.f);
 
     updateVisuals();
 }
@@ -48,14 +49,17 @@ bool Button::handleMouseClick(sf::Vector2f mousePos)
 
 void Button::updateVisuals()
 {
+    // Black glass and a thin line; the selected button lights up in white.
     if (_selected) {
-        _box.setFillColor(sf::Color(40, 50, 85, 230));
-        _box.setOutlineColor(sf::Color(0, 230, 255));
+        _box.setFillColor(sf::Color(0, 0, 0, 230));
+        _box.setOutlineColor(sf::Color(238, 244, 255));
+        _box.setOutlineThickness(2.f);
         _text.setFillColor(sf::Color(255, 255, 255));
     } else {
-        _box.setFillColor(sf::Color(20, 22, 35, 180));
-        _box.setOutlineColor(sf::Color(80, 90, 130));
-        _text.setFillColor(sf::Color(190, 195, 215));
+        _box.setFillColor(sf::Color(0, 0, 0, 190));
+        _box.setOutlineColor(sf::Color(255, 255, 255, 60));
+        _box.setOutlineThickness(1.f);
+        _text.setFillColor(sf::Color(150, 158, 172));
     }
 
     const auto textBounds = _text.getLocalBounds();
@@ -69,6 +73,13 @@ void Button::updateVisuals()
 void Button::draw(sf::RenderTarget &window) const
 {
     window.draw(_box);
+    if (_selected) { // a bar of light on the left edge
+        const auto bounds = _box.getGlobalBounds();
+        sf::RectangleShape bar({4.f, bounds.size.y - 12.f});
+        bar.setPosition({bounds.position.x + 6.f, bounds.position.y + 6.f});
+        bar.setFillColor(sf::Color(255, 255, 255));
+        window.draw(bar);
+    }
     window.draw(_text);
 }
 

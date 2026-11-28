@@ -1,10 +1,14 @@
 // Head-up display of a game: score, wave, players and lives, damage flash, banners and end screen.
+// Same look as the menus: black panels, thin white lines, white text, the colour of the world for what changes.
 
 #include "game/Session.hpp"
 
 #include "common/Constants.hpp"
+#include "render/Looks.hpp"
+#include "render/Neon.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <string>
 #include <vector>
 
@@ -12,10 +16,10 @@ namespace rtype::client {
 
 namespace {
 
-const std::array<const char *, 3> WorldNames = {"WORLD 1 - ORBITAL BELT", "WORLD 2 - MARS", "WORLD 3 - SINGULARITY"};
+using neon::withAlpha;
 
-const std::array<sf::Color, 4> PlayerColors = {sf::Color(0, 230, 255), sf::Color(255, 170, 40), sf::Color(80, 255, 120),
-                                               sf::Color(240, 110, 255)};
+const std::array<const char *, 3> WorldNames = {"WORLD 1  ORBITAL BELT", "WORLD 2  MARS", "WORLD 3  SINGULARITY"};
+const sf::Color Dim(150, 158, 172);
 
 std::uint8_t alphaOf(float ratio, float maximum)
 {
@@ -36,10 +40,34 @@ float bannerAlpha(float remaining)
 std::string lifeStatus(int lives, bool active, bool wasSpawned)
 {
     if (lives <= 0)
-        return active ? "LAST CHANCE" : "DEAD";
+        return active ? "LAST CHANCE" : "DOWN";
     if (!active && wasSpawned)
-        return "RESPAWNING... (" + std::to_string(lives) + " LIVES)";
+        return "RESPAWNING";
     return std::to_string(lives) + " LIVES";
+}
+
+// A panel: black glass, a thin line around it and brighter corners.
+void frame(sf::RenderTarget &window, sf::FloatRect rect, float alpha, bool highContrast, sf::Color corner)
+{
+    neon::Canvas canvas(window, nullptr);
+    const sf::Vector2f a = rect.position;
+    const sf::Vector2f b = a + rect.size;
+    canvas.fill({a, {b.x, a.y}, b, {a.x, b.y}}, sf::Color(0, 0, 0, alphaOf(alpha, highContrast ? 245.f : 228.f)));
+    canvas.path({a, {b.x, a.y}, b, {a.x, b.y}}, true, 1.f, withAlpha(looks::Light, 0.22f * alpha));
+    constexpr float Arm = 14.f;
+    const sf::Color line = withAlpha(corner, alpha);
+    canvas.path({{a.x, a.y + Arm}, a, {a.x + Arm, a.y}}, false, 2.f, line);
+    canvas.path({{b.x - Arm, a.y}, {b.x, a.y}, {b.x, a.y + Arm}}, false, 2.f, line);
+    canvas.path({{b.x, b.y - Arm}, b, {b.x - Arm, b.y}}, false, 2.f, line);
+    canvas.path({{a.x + Arm, b.y}, {a.x, b.y}, {a.x, b.y - Arm}}, false, 2.f, line);
+}
+
+// A horizontal rule on each side of a centred title.
+void rules(sf::RenderTarget &window, sf::Vector2f center, float gap, float length, sf::Color color)
+{
+    neon::Canvas canvas(window, nullptr);
+    canvas.line({center.x - gap - length, center.y}, {center.x - gap, center.y}, 1.5f, color);
+    canvas.line({center.x + gap, center.y}, {center.x + gap + length, center.y}, 1.5f, color);
 }
 
 } // namespace
@@ -48,8 +76,9 @@ sf::Text Session::centeredText(const std::string &string, unsigned int size, sf:
 {
     sf::Text text(_resources.getFont("default"), string, size);
     text.setFillColor(color);
+    text.setLetterSpacing(1.6f);
     const auto bounds = text.getLocalBounds();
-    text.setOrigin({bounds.size.x / 2.f, bounds.size.y / 2.f});
+    text.setOrigin({bounds.position.x + bounds.size.x / 2.f, bounds.position.y + bounds.size.y / 2.f});
     text.setPosition(center);
     outline(text);
     return text;
@@ -72,7 +101,7 @@ void Session::drawShotMarkers(sf::RenderTarget &window) const
             continue;
         sf::CircleShape ring(26.f);
         ring.setOrigin({26.f, 26.f});
-        ring.setPosition({entity.x, entity.y});
+        ring.setPosition({entity.x + 18.f, entity.y + 12.f});
         ring.setFillColor(sf::Color::Transparent);
         ring.setOutlineColor(sf::Color(255, 60, 60));
         ring.setOutlineThickness(3.f);
@@ -84,9 +113,10 @@ void Session::drawAutoFire(sf::RenderTarget &window) const
 {
     if (!_autoFire)
         return;
-    sf::Text text(_resources.getFont("default"), "AUTO FIRE ON (F1)", 20);
-    text.setFillColor(sf::Color(255, 204, 0));
-    text.setPosition({44.f, 160.f});
+    sf::Text text(_resources.getFont("default"), "AUTO FIRE  F1", 16);
+    text.setLetterSpacing(1.6f);
+    text.setFillColor(looks::Light);
+    text.setPosition({40.f, 166.f});
     outline(text);
     window.draw(text);
 }
@@ -96,24 +126,18 @@ void Session::drawWeaponBanner(sf::RenderTarget &window) const
     if (_weaponBannerTimer <= 0.f || _weaponBannerText.empty())
         return;
     const float alpha = std::min(1.f, _weaponBannerTimer / 0.4f);
-    sf::RectangleShape banner({460.f, 44.f});
-    banner.setOrigin({230.f, 22.f});
-    banner.setPosition({WorldWidth / 2.f, 110.f});
-    banner.setFillColor(sf::Color(10, 20, 35, alphaOf(alpha, 220.f)));
-    banner.setOutlineThickness(2.f);
-    banner.setOutlineColor(sf::Color(0, 230, 255, alphaOf(alpha, 255.f)));
-    window.draw(banner);
-    window.draw(centeredText(_weaponBannerText, 20, sf::Color(255, 230, 80, alphaOf(alpha, 255.f)),
-                             {WorldWidth / 2.f, 110.f}));
+    const sf::Text text =
+        centeredText(_weaponBannerText, 22, withAlpha(looks::Light, alpha), {WorldWidth / 2.f, 150.f});
+    rules(window, {WorldWidth / 2.f, 152.f}, text.getLocalBounds().size.x / 2.f + 24.f, 90.f,
+          withAlpha(looks::Light, 0.5f * alpha));
+    window.draw(text);
 }
 
 void Session::drawConnecting(sf::RenderTarget &window) const
 {
-    sf::Text text(_resources.getFont("default"),
-                  "CONNECTING TO SERVER...\nEnsure ./r-type_server is running\n\n[ESC] Return to Menu", 30);
-    text.setFillColor(sf::Color(255, 204, 0));
-    text.setPosition({600.f, 480.f});
-    window.draw(text);
+    window.draw(centeredText("CONNECTING TO THE SERVER", 30, looks::Light, {WorldWidth / 2.f, 500.f}));
+    window.draw(centeredText("Make sure ./r-type_server is running    ESC  back to the menu", 16, Dim,
+                             {WorldWidth / 2.f, 550.f}));
 }
 
 void Session::drawHud(sf::RenderTarget &window) const
@@ -133,82 +157,122 @@ void Session::drawHud(sf::RenderTarget &window) const
 // Score, world, level and wave in a panel, top left.
 void Session::drawScore(sf::RenderTarget &window) const
 {
-    drawPanel(window, {24.f, 18.f}, {420.f, 130.f});
-    sf::Text title(_resources.getFont("default"), WorldNames[static_cast<std::size_t>(_level / 3) % WorldNames.size()],
-                   16);
-    title.setFillColor(sf::Color(150, 170, 210));
-    title.setPosition({44.f, 28.f});
+    const std::size_t world = static_cast<std::size_t>(_level / 3) % WorldNames.size();
+    const sf::Color accent = looks::worldPalette(world).accent;
+    frame(window, {{24.f, 20.f}, {400.f, 132.f}}, 1.f, _highContrast, accent);
+
+    sf::Text title(_resources.getFont("default"), WorldNames[world], 15);
+    title.setLetterSpacing(2.f);
+    title.setFillColor(accent);
+    title.setPosition({42.f, 32.f});
+    outline(title);
     window.draw(title);
 
-    sf::Text score(_resources.getFont("default"), "SCORE  " + std::to_string(_score), 34);
-    score.setFillColor(sf::Color(0, 230, 255));
-    score.setPosition({44.f, 48.f});
+    sf::Text score(_resources.getFont("default"), std::to_string(_score), 40);
+    score.setLetterSpacing(1.4f);
+    score.setFillColor(looks::Light);
+    score.setPosition({40.f, 50.f});
     outline(score);
     window.draw(score);
 
     sf::Text stage(_resources.getFont("default"),
-                   "LEVEL " + std::to_string(_level + 1) + "  -  WAVE " + std::to_string(std::max(_wave, 1)), 18);
-    stage.setFillColor(sf::Color(255, 204, 0));
-    stage.setPosition({44.f, 92.f});
+                   "LEVEL " + std::to_string(_level + 1) + "   WAVE " + std::to_string(std::max(_wave, 1)), 15);
+    stage.setLetterSpacing(1.6f);
+    stage.setFillColor(Dim);
+    stage.setPosition({42.f, 106.f});
     outline(stage);
     window.draw(stage);
 
-    sf::Text weapon(_resources.getFont("default"), "WEAPON: " + _currentWeapon, 20);
-    weapon.setFillColor(_currentWeapon == "LASER" ? sf::Color(255, 90, 220)
-                       : (_currentWeapon == "SPREAD" ? sf::Color(80, 200, 255) : sf::Color(200, 220, 240)));
-    weapon.setPosition({44.f, 116.f});
+    static const std::array<std::pair<const char *, sf::Color>, 3> weapons{{{"BLASTER", sf::Color(120, 220, 255)},
+                                                                            {"SPREAD", sf::Color(80, 200, 255)},
+                                                                            {"LASER", sf::Color(255, 90, 220)}}};
+    sf::Color weaponColor = looks::Light;
+    for (const auto &[name, color] : weapons) {
+        if (_currentWeapon == name)
+            weaponColor = color;
+    }
+    sf::Text weapon(_resources.getFont("default"), _currentWeapon, 15);
+    weapon.setLetterSpacing(1.6f);
+    weapon.setFillColor(weaponColor);
+    const auto bounds = weapon.getLocalBounds();
+    weapon.setPosition({406.f - bounds.size.x, 106.f});
     outline(weapon);
     window.draw(weapon);
 }
 
 void Session::drawPanel(sf::RenderTarget &window, sf::Vector2f position, sf::Vector2f size) const
 {
-    sf::RectangleShape panel(size);
-    panel.setPosition(position);
-    panel.setFillColor(sf::Color(6, 10, 26, _highContrast ? 240 : 170));
-    panel.setOutlineThickness(2.f);
-    panel.setOutlineColor(sf::Color(0, 200, 255, 120));
-    window.draw(panel);
-    sf::RectangleShape accent({size.x, 4.f}); // a colored edge on top, like the menus
-    accent.setPosition(position);
-    accent.setFillColor(sf::Color(0, 220, 255));
-    window.draw(accent);
+    frame(window, {position, size}, 1.f, _highContrast, looks::Light);
 }
 
-// A small heart: two circles and a triangle.
+// A life: a small ship in the player's colour.
 void Session::drawHeart(sf::RenderTarget &window, sf::Vector2f center, sf::Color color) const
 {
-    for (const float side : {-1.f, 1.f}) {
-        sf::CircleShape lobe(6.f);
-        lobe.setOrigin({6.f, 6.f});
-        lobe.setPosition(center + sf::Vector2f{side * 5.f, -3.f});
-        lobe.setFillColor(color);
-        window.draw(lobe);
-    }
-    sf::ConvexShape point(3);
-    point.setPoint(0, center + sf::Vector2f{-11.f, -1.f});
-    point.setPoint(1, center + sf::Vector2f{11.f, -1.f});
-    point.setPoint(2, center + sf::Vector2f{0.f, 12.f});
-    point.setFillColor(color);
-    window.draw(point);
+    neon::Canvas canvas(window, nullptr);
+    sf::Transform transform;
+    transform.translate(center);
+    transform.scale({0.42f, 0.42f});
+    canvas.setTransform(transform);
+    canvas.shape({{36, 0},
+                  {14, -5},
+                  {-2, -7},
+                  {-14, -17},
+                  {-24, -17},
+                  {-17, -6},
+                  {-26, -5},
+                  {-26, 5},
+                  {-17, 6},
+                  {-24, 17},
+                  {-14, 17},
+                  {-2, 7},
+                  {14, 5}},
+                 looks::Black, 4.f, color);
 }
 
-// A banner while a boss (enemy variants 5 and 6, see entities.json) is on screen.
+// While a boss (see render/Looks.hpp) is on screen, top centre: a blinking warning as it arrives, then its name, and
+// its health in a bar that fills as it comes in. The health just lost stays white a moment behind the red.
 void Session::drawBossAlert(sf::RenderTarget &window) const
 {
-    const bool boss = std::any_of(_shown.begin(), _shown.end(), [](const protocol::EntityState &entity) {
-        return entity.type == protocol::EntityType::Enemy && entity.variant >= 5 && entity.variant <= 6;
+    const auto boss = std::find_if(_shown.begin(), _shown.end(), [](const protocol::EntityState &entity) {
+        return entity.type == protocol::EntityType::Enemy && looks::isBoss(entity.variant);
     });
-    if (!boss)
+    if (boss == _shown.end() && _bossBar < 0.005f)
         return;
-    sf::RectangleShape background({360.f, 24.f});
-    background.setOrigin({180.f, 12.f});
-    background.setPosition({WorldWidth / 2.f, 45.f});
-    background.setFillColor(sf::Color(20, 10, 15, 220));
-    background.setOutlineThickness(2.f);
-    background.setOutlineColor(sf::Color(255, 50, 70));
-    window.draw(background);
-    window.draw(centeredText("WARNING - BOSS ENCOUNTER", 16, sf::Color(255, 70, 70), {WorldWidth / 2.f, 43.f}));
+    const float center = WorldWidth / 2.f;
+    const sf::Color corner = boss != _shown.end() ? looks::worldPalette(looks::worldOfEnemy(boss->variant)).accent
+                                                  : looks::Light;
+    frame(window, {{center - 340.f, 14.f}, {680.f, 66.f}}, std::min(1.f, _bossBar * 4.f + 0.5f), _highContrast, corner);
+    if (boss != _shown.end()) {
+        const bool warning = _bossTime < 3.f;
+        const float blink = _highContrast || !warning ? 1.f : 0.6f + 0.4f * std::sin(_hudTime * 9.f);
+        const sf::Color color = warning ? withAlpha(looks::Danger, blink) : looks::Light;
+        const sf::Text text =
+            centeredText(warning ? "WARNING" : looks::bossName(boss->variant), 17, color, {center, 36.f});
+        rules(window, {center, 37.f}, text.getLocalBounds().size.x / 2.f + 20.f, 100.f,
+              withAlpha(warning ? looks::Danger : looks::Light, warning ? blink : 0.35f));
+        window.draw(text);
+    }
+
+    constexpr float Half = 300.f;
+    constexpr float Top = 56.f;
+    constexpr float Height = 10.f;
+    neon::Canvas canvas(window, nullptr);
+    const auto bar = [&canvas](float from, float to, sf::Color color) {
+        canvas.fill({{from, Top}, {to, Top}, {to, Top + Height}, {from, Top + Height}}, color);
+    };
+    bar(center - Half - 3.f, center + Half + 3.f, sf::Color(0, 0, 0, 220));
+    const float left = center - Half;
+    bar(left, left + 2.f * Half * _bossTrail, withAlpha(looks::Light, 0.75f));
+    bar(left, left + 2.f * Half * _bossBar, looks::Danger);
+    if (_bossBar > 0.01f) // the hot edge of the bar
+        bar(left + 2.f * Half * _bossBar - 2.f, left + 2.f * Half * _bossBar, looks::DangerHot);
+    for (int i = 1; i < 10; ++i) { // a notch every tenth
+        const float x = left + 2.f * Half * static_cast<float>(i) / 10.f;
+        canvas.line({x, Top}, {x, Top + Height}, 2.f, sf::Color(0, 0, 0, 200));
+    }
+    const sf::Vector2f a{center - Half - 3.f, Top - 3.f};
+    const sf::Vector2f b{center + Half + 3.f, Top + Height + 3.f};
+    canvas.path({a, {b.x, a.y}, b, {a.x, b.y}}, true, 1.f, withAlpha(looks::Light, 0.35f));
 }
 
 // One line per player, top right: lives, respawning or dead. Players who never joined are hidden.
@@ -227,45 +291,52 @@ void Session::drawPlayers(sf::RenderTarget &window) const
     if (shown.empty())
         return;
     const float width = 380.f;
-    drawPanel(window, {WorldWidth - width - 24.f, 18.f}, {width, 20.f + 36.f * static_cast<float>(shown.size())});
+    drawPanel(window, {WorldWidth - width - 24.f, 20.f}, {width, 24.f + 32.f * static_cast<float>(shown.size())});
     float y = 34.f;
     for (const std::uint8_t player : shown) {
         drawPlayerLine(window, player, active[player], y);
-        y += 36.f;
+        y += 32.f;
     }
 }
 
-// "P2 (YOU)" in the player's color, then one heart per life, or the status when there is none.
+// "P2 YOU" in the player's color, then one small ship per life, or the status when there is none.
 void Session::drawPlayerLine(sf::RenderTarget &window, std::uint8_t player, bool active, float y) const
 {
-    const float left = WorldWidth - 380.f;
+    const float left = WorldWidth - 384.f;
     const int lives = _lives[player];
+    const bool alive = lives > 0 || active;
     sf::Text name(_resources.getFont("default"),
-                  "P" + std::to_string(player + 1) + (_localPlayer == player ? " (YOU)" : ""), 20);
-    name.setFillColor(lives > 0 || active ? PlayerColors[player] : sf::Color(140, 140, 140));
+                  "P" + std::to_string(player + 1) + (_localPlayer == player ? "  YOU" : ""), 17);
+    name.setLetterSpacing(1.6f);
+    name.setFillColor(alive ? looks::playerColor(player) : Dim);
     name.setPosition({left, y});
     outline(name);
     window.draw(name);
     if (lives <= 0 || (!active && _playerWasSpawned)) {
-        sf::Text status(_resources.getFont("default"), lifeStatus(lives, active, _playerWasSpawned), 16);
-        status.setFillColor(lives > 0 ? sf::Color(255, 204, 0) : sf::Color(150, 150, 160));
-        status.setPosition({left + 130.f, y + 3.f});
+        sf::Text status(_resources.getFont("default"), lifeStatus(lives, active, _playerWasSpawned), 15);
+        status.setLetterSpacing(1.6f);
+        status.setFillColor(lives > 0 ? looks::Light : Dim);
+        status.setPosition({left + 140.f, y + 2.f});
+        outline(status);
         window.draw(status);
         return;
     }
     for (int life = 0; life < lives; life++)
-        drawHeart(window, {left + 150.f + static_cast<float>(life) * 30.f, y + 12.f}, sf::Color(255, 70, 90));
+        drawHeart(window, {left + 156.f + static_cast<float>(life) * 34.f, y + 12.f}, looks::playerColor(player));
 }
 
-// The screen turns red for a moment when a ship is hit.
+// The edges of the screen turn red for a moment when a ship is hit.
 void Session::drawDamageFlash(sf::RenderTarget &window) const
 {
     if (_damageFlash <= 0.f)
         return;
-    sf::RectangleShape flash({WorldWidth, WorldHeight});
-    // Softer in high contrast: no bright full-screen flash.
-    flash.setFillColor(sf::Color(255, 0, 0, alphaOf(_damageFlash / DamageFlashDuration, _highContrast ? 50.f : 135.f)));
-    window.draw(flash);
+    const std::uint8_t alpha = alphaOf(_damageFlash / DamageFlashDuration, _highContrast ? 50.f : 150.f);
+    const sf::Color red(255, 30, 50, alpha);
+    const sf::Color clear(255, 30, 50, 0);
+    neon::Canvas canvas(window, nullptr);
+    constexpr float Edge = 220.f;
+    canvas.gradient({{0.f, 0.f}, {WorldWidth, Edge}}, red, clear);
+    canvas.gradient({{0.f, WorldHeight - Edge}, {WorldWidth, Edge}}, clear, red);
 }
 
 void Session::drawWaveBanner(sf::RenderTarget &window) const
@@ -273,17 +344,13 @@ void Session::drawWaveBanner(sf::RenderTarget &window) const
     if (_waveBanner <= 0.f)
         return;
     const float alpha = bannerAlpha(_waveBanner);
-    sf::RectangleShape banner({640.f, 100.f});
-    banner.setOrigin({320.f, 50.f});
-    banner.setPosition({WorldWidth / 2.f, 250.f});
-    banner.setFillColor(sf::Color(10, 15, 30, alphaOf(alpha, 220.f)));
-    banner.setOutlineThickness(2.f);
-    banner.setOutlineColor(sf::Color(255, 204, 0, alphaOf(alpha, 255.f)));
-    window.draw(banner);
-    window.draw(centeredText("--- WAVE " + std::to_string(_wave) + " ---", 44,
-                             sf::Color(255, 204, 0, alphaOf(alpha, 255.f)), {WorldWidth / 2.f, 235.f}));
-    window.draw(centeredText("INCOMING ENEMY SQUADRON", 18, sf::Color(0, 230, 255, alphaOf(alpha, 240.f)),
-                             {WorldWidth / 2.f, 275.f}));
+    const sf::Color light = withAlpha(looks::Light, alpha);
+    const sf::Color accent = withAlpha(looks::worldPalette(static_cast<std::size_t>(_level / 3)).accent, alpha);
+    const sf::Text title = centeredText("WAVE " + std::to_string(_wave), 50, light, {WorldWidth / 2.f, 236.f});
+    rules(window, {WorldWidth / 2.f, 240.f}, title.getLocalBounds().size.x / 2.f + 30.f, 220.f,
+          withAlpha(looks::Light, 0.5f * alpha));
+    window.draw(title);
+    window.draw(centeredText("INCOMING SQUADRON", 16, accent, {WorldWidth / 2.f, 284.f}));
 }
 
 // While the server waits for players: how many are here, ready button and controls to try.
@@ -294,46 +361,27 @@ void Session::drawWaitingRoom(sf::RenderTarget &window) const
     const auto players = std::count_if(_shown.begin(), _shown.end(), [](const protocol::EntityState &entity) {
         return entity.type == protocol::EntityType::Player;
     });
-    sf::RectangleShape panel({900.f, 270.f});
-    panel.setOrigin({450.f, 135.f});
-    panel.setPosition({WorldWidth / 2.f, 420.f});
-    panel.setFillColor(sf::Color(10, 15, 30, 220));
-    panel.setOutlineThickness(2.f);
-    panel.setOutlineColor(sf::Color(0, 230, 255));
-    window.draw(panel);
-    window.draw(centeredText("WAITING FOR PLAYERS", 40, sf::Color(0, 230, 255), {WorldWidth / 2.f, 335.f}));
-    window.draw(centeredText(std::to_string(players) + " / 4 connected", 20, sf::Color(180, 200, 230),
-                             {WorldWidth / 2.f, 375.f}));
+    frame(window, {{WorldWidth / 2.f - 450.f, 290.f}, {900.f, 260.f}}, 1.f, _highContrast, looks::Light);
+    window.draw(centeredText("WAITING FOR PLAYERS", 38, looks::Light, {WorldWidth / 2.f, 340.f}));
+    window.draw(centeredText(std::to_string(players) + " / 4 CONNECTED", 16, Dim, {WorldWidth / 2.f, 384.f}));
 
-    // Ready indicator / button
-    sf::RectangleShape readyBox({420.f, 48.f});
-    readyBox.setOrigin({210.f, 24.f});
-    readyBox.setPosition({WorldWidth / 2.f, 420.f});
-    if (_isReady) {
-        readyBox.setFillColor(sf::Color(0, 140, 60, 200));
-        readyBox.setOutlineColor(sf::Color(0, 255, 120));
-        readyBox.setOutlineThickness(2.f);
-        window.draw(readyBox);
-        window.draw(
-            centeredText("READY ! (WAITING FOR OTHERS)", 20, sf::Color(255, 255, 255), {WorldWidth / 2.f, 420.f}));
-    } else {
-        readyBox.setFillColor(sf::Color(140, 90, 0, 200));
-        readyBox.setOutlineColor(sf::Color(255, 204, 0));
-        readyBox.setOutlineThickness(2.f);
-        window.draw(readyBox);
-        window.draw(
-            centeredText("PRESS SPACE / ENTER TO READY", 20, sf::Color(255, 255, 255), {WorldWidth / 2.f, 420.f}));
-    }
-
-    window.draw(centeredText("Move: arrows or your keys    Network stats: F3    Menu: ESC", 18,
-                             sf::Color(200, 210, 230), {WorldWidth / 2.f, 475.f}));
+    neon::Canvas canvas(window, nullptr);
+    const sf::Color box = _isReady ? sf::Color(90, 235, 120) : looks::Light;
+    const sf::Vector2f a{WorldWidth / 2.f - 220.f, 412.f};
+    const sf::Vector2f b{WorldWidth / 2.f + 220.f, 462.f};
+    canvas.shape({a, {b.x, a.y}, b, {a.x, b.y}}, sf::Color(0, 0, 0, 220), 2.f, box);
+    canvas.flush();
+    window.draw(centeredText(_isReady ? "READY  WAITING FOR THE OTHERS" : "SPACE OR ENTER WHEN READY", 18, box,
+                             {WorldWidth / 2.f, 436.f}));
+    window.draw(
+        centeredText("MOVE  ARROWS OR YOUR KEYS     NETWORK  F3     MENU  ESC", 14, Dim, {WorldWidth / 2.f, 510.f}));
 }
 
 void Session::drawPlayerLeft(sf::RenderTarget &window) const
 {
     if (_leftTimer <= 0.f)
         return;
-    window.draw(centeredText(_leftMessage, 28, sf::Color(255, 170, 40), {WorldWidth / 2.f, 140.f}));
+    window.draw(centeredText(_leftMessage, 24, looks::Light, {WorldWidth / 2.f, 190.f}));
 }
 
 // Victory or defeat, decided by the server, with the final score.
@@ -342,13 +390,16 @@ void Session::drawEndScreen(sf::RenderTarget &window) const
     if (!_gameOver)
         return;
     sf::RectangleShape overlay({WorldWidth, WorldHeight});
-    overlay.setFillColor(sf::Color(5, 5, 15, 205));
+    overlay.setFillColor(sf::Color(0, 0, 0, 215));
     window.draw(overlay);
-    window.draw(centeredText(_gameWon ? "MISSION ACCOMPLISHED" : "GAME OVER", 64,
-                             _gameWon ? sf::Color(0, 230, 255) : sf::Color(255, 50, 50), {WorldWidth / 2.f, 430.f}));
-    window.draw(
-        centeredText("FINAL SCORE: " + std::to_string(_score), 32, sf::Color(255, 204, 0), {WorldWidth / 2.f, 520.f}));
-    window.draw(centeredText("Press [ESC] to Return to Menu", 22, sf::Color(170, 185, 215), {WorldWidth / 2.f, 600.f}));
+    const sf::Color title = _gameWon ? looks::Light : looks::Danger;
+    const sf::Text heading =
+        centeredText(_gameWon ? "MISSION ACCOMPLISHED" : "GAME OVER", 66, title, {WorldWidth / 2.f, 430.f});
+    rules(window, {WorldWidth / 2.f, 434.f}, heading.getLocalBounds().size.x / 2.f + 34.f, 200.f,
+          withAlpha(title, 0.5f));
+    window.draw(heading);
+    window.draw(centeredText("FINAL SCORE   " + std::to_string(_score), 26, looks::Light, {WorldWidth / 2.f, 520.f}));
+    window.draw(centeredText("ESC  BACK TO THE MENU", 16, Dim, {WorldWidth / 2.f, 590.f}));
 }
 
 } // namespace rtype::client
