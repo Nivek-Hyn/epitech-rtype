@@ -53,7 +53,7 @@ A component is a plain struct holding data, with default values.
    | Any game (generic) | Nowhere: the engine never defines components. Make the engine code a template instead (see `engine/systems/Movement.hpp`). |
    | Server **and** client | `common/include/common/Components.hpp`, namespace `rtype::components` |
    | Server only (health, hitbox, AI...) | a header in `server/src/`, namespace `rtype::server` |
-   | Client only (sprite, animation...) | a header in `client/src/`, namespace `rtype::client` |
+   | Client only (drawing, animation...) | a header in `client/src/`, namespace `rtype::client` |
 
 2. **Write the struct.** Use explicit names and put the unit in a comment when there is one:
 
@@ -177,7 +177,7 @@ entity only combines existing components.
 
 | Component | Fields | Used by |
 |---|---|---|
-| `Kind` | `type` (`player`, `enemy`, `player_missile`, `enemy_missile`, `obstacle`, `bonus`), `variant` | Snapshot: the client chooses the sprite from both |
+| `Kind` | `type` (`player`, `enemy`, `player_missile`, `enemy_missile`, `obstacle`, `bonus`), `variant` | Snapshot: the client chooses how it looks from both |
 | `Hitbox` | `width`, `height`, `offset_y` | Collisions and screen limits; no Hitbox means no collision |
 | `Health` | `hp` | Damage from missiles |
 | `Velocity` | `x`, `y` (world units per second; negative x goes left) | Movement |
@@ -190,7 +190,7 @@ entity only combines existing components.
 
 Then use the name in a level (`"type": "armored_scout"`) and restart the server.
 A prefab with an unknown component or invalid data is skipped with a warning at startup.
-A new `variant` also needs its sprite in the client; reusing an existing variant needs nothing.
+A new `variant` also needs its drawing in the client (`client/src/render/EntityRenderer.cpp`, names in `render/Looks.hpp`); reusing an existing variant needs nothing.
 
 ### Add a component usable in prefabs
 
@@ -214,7 +214,7 @@ angle per missile fired at once:
 "twin": { "missile": "player_missile", "cooldown": 0.3, "angles": [-4.0, 4.0] }
 ```
 
-The missile prefab gives its sprite variant, hitbox, speed and `MissileDamage`. To give the weapon to players,
+The missile prefab gives its variant (how it looks), hitbox, speed and `MissileDamage`. To give the weapon to players,
 add a bonus prefab with `"BonusEffect": {"weapon": "twin"}` and list it in `bonus_drops.prefabs`.
 `bonus_drops.chance` is the probability that a destroyed enemy drops a bonus. A destroyed ship goes back to
 `default_weapon`.
@@ -246,8 +246,8 @@ of the prefab for this enemy only; 0 or nothing keeps them.
 
 ### Edit a level with the level editor
 
-In the client menu, choose **CREATE A LEVEL**. The level is shown as it is played: the world background, the real
-sprites, time running to the right (one line per second) and the height of the screen from top to bottom.
+In the client menu, choose **CREATE A LEVEL**. The level is shown as it is played: the world background, the
+enemies as they look in the game, time running to the right (one line per second) and the height of the screen from top to bottom.
 
 | Action | Control |
 |---|---|

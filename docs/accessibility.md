@@ -31,7 +31,7 @@ changing the movement actions understood by the server. Gamepads are not support
 
 | Feature | Barrier addressed | Current status | Verification to perform |
 |---|---|---|---|
-| Player appearance variants | Helps identify players | Available: sprite variants plus a "P1"..."P4" tag above each ship and in the HUD | Check four players without relying only on hue. |
+| Player appearance variants | Helps identify players | Available: a colour per player plus a "P1"..."P4" tag above each ship and in the HUD | Check four players without relying only on hue. |
 | Shapes/numbers in addition to color | Supports recognition without color alone | Available: player tags, bonus letters (S, L, +), red ring around enemy shots in high contrast | Check players and opposing projectile types in normal play and contrast modes. |
 | High-contrast presentation | Helps distinguish objects from the background | Available: Settings or F2 in game, saved. Plain dark background, outlined HUD text | Compare ships/projectiles, backgrounds, overlays and both UI themes where applicable. |
 | Readable HUD text | Helps read score, health and states | Score, wave and lives of every player shown | Check text size, contrast, scaling and absence of clipping. |

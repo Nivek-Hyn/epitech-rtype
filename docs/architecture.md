@@ -223,7 +223,7 @@ sender address of each datagram it receives.
 
 The client follows the same idea: its network thread fills a queue that the main (rendering) thread empties every
 frame before drawing. The client sends held input flags while connected; the server remains authoritative for
-player positions. The current client draws the snapshot entities directly as sprites rather than storing
+player positions. The current client draws the snapshot entities directly (drawn in code, see `client/src/render/`) rather than storing
 them in a local ECS.
 
 ## 6. Inside the engine: the ECS

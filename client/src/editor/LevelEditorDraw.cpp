@@ -13,7 +13,7 @@ namespace {
 constexpr float PixelsPerSecond = 100.f;
 constexpr float TimelineLeft = 120.f;
 constexpr float PaletteTop = 940.f;
-const sf::Color Accent(0, 220, 255);
+const sf::Color Accent(238, 244, 255); // white light, as the menus
 
 std::string seconds(float time)
 {
@@ -76,7 +76,7 @@ void LevelEditor::drawSpawns(sf::RenderTarget &target, float time)
         return;
     sf::RectangleShape outline(hovered->second.size);
     outline.setPosition(hovered->second.position);
-    outline.setFillColor(sf::Color(0, 220, 255, 40));
+    outline.setFillColor(sf::Color(255, 255, 255, 22));
     outline.setOutlineThickness(3.f);
     outline.setOutlineColor(Accent);
     target.draw(outline);
@@ -91,12 +91,12 @@ void LevelEditor::drawSpawns(sf::RenderTarget &target, float time)
 void LevelEditor::drawTopBar(sf::RenderTarget &target) const
 {
     sf::RectangleShape bar({WorldWidth, TimelineTop});
-    bar.setFillColor(sf::Color(6, 10, 24, 225));
+    bar.setFillColor(sf::Color(0, 0, 0, 228));
     target.draw(bar);
-    sf::Text title = label("LEVEL EDITOR - " + _levelName, 30, sf::Color(255, 204, 0));
+    sf::Text title = label("LEVEL EDITOR - " + _levelName, 30, Accent);
     title.setPosition({30.f, 10.f});
     target.draw(title);
-    sf::Text status = label(_status, 20, sf::Color(180, 200, 230));
+    sf::Text status = label(_status, 20, sf::Color(150, 158, 172));
     status.setPosition({30.f, 52.f});
     target.draw(status);
     for (const auto &button : _buttons)
@@ -127,15 +127,15 @@ void LevelEditor::drawPalette(sf::RenderTarget &target, float time) const
 {
     sf::RectangleShape panel({WorldWidth, WorldHeight - PaletteTop});
     panel.setPosition({0.f, PaletteTop});
-    panel.setFillColor(sf::Color(6, 10, 24, 225));
+    panel.setFillColor(sf::Color(0, 0, 0, 228));
     target.draw(panel);
     for (std::size_t i = _paletteFirst; i < _types.size() && i < _paletteFirst + PaletteSlots; i++) {
         const sf::FloatRect slot = paletteSlot(i - _paletteFirst);
         sf::RectangleShape frame(slot.size);
         frame.setPosition(slot.position);
-        frame.setFillColor(sf::Color(20, 26, 48));
+        frame.setFillColor(sf::Color(0, 0, 0, 235));
         frame.setOutlineThickness(i == _selectedType ? 4.f : 1.f);
-        frame.setOutlineColor(i == _selectedType ? Accent : sf::Color(80, 90, 120));
+        frame.setOutlineColor(i == _selectedType ? Accent : sf::Color(255, 255, 255, 40));
         target.draw(frame);
         drawThumbnail(target, i, slot, time);
     }
@@ -148,7 +148,7 @@ void LevelEditor::drawHint(sf::RenderTarget &target) const
 {
     sf::Text hint =
         label("Left click: place or drag   Right click: delete\nWheel / arrows: move in time   Ctrl+S: save", 18,
-              sf::Color(200, 210, 230));
+              sf::Color(150, 158, 172));
     hint.setPosition({24.f + PaletteSlots * 134.f, PaletteTop + 58.f});
     target.draw(hint);
 }

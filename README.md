@@ -20,7 +20,7 @@ for this recording (not part of the repository) that reads the client's snapshot
   infinite mode with random spawns; three difficulties; weapons and bonuses; a waiting room; lives and respawns.
 - **Content as data**: every entity is a prefab described by its components in
   [`assets/config/entities.json`](assets/config/entities.json), and every level is a JSON file. A level editor is built
-  into the game (CREATE A LEVEL): place enemies on a timeline with the real sprites, save, and test the level at once.
+  into the game (CREATE A LEVEL): place enemies on a timeline as they look in the game, save, and test the level at once.
 - **Network**: binary protocol over UDP ([specification](docs/protocol.md)), reliable messages with acknowledgements,
   split snapshots, 16-bit positions, 30 snapshots per second with client interpolation, rate limits, live statistics
   (F3). The server is authoritative: clients only send their inputs.
@@ -98,14 +98,24 @@ dependency notices and asset provenance.
 
 ## License
 
-No license has been chosen: the source code is all rights reserved by its authors. The sprites were supplied by
-Epitech for this student project and must not be redistributed.
+No license has been chosen: the source code is all rights reserved by its authors. Every picture of the game is drawn
+in code; the Chakra Petch font is under the SIL Open Font License (see [`THIRD_PARTY_NOTICES.txt`](THIRD_PARTY_NOTICES.txt)).
 
 ## After the project
 
-This repository is the final version from the school repository (up to 9 November 2026). Since then, three display
-fixes: the HUD lines no longer overlap, the end screen no longer shows the connection message, and a new level no
-longer announces "wave 0".
+This repository is the final version from the school repository (up to 9 November 2026). Since then:
+
+- **A new look, drawn in code.** The sprites supplied by the school and the image backgrounds are gone: ships,
+  enemies, bosses and the three worlds are drawn from black shapes and lines of light, one colour per world, red only
+  for what hurts. A glow pass (Settings > Visual style: Classic, Neon, Arcade) makes shots, engines and explosions
+  shine; high contrast turns every effect off.
+- **Bosses.** Three new animated bosses, one per world, that wear down below half health. A boss enters quickly,
+  cannot be hurt before it is in place, and its health grows with the number of players; the HUD shows its name and
+  a health bar (protocol version 9 carries the boss health in each snapshot).
+- **Effects and interface.** Explosions with sparks, embers and smoke, engine trails in each player's colour, a hit
+  flash, a chain of explosions when a boss falls; HUD, menus and level editor restyled.
+- **Display fixes.** The HUD lines no longer overlap, the end screen no longer shows the connection message, and a
+  new level no longer announces "wave 0".
 
 ## Team and contributions
 
