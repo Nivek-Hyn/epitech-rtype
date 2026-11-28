@@ -109,7 +109,7 @@ void MainMenu::initJoinScreen()
 void MainMenu::initSettingsScreen()
 {
     const float posX = 680.f;
-    float startY = 295.f;
+    float startY = 250.f;
 
     const std::size_t sfxIdx =
         std::clamp(static_cast<std::size_t>(std::round(_config.sfxVolume / 25.f)), std::size_t{0}, std::size_t{4});
@@ -133,7 +133,13 @@ void MainMenu::initSettingsScreen()
     _contrastSelector =
         std::make_unique<OptionSelector>(_font, "HIGH CONTRAST (F2)", std::vector<std::string>{"OFF", "ON"},
                                          sf::Vector2f(posX, startY), _config.highContrast ? 1 : 0);
-    startY += 85.f;
+    startY += 70.f;
+    const std::vector<std::string> styles{"classic", "neon", "arcade"};
+    const auto style = std::find(styles.begin(), styles.end(), _config.visualStyle);
+    _styleSelector = std::make_unique<OptionSelector>(
+        _font, "VISUAL STYLE", std::vector<std::string>{"CLASSIC", "NEON", "ARCADE"}, sf::Vector2f(posX, startY),
+        style == styles.end() ? 1 : static_cast<std::size_t>(style - styles.begin()));
+    startY += 80.f;
 
     _controlsTitleText.setString("--- CONTROLS RECONFIGURATION ---");
     _controlsTitleText.setCharacterSize(22);
@@ -407,7 +413,7 @@ void MainMenu::handleSettingsEvent(std::optional<sf::Vector2f> mouse, bool click
     if (!mouse)
         return;
     if (!clicked) {
-        for (auto *selector : {&_sfxVolumeSelector, &_musicVolumeSelector, &_autoFireSelector, &_contrastSelector})
+        for (auto *selector : {&_sfxVolumeSelector, &_musicVolumeSelector, &_autoFireSelector, &_contrastSelector, &_styleSelector})
             (*selector)->handleMouseMove(*mouse);
         for (auto *buttons : {&_keyButtons, &_presetButtons, &_settingsButtons}) {
             for (auto &button : *buttons)
@@ -447,6 +453,11 @@ bool MainMenu::clickSettingSelectors(sf::Vector2f mouse)
     }
     if (_contrastSelector->handleMouseClick(mouse)) {
         _config.highContrast = _contrastSelector->getSelectedIndex() == 1;
+        changed = true;
+    }
+    if (_styleSelector->handleMouseClick(mouse)) {
+        static const std::array<const char *, 3> styles{"classic", "neon", "arcade"};
+        _config.visualStyle = styles[std::min<std::size_t>(_styleSelector->getSelectedIndex(), 2)];
         changed = true;
     }
     if (changed) {
@@ -555,8 +566,10 @@ void MainMenu::drawScreenTitle(sf::RenderTarget &window, const std::string &titl
 
 void MainMenu::draw(sf::RenderTarget &window)
 {
-    window.draw(_titleText);
-    window.draw(_subtitleText);
+    if (_currentScreen != MenuScreen::Settings) { // the settings need the whole height
+        window.draw(_titleText);
+        window.draw(_subtitleText);
+    }
     if (_currentScreen == MenuScreen::Root) {
         for (const auto &button : _rootButtons)
             button->draw(window);
@@ -583,8 +596,9 @@ void MainMenu::draw(sf::RenderTarget &window)
 
 void MainMenu::drawSettings(sf::RenderTarget &window)
 {
-    drawScreenTitle(window, "SETTINGS", 215.f);
-    for (const auto *selector : {&_sfxVolumeSelector, &_musicVolumeSelector, &_autoFireSelector, &_contrastSelector})
+    drawScreenTitle(window, "SETTINGS", 178.f);
+    for (const auto *selector :
+         {&_sfxVolumeSelector, &_musicVolumeSelector, &_autoFireSelector, &_contrastSelector, &_styleSelector})
         (*selector)->draw(window);
     window.draw(_controlsTitleText);
     for (const auto *buttons : {&_keyButtons, &_presetButtons, &_settingsButtons}) {

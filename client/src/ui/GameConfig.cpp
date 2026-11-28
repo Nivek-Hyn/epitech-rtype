@@ -187,6 +187,7 @@ GameConfig GameConfig::loadFromFile(const std::string &path)
 
         config.autoFire = j.value("auto_fire", false);
         config.highContrast = j.value("high_contrast", false);
+        config.visualStyle = j.value("visual_style", std::string("neon"));
         config.campaignUnlocked = std::max(0, j.value("campaign_unlocked", 0));
         if (j.contains("join_ip") && j["join_ip"].is_string()) {
             config.joinIp = j["join_ip"].get<std::string>();
@@ -252,6 +253,7 @@ bool GameConfig::saveToFile(const std::string &path) const
         j["music_volume"] = musicVolume;
         j["auto_fire"] = autoFire;
         j["high_contrast"] = highContrast;
+        j["visual_style"] = visualStyle;
         j["campaign_unlocked"] = campaignUnlocked;
         j["host_port"] = hostPort;
         j["join_ip"] = joinIp;

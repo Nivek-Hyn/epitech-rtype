@@ -60,12 +60,12 @@ CampaignMap::CampaignMap(const sf::Font &font) : _font(font)
     const std::vector<std::string> names = campaignNames();
     for (std::size_t i = 0; i < names.size(); i++) {
         const float t = static_cast<float>(i);
-        _levels.push_back({names[i], {230.f + t * 182.f, 430.f + std::sin(t * 1.3f) * 120.f}});
+        _levels.push_back({names[i], {230.f + t * 182.f, 455.f + std::sin(t * 1.3f) * 100.f}});
     }
     _difficulty = std::make_unique<OptionSelector>(
-        font, "DIFFICULTY", std::vector<std::string>{"EASY", "NORMAL", "HARD"}, sf::Vector2f(680.f, 820.f), 1);
-    _playButton = std::make_unique<Button>(font, "PLAY", sf::Vector2f(680.f, 920.f), sf::Vector2f(260.f, 58.f));
-    _backButton = std::make_unique<Button>(font, "BACK", sf::Vector2f(980.f, 920.f), sf::Vector2f(260.f, 58.f));
+        font, "DIFFICULTY", std::vector<std::string>{"EASY", "NORMAL", "HARD"}, sf::Vector2f(680.f, 735.f), 1);
+    _playButton = std::make_unique<Button>(font, "PLAY", sf::Vector2f(680.f, 808.f), sf::Vector2f(260.f, 58.f));
+    _backButton = std::make_unique<Button>(font, "BACK", sf::Vector2f(980.f, 808.f), sf::Vector2f(260.f, 58.f));
 }
 
 void CampaignMap::open(std::size_t unlocked)
@@ -148,7 +148,7 @@ sf::Text CampaignMap::text(const std::string &string, unsigned int size, sf::Col
 
 void CampaignMap::draw(sf::RenderTarget &window) const
 {
-    window.draw(text("CAMPAIGN", 56, sf::Color(255, 204, 0), {960.f, 110.f}));
+    window.draw(text("CAMPAIGN", 56, sf::Color(255, 204, 0), {960.f, 205.f}));
     drawWorldLabels(window);
     drawPath(window);
     for (std::size_t i = 0; i < _levels.size(); i++)
@@ -163,7 +163,7 @@ void CampaignMap::drawWorldLabels(sf::RenderTarget &window) const
             _levels[world * LevelsPerWorld + 1 < _levels.size() ? world * LevelsPerWorld + 1 : world * LevelsPerWorld]
                 .position.x;
         window.draw(
-            text(WorldNames[world % WorldNames.size()], 24, WorldColors[world % WorldColors.size()], {x, 210.f}));
+            text(WorldNames[world % WorldNames.size()], 24, WorldColors[world % WorldColors.size()], {x, 272.f}));
     }
 }
 
@@ -230,14 +230,14 @@ void CampaignMap::drawLock(sf::RenderTarget &window, sf::Vector2f center) const
 // The selected level, the difficulty and the buttons.
 void CampaignMap::drawPanel(sf::RenderTarget &window) const
 {
-    sf::RectangleShape panel({1000.f, 300.f});
-    panel.setPosition({460.f, 700.f});
+    sf::RectangleShape panel({1000.f, 285.f});
+    panel.setPosition({460.f, 608.f}); // between the map and the ground of the world
     panel.setFillColor(sf::Color(8, 12, 28, 210));
     panel.setOutlineThickness(2.f);
     panel.setOutlineColor(WorldColors[world() % WorldColors.size()]);
     window.draw(panel);
     if (!_levels.empty())
-        window.draw(text(_levels[_selected].name, 32, sf::Color::White, {960.f, 750.f}));
+        window.draw(text(_levels[_selected].name, 32, sf::Color::White, {960.f, 660.f}));
     _difficulty->draw(window);
     _playButton->draw(window);
     _backButton->draw(window);

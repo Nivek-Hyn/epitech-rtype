@@ -104,22 +104,27 @@ void WorldBackground::drawWorld(sf::RenderTarget &target, std::size_t world, std
     }
 }
 
-// Scaled to cover the screen; the texture repeats, so scrolling only moves the part shown.
+// Scaled to cover the screen; the texture repeats, so scrolling only moves the part shown. The whole texels go in
+// the texture rectangle and the rest of the offset in the position, so that slow layers glide instead of stepping.
 void WorldBackground::drawFill(sf::RenderTarget &target, const Layer &layer, std::uint8_t alpha) const
 {
     const sf::Vector2f size(layer.texture->getSize());
     const float scale = std::max(WorldWidth / size.x, WorldHeight / size.y);
     const float rawOffset = std::fmod(_time * layer.speed / scale, size.x);
-    const int offset = static_cast<int>(rawOffset < 0.f ? rawOffset + size.x : rawOffset);
+    const float offset = rawOffset < 0.f ? rawOffset + size.x : rawOffset;
+    const float whole = std::floor(offset);
     sf::Sprite sprite(*layer.texture);
-    sprite.setTextureRect(
-        sf::IntRect({offset, 0}, {static_cast<int>(std::ceil(WorldWidth / scale)), static_cast<int>(size.y)}));
+    sprite.setTextureRect(sf::IntRect({static_cast<int>(whole), 0},
+                                      {static_cast<int>(std::ceil(WorldWidth / scale)) + 2, static_cast<int>(size.y)}));
     sprite.setScale({scale, scale});
+    sprite.setPosition({-(offset - whole) * scale, 0.f});
     sprite.setColor(sf::Color(255, 255, 255, alpha));
     target.draw(sprite);
 }
 
-// Repeats horizontally across the screen at layer.position.y (ground, ceiling, mountain ranges).
+// Repeats horizontally across the screen at layer.position.y (ground, ceiling, mountain ranges). The texture also
+// repeats vertically for the GPU, so the first and last rows are left out: smoothing would otherwise blend the top
+// edge with the bottom one and draw a thin line across the screen.
 void WorldBackground::drawRepeatX(sf::RenderTarget &target, const Layer &layer, std::uint8_t alpha) const
 {
     const sf::Vector2f size(layer.texture->getSize());
@@ -127,13 +132,14 @@ void WorldBackground::drawRepeatX(sf::RenderTarget &target, const Layer &layer, 
     const float scaledWidth = size.x * scale;
     const float scaledOffset = std::fmod(_time * layer.speed - layer.position.x, scaledWidth);
     const float effectiveOffset = scaledOffset < 0.f ? scaledOffset + scaledWidth : scaledOffset;
-    const int textureOffset = static_cast<int>(effectiveOffset / scale);
+    const float texels = effectiveOffset / scale;
+    const float whole = std::floor(texels);
 
     sf::Sprite sprite(*layer.texture);
-    sprite.setTextureRect(
-        sf::IntRect({textureOffset, 0}, {static_cast<int>(std::ceil(WorldWidth / scale)) + 2, static_cast<int>(size.y)}));
+    sprite.setTextureRect(sf::IntRect({static_cast<int>(whole), 1}, {static_cast<int>(std::ceil(WorldWidth / scale)) + 2,
+                                                                     static_cast<int>(size.y) - 2}));
     sprite.setScale({scale, scale});
-    sprite.setPosition({0.f, layer.position.y});
+    sprite.setPosition({-(texels - whole) * scale, layer.position.y + scale});
     sprite.setColor(sf::Color(255, 255, 255, alpha));
     target.draw(sprite);
 }

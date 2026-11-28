@@ -16,6 +16,7 @@ struct GameConfig {
     float musicVolume{100.f};
     bool autoFire{false};     // shoot without holding the fire key (the server keeps its fire rate)
     bool highContrast{false}; // plain background, outlined shots and HUD, softer flashes
+    std::string visualStyle{"neon"}; // classic, neon or arcade: see render/PostEffects.hpp
     int campaignUnlocked{0};  // last level playable on the campaign map, from 0
 
     sf::Keyboard::Key keyUp{sf::Keyboard::Key::Z};

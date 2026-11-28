@@ -5,6 +5,7 @@
 #include "game/LocalServer.hpp"
 #include "game/Session.hpp"
 #include "net/AsioNetworkClient.hpp"
+#include "render/PostEffects.hpp"
 #include "render/WorldBackground.hpp"
 #include "ui/CampaignMap.hpp"
 #include "ui/MainMenu.hpp"
@@ -39,13 +40,14 @@ private:
     void recordCampaignProgress();
     void checkConnection();
     void leaveGame(const std::string &message = "");
-    void drawStats();
+    void drawStats(sf::RenderTarget &target);
     void draw(float dt);
 
     sf::RenderWindow _window;
     ResourceManager &_resources;
     bool _hasAssets;
     WorldBackground _background;
+    PostEffects _post;
     ui::MainMenu _menu;
     ui::CampaignMap _campaign;
     LevelEditor _editor;

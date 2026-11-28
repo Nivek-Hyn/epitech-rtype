@@ -6,6 +6,7 @@
 #include "common/SnapshotAssembler.hpp"
 #include "common/SnapshotInterpolator.hpp"
 #include "net/INetworkClient.hpp"
+#include "render/Effects.hpp"
 #include "render/EntityRenderer.hpp"
 #include "ui/GameConfig.hpp"
 
@@ -39,6 +40,8 @@ public:
     void sendInput(INetworkClient &network, const ui::GameConfig &config, float dt, bool focused);
     // High contrast: outlined enemy shots and HUD, softer flash, no screen shake.
     void setHighContrast(bool enabled) { _highContrast = enabled; }
+    // Where shots, engines and explosions are drawn a second time to glow (nullptr: no glow).
+    void setGlowTarget(sf::RenderTarget *glow) { _glow = glow; }
     // Reads every message the network received, then handles the snapshots whose time has come.
     void receive(INetworkClient &network);
     // Why the server refused us, after a ConnectRejected.
@@ -51,7 +54,7 @@ public:
 
     // The world view, shaken for a moment when the local ship is hit.
     sf::View view() const;
-    void draw(sf::RenderWindow &window, float time, float dt, bool hasAssets);
+    void draw(sf::RenderTarget &window, float time, float dt, bool hasAssets);
 
 private:
     void handle(const protocol::Message &message, bool &gotSnapshot);
@@ -60,27 +63,29 @@ private:
     std::optional<protocol::EntityState> lastSeen(std::uint32_t netId) const;
     void onDestroyed(const protocol::EntityDestroyed &event);
     void onPlayerLeft(const protocol::PlayerLeft &event);
+    void drawGlowOf(const protocol::EntityState &entity, float time, float tilt, float dt);
+    void flashEnemyNear(sf::Vector2f point);
     void addExplosion(const protocol::EntityState &entity, float duration);
     float tiltOf(const protocol::EntityState &entity, float dt);
 
     // SessionHud.cpp
-    void drawConnecting(sf::RenderWindow &window) const;
-    void drawHud(sf::RenderWindow &window) const;
-    void drawScore(sf::RenderWindow &window) const;
-    void drawBossAlert(sf::RenderWindow &window) const;
-    void drawPlayers(sf::RenderWindow &window) const;
-    void drawPlayerLine(sf::RenderWindow &window, std::uint8_t player, bool active, float y) const;
-    void drawPanel(sf::RenderWindow &window, sf::Vector2f position, sf::Vector2f size) const;
-    void drawHeart(sf::RenderWindow &window, sf::Vector2f center, sf::Color color) const;
-    void drawDamageFlash(sf::RenderWindow &window) const;
-    void drawWaveBanner(sf::RenderWindow &window) const;
-    void drawWeaponBanner(sf::RenderWindow &window) const;
-    void drawWaitingRoom(sf::RenderWindow &window) const;
-    void drawPlayerLeft(sf::RenderWindow &window) const;
-    void drawAutoFire(sf::RenderWindow &window) const;
-    void drawShotMarkers(sf::RenderWindow &window) const;
+    void drawConnecting(sf::RenderTarget &window) const;
+    void drawHud(sf::RenderTarget &window) const;
+    void drawScore(sf::RenderTarget &window) const;
+    void drawBossAlert(sf::RenderTarget &window) const;
+    void drawPlayers(sf::RenderTarget &window) const;
+    void drawPlayerLine(sf::RenderTarget &window, std::uint8_t player, bool active, float y) const;
+    void drawPanel(sf::RenderTarget &window, sf::Vector2f position, sf::Vector2f size) const;
+    void drawHeart(sf::RenderTarget &window, sf::Vector2f center, sf::Color color) const;
+    void drawDamageFlash(sf::RenderTarget &window) const;
+    void drawWaveBanner(sf::RenderTarget &window) const;
+    void drawWeaponBanner(sf::RenderTarget &window) const;
+    void drawWaitingRoom(sf::RenderTarget &window) const;
+    void drawPlayerLeft(sf::RenderTarget &window) const;
+    void drawAutoFire(sf::RenderTarget &window) const;
+    void drawShotMarkers(sf::RenderTarget &window) const;
     void outline(sf::Text &text) const;
-    void drawEndScreen(sf::RenderWindow &window) const;
+    void drawEndScreen(sf::RenderTarget &window) const;
     sf::Text centeredText(const std::string &string, unsigned int size, sf::Color color, sf::Vector2f center) const;
 
     ResourceManager &_resources;
@@ -92,6 +97,12 @@ private:
     std::vector<protocol::EntityState> _shown;    // interpolated entities drawn this frame
     std::string _rejectionReason = "the server refused the connection";
     std::vector<Explosion> _explosions;
+    Effects _effects;
+    // A boss that was just destroyed stays on screen, shaking and flashing, while its chain of blasts goes off.
+    std::optional<protocol::EntityState> _dyingBoss;
+    float _dyingTimer = 0.f;
+    sf::RenderTarget *_glow = nullptr;
+    std::unordered_map<std::uint32_t, float> _hitFlash; // enemies just hit, by net id: they glow for a moment
     std::optional<std::uint8_t> _localPlayer;
     std::array<std::uint8_t, 4> _lives{};
     std::uint32_t _score = 0;

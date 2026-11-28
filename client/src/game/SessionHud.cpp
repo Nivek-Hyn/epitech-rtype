@@ -65,7 +65,7 @@ void Session::outline(sf::Text &text) const
 }
 
 // In high contrast, a red ring around each enemy shot: enemy and player shots differ by shape, not only color.
-void Session::drawShotMarkers(sf::RenderWindow &window) const
+void Session::drawShotMarkers(sf::RenderTarget &window) const
 {
     for (const auto &entity : _shown) {
         if (entity.type != protocol::EntityType::EnemyMissile)
@@ -80,7 +80,7 @@ void Session::drawShotMarkers(sf::RenderWindow &window) const
     }
 }
 
-void Session::drawAutoFire(sf::RenderWindow &window) const
+void Session::drawAutoFire(sf::RenderTarget &window) const
 {
     if (!_autoFire)
         return;
@@ -91,7 +91,7 @@ void Session::drawAutoFire(sf::RenderWindow &window) const
     window.draw(text);
 }
 
-void Session::drawWeaponBanner(sf::RenderWindow &window) const
+void Session::drawWeaponBanner(sf::RenderTarget &window) const
 {
     if (_weaponBannerTimer <= 0.f || _weaponBannerText.empty())
         return;
@@ -107,7 +107,7 @@ void Session::drawWeaponBanner(sf::RenderWindow &window) const
                              {WorldWidth / 2.f, 110.f}));
 }
 
-void Session::drawConnecting(sf::RenderWindow &window) const
+void Session::drawConnecting(sf::RenderTarget &window) const
 {
     sf::Text text(_resources.getFont("default"),
                   "CONNECTING TO SERVER...\nEnsure ./r-type_server is running\n\n[ESC] Return to Menu", 30);
@@ -116,7 +116,7 @@ void Session::drawConnecting(sf::RenderWindow &window) const
     window.draw(text);
 }
 
-void Session::drawHud(sf::RenderWindow &window) const
+void Session::drawHud(sf::RenderTarget &window) const
 {
     drawScore(window);
     drawAutoFire(window);
@@ -131,7 +131,7 @@ void Session::drawHud(sf::RenderWindow &window) const
 }
 
 // Score, world, level and wave in a panel, top left.
-void Session::drawScore(sf::RenderWindow &window) const
+void Session::drawScore(sf::RenderTarget &window) const
 {
     drawPanel(window, {24.f, 18.f}, {420.f, 130.f});
     sf::Text title(_resources.getFont("default"), WorldNames[static_cast<std::size_t>(_level / 3) % WorldNames.size()],
@@ -161,7 +161,7 @@ void Session::drawScore(sf::RenderWindow &window) const
     window.draw(weapon);
 }
 
-void Session::drawPanel(sf::RenderWindow &window, sf::Vector2f position, sf::Vector2f size) const
+void Session::drawPanel(sf::RenderTarget &window, sf::Vector2f position, sf::Vector2f size) const
 {
     sf::RectangleShape panel(size);
     panel.setPosition(position);
@@ -176,7 +176,7 @@ void Session::drawPanel(sf::RenderWindow &window, sf::Vector2f position, sf::Vec
 }
 
 // A small heart: two circles and a triangle.
-void Session::drawHeart(sf::RenderWindow &window, sf::Vector2f center, sf::Color color) const
+void Session::drawHeart(sf::RenderTarget &window, sf::Vector2f center, sf::Color color) const
 {
     for (const float side : {-1.f, 1.f}) {
         sf::CircleShape lobe(6.f);
@@ -194,7 +194,7 @@ void Session::drawHeart(sf::RenderWindow &window, sf::Vector2f center, sf::Color
 }
 
 // A banner while a boss (enemy variants 5 and 6, see entities.json) is on screen.
-void Session::drawBossAlert(sf::RenderWindow &window) const
+void Session::drawBossAlert(sf::RenderTarget &window) const
 {
     const bool boss = std::any_of(_shown.begin(), _shown.end(), [](const protocol::EntityState &entity) {
         return entity.type == protocol::EntityType::Enemy && entity.variant >= 5 && entity.variant <= 6;
@@ -212,7 +212,7 @@ void Session::drawBossAlert(sf::RenderWindow &window) const
 }
 
 // One line per player, top right: lives, respawning or dead. Players who never joined are hidden.
-void Session::drawPlayers(sf::RenderWindow &window) const
+void Session::drawPlayers(sf::RenderTarget &window) const
 {
     std::array<bool, 4> active{};
     for (const auto &entity : _shown) {
@@ -236,7 +236,7 @@ void Session::drawPlayers(sf::RenderWindow &window) const
 }
 
 // "P2 (YOU)" in the player's color, then one heart per life, or the status when there is none.
-void Session::drawPlayerLine(sf::RenderWindow &window, std::uint8_t player, bool active, float y) const
+void Session::drawPlayerLine(sf::RenderTarget &window, std::uint8_t player, bool active, float y) const
 {
     const float left = WorldWidth - 380.f;
     const int lives = _lives[player];
@@ -258,7 +258,7 @@ void Session::drawPlayerLine(sf::RenderWindow &window, std::uint8_t player, bool
 }
 
 // The screen turns red for a moment when a ship is hit.
-void Session::drawDamageFlash(sf::RenderWindow &window) const
+void Session::drawDamageFlash(sf::RenderTarget &window) const
 {
     if (_damageFlash <= 0.f)
         return;
@@ -268,7 +268,7 @@ void Session::drawDamageFlash(sf::RenderWindow &window) const
     window.draw(flash);
 }
 
-void Session::drawWaveBanner(sf::RenderWindow &window) const
+void Session::drawWaveBanner(sf::RenderTarget &window) const
 {
     if (_waveBanner <= 0.f)
         return;
@@ -287,7 +287,7 @@ void Session::drawWaveBanner(sf::RenderWindow &window) const
 }
 
 // While the server waits for players: how many are here, ready button and controls to try.
-void Session::drawWaitingRoom(sf::RenderWindow &window) const
+void Session::drawWaitingRoom(sf::RenderTarget &window) const
 {
     if (!_waiting)
         return;
@@ -329,7 +329,7 @@ void Session::drawWaitingRoom(sf::RenderWindow &window) const
                              sf::Color(200, 210, 230), {WorldWidth / 2.f, 475.f}));
 }
 
-void Session::drawPlayerLeft(sf::RenderWindow &window) const
+void Session::drawPlayerLeft(sf::RenderTarget &window) const
 {
     if (_leftTimer <= 0.f)
         return;
@@ -337,7 +337,7 @@ void Session::drawPlayerLeft(sf::RenderWindow &window) const
 }
 
 // Victory or defeat, decided by the server, with the final score.
-void Session::drawEndScreen(sf::RenderWindow &window) const
+void Session::drawEndScreen(sf::RenderTarget &window) const
 {
     if (!_gameOver)
         return;

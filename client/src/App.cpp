@@ -283,42 +283,48 @@ void App::leaveGame(const std::string &message)
 }
 
 // Bottom left, away from the HUD.
-void App::drawStats()
+void App::drawStats(sf::RenderTarget &target)
 {
     sf::Text text(_resources.getFont("default"), statsLine(_network.stats()), 22);
     text.setFillColor(sf::Color::White);
     text.setOutlineColor(sf::Color::Black);
     text.setOutlineThickness(2.f);
     text.setPosition({20.f, WorldHeight - 45.f});
-    _window.draw(text);
+    target.draw(text);
 }
 
 // Everything is drawn in world coordinates (1920x1080); the view scales them to the window.
 void App::draw(float dt)
 {
-    _window.clear(sf::Color(10, 10, 25));
+    _post.setStyle(visualStyleFromName(_menu.getConfig().visualStyle));
+    const sf::View view = _screen == Screen::Playing ? _session.view()
+                                                     : sf::View(sf::FloatRect({0.f, 0.f}, {WorldWidth, WorldHeight}));
+    _window.setView(view); // also used to turn mouse positions into world coordinates
+    sf::RenderTarget &target = _post.begin(_window);
+    target.setView(view);
+    target.clear(sf::Color(10, 10, 25));
     if (_screen == Screen::Playing) {
-        _window.setView(_session.view());
         if (!_menu.getConfig().highContrast) // plain dark background in high contrast
-            _background.draw(_window);
-        _session.draw(_window, _time, dt, _hasAssets);
+            _background.draw(target);
+        _session.setGlowTarget(_post.glow());
+        _session.draw(target, _time, dt, _hasAssets);
         if (_showStats)
-            drawStats();
+            drawStats(target);
     } else {
-        _window.setView(sf::View(sf::FloatRect({0.f, 0.f}, {WorldWidth, WorldHeight})));
         // The map shows the world of the selected level; the menu shows each world in turn.
         if (_screen == Screen::Editor) {
-            _editor.draw(_window, _time); // with the background of the world chosen in the editor
+            _editor.draw(target, _time); // with the background of the world chosen in the editor
         } else {
             _background.setWorld(_screen == Screen::Campaign ? _campaign.world()
                                                              : static_cast<std::size_t>(_time / 12.f));
-            _background.draw(_window);
+            _background.draw(target);
             if (_screen == Screen::Campaign)
-                _campaign.draw(_window);
+                _campaign.draw(target);
             else
-                _menu.draw(_window);
+                _menu.draw(target);
         }
     }
+    _post.end(_window, _time);
     _window.display();
 }
 

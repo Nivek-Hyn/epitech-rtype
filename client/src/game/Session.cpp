@@ -5,6 +5,7 @@
 #include <SFML/Window/Keyboard.hpp>
 
 #include <algorithm>
+#include <cmath>
 #include <cstdlib>
 #include <iostream>
 #include <unordered_set>
@@ -50,6 +51,9 @@ void Session::reset()
     _shown.clear();
     _rejectionReason = "the server refused the connection";
     _explosions.clear();
+    _effects.clear();
+    _dyingBoss.reset();
+    _hitFlash.clear();
     _localPlayer.reset();
     _lives.fill(0);
     _score = 0;
@@ -72,6 +76,12 @@ void Session::update(float dt, bool connected)
     countDown(_waveBanner, dt);
     countDown(_weaponBannerTimer, dt);
     countDown(_leftTimer, dt);
+    _effects.update(dt);
+    if (_dyingBoss && (_dyingTimer -= dt) <= 0.f)
+        _dyingBoss.reset();
+    for (auto &[netId, timer] : _hitFlash)
+        timer -= dt;
+    std::erase_if(_hitFlash, [](const auto &entry) { return entry.second <= 0.f; });
     for (auto &explosion : _explosions)
         explosion.timer += dt;
     std::erase_if(_explosions, [](const Explosion &explosion) { return explosion.timer >= explosion.maxDuration; });
@@ -225,13 +235,23 @@ void Session::onDestroyed(const protocol::EntityDestroyed &event)
     case EntityType::Enemy:
     case EntityType::Obstacle:
         _resources.playSound("explosion", 90.f);
-        addExplosion(*entity, 0.35f);
+        if (entity->type == EntityType::Enemy && entity->variant >= 5) { // bosses: a chain of blasts
+            _effects.bossExplosion({entity->x + 140.f, entity->y + 60.f});
+            _dyingBoss = *entity;
+            _dyingTimer = 1.5f;
+            _shakeTimer = ShakeDuration * 5.f;
+            _shakeIntensity = 14.f;
+        } else {
+            addExplosion(*entity, 0.35f);
+            _effects.explosion({entity->x + 32.f, entity->y + 30.f}, sf::Color(255, 160, 50), 1.f);
+        }
         break;
     case EntityType::Player:
         _currentWeapon = "BLASTER";
         _resources.playSound("hit", 100.f);
         _resources.playSound("explosion", 100.f);
         addExplosion(*entity, 0.45f);
+        _effects.explosion({entity->x + 33.f, entity->y + 17.f}, sf::Color(0, 220, 255), 1.4f);
         _damageFlash = DamageFlashDuration;
         _shakeTimer = ShakeDuration;
         _shakeIntensity = 15.f;
@@ -240,10 +260,20 @@ void Session::onDestroyed(const protocol::EntityDestroyed &event)
     case EntityType::EnemyMissile: // a shot that hit something
         _resources.playSound("hit", 95.f);
         addExplosion(*entity, 0.2f);
+        if (entity->type == EntityType::PlayerMissile) {
+            const sf::Vector2f tip(entity->x + 40.f, entity->y + 10.f);
+            _effects.hit(tip, sf::Color(90, 220, 255));
+            flashEnemyNear(tip);
+        } else {
+            _effects.hit({entity->x + 16.f, entity->y + 12.f}, sf::Color(255, 90, 70));
+        }
         break;
     case EntityType::Bonus:
         if (event.reason == protocol::DestroyReason::Collected || event.reason == protocol::DestroyReason::Killed) {
             _resources.playSound("hit", 90.f, 1.5f);
+            static const std::array<sf::Color, 3> bonusColors{sf::Color(80, 200, 255), sf::Color(255, 90, 220),
+                                                              sf::Color(120, 255, 140)};
+            _effects.pickup({entity->x + 16.f, entity->y + 16.f}, bonusColors[std::min<std::size_t>(entity->variant, 2)]);
             if (entity->variant == 0) {
                 _currentWeapon = "SPREAD";
                 _weaponBannerText = "+ SPREAD SHOT (3-WAY) !";
@@ -267,6 +297,46 @@ void Session::onPlayerLeft(const protocol::PlayerLeft &event)
     _leftMessage = "P" + std::to_string(event.playerId + 1) +
                    (event.reason == protocol::LeaveReason::TimedOut ? " LOST THE CONNECTION" : " LEFT THE GAME");
     _leftTimer = 3.f;
+}
+
+// Shots, bonuses and enemies just hit are drawn again on the glow layer; ships leave an exhaust trail.
+void Session::drawGlowOf(const EntityState &entity, float time, float tilt, float dt)
+{
+    if (_highContrast)
+        return;
+    if (entity.type == EntityType::Player) {
+        static const std::array<sf::Color, 4> exhaust{sf::Color(60, 200, 255), sf::Color(255, 170, 60),
+                                                      sf::Color(90, 255, 130), sf::Color(240, 120, 255)};
+        _effects.engine({entity.x - 2.f, entity.y + 17.f}, exhaust[entity.variant % 4], dt);
+        return;
+    }
+    if (!_glow)
+        return;
+    const bool shot = entity.type == EntityType::PlayerMissile || entity.type == EntityType::EnemyMissile;
+    const bool hitEnemy = entity.type == EntityType::Enemy && _hitFlash.contains(entity.netId);
+    if (shot || entity.type == EntityType::Bonus || hitEnemy)
+        _renderer.draw(*_glow, entity, time, tilt, _localPlayer);
+}
+
+// The enemy nearest to where a shot ended, if close enough, glows for a moment.
+void Session::flashEnemyNear(sf::Vector2f point)
+{
+    float best = 160.f * 160.f;
+    std::optional<std::uint32_t> found;
+    for (const auto &entity : _shown) {
+        if (entity.type != EntityType::Enemy)
+            continue;
+        const float size = entity.variant >= 5 ? 140.f : 34.f;
+        const sf::Vector2f center(entity.x + size, entity.y + size * 0.8f);
+        const sf::Vector2f d = center - point;
+        const float distance = d.x * d.x + d.y * d.y;
+        if (distance < best) {
+            best = distance;
+            found = entity.netId;
+        }
+    }
+    if (found)
+        _hitFlash[*found] = 0.07f;
 }
 
 void Session::addExplosion(const EntityState &entity, float duration)
@@ -305,7 +375,7 @@ float Session::tiltOf(const EntityState &entity, float dt)
     return tilt;
 }
 
-void Session::draw(sf::RenderWindow &window, float time, float dt, bool hasAssets)
+void Session::draw(sf::RenderTarget &window, float time, float dt, bool hasAssets)
 {
     _shown = _interpolator.sample(protocol::SnapshotInterpolator::Clock::now());
     if (!_gameOver && (!_connected || _shown.empty()))
@@ -316,12 +386,30 @@ void Session::draw(sf::RenderWindow &window, float time, float dt, bool hasAsset
                 continue;
             const float tilt = entity.type == EntityType::Player ? tiltOf(entity, dt) : 0.f;
             _renderer.draw(window, entity, time, tilt, _localPlayer);
+            drawGlowOf(entity, time, tilt, dt);
         }
+    }
+    if (_dyingBoss && hasAssets) {
+        protocol::EntityState shaking = *_dyingBoss;
+        const float strength = 4.f + (1.5f - _dyingTimer) * 6.f;
+        shaking.x += std::sin(time * 83.f) * strength;
+        shaking.y += std::cos(time * 67.f) * strength;
+        _renderer.draw(window, shaking, time, 0.f, _localPlayer);
+        if (_glow && static_cast<int>(time * 20.f) % 2 == 0)
+            _renderer.draw(*_glow, shaking, time, 0.f, _localPlayer);
     }
     if (_highContrast)
         drawShotMarkers(window);
     for (const auto &explosion : _explosions)
         _renderer.drawExplosion(window, explosion);
+    if (!_highContrast)
+        _effects.draw(window, _glow);
+    if (const float flash = _effects.flash(); flash > 0.f && !_highContrast) {
+        sf::RectangleShape white({WorldWidth + 100.f, WorldHeight + 100.f});
+        white.setPosition({-50.f, -50.f});
+        white.setFillColor(sf::Color(255, 245, 230, static_cast<std::uint8_t>(flash * 170.f)));
+        window.draw(white);
+    }
     drawHud(window);
 }
 

@@ -98,6 +98,7 @@ private:
     std::unique_ptr<OptionSelector> _musicVolumeSelector;
     std::unique_ptr<OptionSelector> _autoFireSelector;
     std::unique_ptr<OptionSelector> _contrastSelector;
+    std::unique_ptr<OptionSelector> _styleSelector;
     sf::Text _controlsTitleText;
     std::vector<std::unique_ptr<Button>> _keyButtons;
     std::vector<std::unique_ptr<Button>> _presetButtons;
